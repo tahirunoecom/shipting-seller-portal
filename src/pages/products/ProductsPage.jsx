@@ -32,6 +32,12 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
+// Helper to normalize category data from different API response formats
+const normalizeCategory = (cat) => ({
+  category_id: cat.category_id || cat.id || cat.categoryId || '',
+  name: cat.name || cat.category_name || cat.categoryName || cat.title || '',
+})
+
 function ProductsPage() {
   const { user } = useAuthStore()
   const [loading, setLoading] = useState(true)
@@ -77,11 +83,51 @@ function ProductsPage() {
   const loadCategories = async () => {
     try {
       const response = await productService.getCategories()
+      console.log('Categories API response:', response)
+
       if (response.status === 1) {
-        setCategories(response.data?.categories || [])
+        // Handle different response structures
+        let rawCategories = []
+        if (Array.isArray(response.data?.categories)) {
+          rawCategories = response.data.categories
+        } else if (Array.isArray(response.data)) {
+          rawCategories = response.data
+        } else if (Array.isArray(response.categories)) {
+          rawCategories = response.categories
+        }
+
+        // Normalize categories to consistent format
+        const normalizedCategories = rawCategories.map(normalizeCategory)
+        console.log('Normalized categories:', normalizedCategories)
+        setCategories(normalizedCategories)
+
+        if (normalizedCategories.length === 0) {
+          console.warn('No categories found in response')
+        }
+      } else {
+        console.error('Categories API returned error status:', response.message)
       }
     } catch (error) {
       console.error('Failed to load categories:', error)
+      // Try alternative endpoint
+      try {
+        const altResponse = await productService.getCategoryList()
+        console.log('CategoryList API response:', altResponse)
+        if (altResponse.status === 1) {
+          let rawCategories = []
+          if (Array.isArray(altResponse.data?.categories)) {
+            rawCategories = altResponse.data.categories
+          } else if (Array.isArray(altResponse.data)) {
+            rawCategories = altResponse.data
+          } else if (Array.isArray(altResponse.categories)) {
+            rawCategories = altResponse.categories
+          }
+          const normalizedCategories = rawCategories.map(normalizeCategory)
+          setCategories(normalizedCategories)
+        }
+      } catch (altError) {
+        console.error('Both category endpoints failed')
+      }
     }
   }
 
