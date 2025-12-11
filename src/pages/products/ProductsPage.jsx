@@ -273,10 +273,10 @@ function ProductsPage() {
       // Always set is_manual to Y
       data.append('is_manual', 'Y')
 
-      // Optional fields
-      if (formData.subcategory_id) {
-        data.append('subcategory_id', formData.subcategory_id)
-      }
+      // Subcategory - always send (even empty to allow removal)
+      data.append('subcategory_id', formData.subcategory_id || '')
+
+      console.log('Submitting product with subcategory_id:', formData.subcategory_id)
 
       // Image file - send as regular file upload (not environment='web')
       // API will process it: move to ProductImagesUpload folder and return URL
@@ -923,9 +923,6 @@ function ProductsPage() {
             placeholder="e.g., KIDS, COMBO, SPECIAL"
             autoFocus
           />
-          <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
-            Note: Subcategories are stored locally. For production, consider creating a backend API.
-          </p>
           <ModalFooter>
             <Button
               type="button"
