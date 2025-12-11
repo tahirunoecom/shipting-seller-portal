@@ -33,24 +33,6 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
-// Local storage key for subcategories
-const SUBCATEGORIES_STORAGE_KEY = 'shipting_subcategories'
-
-// Get subcategories from localStorage
-const getStoredSubcategories = () => {
-  try {
-    const stored = localStorage.getItem(SUBCATEGORIES_STORAGE_KEY)
-    return stored ? JSON.parse(stored) : {}
-  } catch {
-    return {}
-  }
-}
-
-// Save subcategories to localStorage
-const saveSubcategories = (subcategories) => {
-  localStorage.setItem(SUBCATEGORIES_STORAGE_KEY, JSON.stringify(subcategories))
-}
-
 // Generate a 13-digit UPC code for restaurant products
 const generateUPC = () => {
   // Generate 13 numeric digits
@@ -68,7 +50,8 @@ function ProductsPage() {
   const [products, setProducts] = useState([])
   const [categories, setCategories] = useState([])
   const [defaultCategoryId, setDefaultCategoryId] = useState('') // Restaurant category ID
-  const [subcategories, setSubcategories] = useState({}) // { category_id: [{id, name}] }
+  const [subcategories, setSubcategories] = useState([]) // Array of subcategories for current category
+  const [loadingSubcategories, setLoadingSubcategories] = useState(false)
   const [viewMode, setViewMode] = useState('grid') // 'grid' or 'list'
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('')
@@ -109,9 +92,31 @@ function ProductsPage() {
   useEffect(() => {
     loadProducts()
     loadCategories()
-    // Load stored subcategories
-    setSubcategories(getStoredSubcategories())
   }, [])
+
+  // Load subcategories when category changes
+  const loadSubcategories = async (categoryId) => {
+    if (!categoryId) {
+      setSubcategories([])
+      return
+    }
+    try {
+      setLoadingSubcategories(true)
+      const response = await productService.getSubcategories(categoryId, user.wh_account_id)
+      console.log('Subcategories API response:', response)
+      if (response.status === 1) {
+        const subs = response.data?.subcategories || []
+        setSubcategories(subs)
+      } else {
+        setSubcategories([])
+      }
+    } catch (error) {
+      console.error('Failed to load subcategories:', error)
+      setSubcategories([])
+    } finally {
+      setLoadingSubcategories(false)
+    }
+  }
 
   const loadProducts = async () => {
     try {
@@ -183,8 +188,8 @@ function ProductsPage() {
     }
   }
 
-  // Add a new subcategory for a category (stored locally)
-  const handleAddSubcategory = () => {
+  // Add a new subcategory via API
+  const handleAddSubcategory = async () => {
     if (!formData.category_id) {
       toast.error('Please select a category first')
       return
@@ -194,27 +199,32 @@ function ProductsPage() {
       return
     }
 
-    const categoryId = formData.category_id
-    const newSubcategory = {
-      id: `sub_${Date.now()}`,
-      name: newSubcategoryName.trim(),
-    }
+    try {
+      const response = await productService.addSubcategory({
+        wh_account_id: user.wh_account_id,
+        category_id: formData.category_id,
+        name: newSubcategoryName.trim(),
+      })
 
-    const updatedSubcategories = {
-      ...subcategories,
-      [categoryId]: [...(subcategories[categoryId] || []), newSubcategory],
+      if (response.status === 1) {
+        const newSubcategory = response.data?.subcategory
+        // Reload subcategories to get updated list
+        await loadSubcategories(formData.category_id)
+        // Select the newly created subcategory
+        if (newSubcategory?.id) {
+          setFormData(prev => ({ ...prev, subcategory_id: String(newSubcategory.id) }))
+        }
+        setNewSubcategoryName('')
+        setShowSubcategoryModal(false)
+        toast.success('Subcategory added!')
+      } else {
+        toast.error(response.message || 'Failed to add subcategory')
+      }
+    } catch (error) {
+      console.error('Failed to add subcategory:', error)
+      toast.error('Failed to add subcategory')
     }
-
-    setSubcategories(updatedSubcategories)
-    saveSubcategories(updatedSubcategories)
-    setFormData(prev => ({ ...prev, subcategory_id: newSubcategory.id }))
-    setNewSubcategoryName('')
-    setShowSubcategoryModal(false)
-    toast.success('Subcategory added!')
   }
-
-  // Get subcategories for selected category
-  const currentSubcategories = formData.category_id ? (subcategories[formData.category_id] || []) : []
 
   const handleInputChange = (e) => {
     const { name, value } = e.target
@@ -313,11 +323,17 @@ function ProductsPage() {
     }
   }
 
-  const handleEdit = (product) => {
+  const handleEdit = async (product) => {
     console.log('Editing product:', product) // Debug: see all fields
 
     // Get category_id as string for proper comparison
     const categoryId = String(product.ai_category_id || product.category_id || '')
+    const subcategoryId = String(product.subcategory_id || product.sub_category_id || '')
+
+    // Load subcategories for this category first
+    if (categoryId) {
+      await loadSubcategories(categoryId)
+    }
 
     setEditingProduct({
       ...product,
@@ -327,7 +343,7 @@ function ProductsPage() {
     setFormData({
       title: product.title || '',
       category_id: categoryId,
-      subcategory_id: product.subcategory_id || product.sub_category_id || '',
+      subcategory_id: subcategoryId,
       upc: product.upc || '',
       price: product.price || product.lowest_recorded_price || '',
       discount: product.discount || '',
@@ -364,6 +380,10 @@ function ProductsPage() {
       status: 1,
       image: null,
     })
+    // Load subcategories for default category
+    if (defaultCategoryId) {
+      loadSubcategories(defaultCategoryId)
+    }
     setShowAddModal(true)
   }
 
@@ -649,9 +669,10 @@ function ProductsPage() {
               name="category_id"
               value={formData.category_id}
               onChange={(e) => {
-                handleInputChange(e)
-                // Reset subcategory when category changes
-                setFormData(prev => ({ ...prev, category_id: e.target.value, subcategory_id: '' }))
+                const newCategoryId = e.target.value
+                // Reset subcategory and load new subcategories when category changes
+                setFormData(prev => ({ ...prev, category_id: newCategoryId, subcategory_id: '' }))
+                loadSubcategories(newCategoryId)
               }}
               options={categories.map((cat) => ({
                 value: cat.category_id,
@@ -679,13 +700,13 @@ function ProductsPage() {
                 value={formData.subcategory_id}
                 onChange={handleInputChange}
                 options={[
-                  { value: '', label: 'Select subcategory (optional)' },
-                  ...currentSubcategories.map((sub) => ({
-                    value: sub.id,
+                  { value: '', label: loadingSubcategories ? 'Loading...' : 'Select subcategory (optional)' },
+                  ...subcategories.map((sub) => ({
+                    value: String(sub.id),
                     label: sub.name,
                   })),
                 ]}
-                disabled={!formData.category_id}
+                disabled={!formData.category_id || loadingSubcategories}
               />
             </div>
           </div>
