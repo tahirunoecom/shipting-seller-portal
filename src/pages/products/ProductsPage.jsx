@@ -30,6 +30,8 @@ import {
   Camera,
   X,
   FolderPlus,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -76,6 +78,10 @@ function ProductsPage() {
     status: 1,
     image: null,
   })
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 12 // 12 for grid (3x4 or 4x3)
 
   // Check if selected category is a restaurant category
   const isRestaurantCategory = () => {
@@ -416,6 +422,16 @@ function ProductsPage() {
     return matchesSearch && matchesCategory
   })
 
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const paginatedProducts = filteredProducts.slice(startIndex, startIndex + itemsPerPage)
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery, selectedCategory])
+
   if (loading) {
     return <PageLoader />
   }
@@ -494,9 +510,10 @@ function ProductsPage() {
 
       {/* Products Grid/List */}
       {filteredProducts.length > 0 ? (
-        viewMode === 'grid' ? (
+        <>
+        {viewMode === 'grid' ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filteredProducts.map((product) => (
+            {paginatedProducts.map((product) => (
               <Card key={product.product_id} className="overflow-hidden hover:shadow-card-hover transition-shadow">
                 <div className="aspect-square bg-gray-100 dark:bg-dark-border relative">
                   {product.images ? (
@@ -571,7 +588,7 @@ function ProductsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-dark-border">
-                  {filteredProducts.map((product) => (
+                  {paginatedProducts.map((product) => (
                     <tr key={product.product_id} className="hover:bg-gray-50 dark:hover:bg-dark-border">
                       <td className="table-cell">
                         <div className="flex items-center gap-3">
@@ -627,7 +644,64 @@ function ProductsPage() {
               </table>
             </div>
           </Card>
-        )
+        )}
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6">
+            <p className="text-sm text-gray-500">
+              Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredProducts.length)} of {filteredProducts.length} products
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Previous
+              </Button>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                  let pageNum
+                  if (totalPages <= 5) {
+                    pageNum = i + 1
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i
+                  } else {
+                    pageNum = currentPage - 2 + i
+                  }
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
+                        currentPage === pageNum
+                          ? 'bg-primary-500 text-white'
+                          : 'text-gray-600 hover:bg-gray-100 dark:text-dark-muted dark:hover:bg-dark-border'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  )
+                })}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+              >
+                Next
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+      </>
       ) : (
         <Card>
           <CardContent className="py-12 text-center">
