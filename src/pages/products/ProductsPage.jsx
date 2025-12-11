@@ -266,11 +266,11 @@ function ProductsPage() {
 
       let response
       if (editingProduct) {
-        data.append('shipper_product_id', editingProduct.id)
-        response = await productService.editProduct(data)
-      } else {
-        response = await productService.addProduct(data)
+        // Use same addProductsToShipper API with shipper_product_id for updates
+        data.append('shipper_product_id', editingProduct.product_id)
       }
+      // Both add and edit use the same API
+      response = await productService.addProduct(data)
 
       if (response.status === 1) {
         toast.success(editingProduct ? 'Product updated!' : 'Product added!')
@@ -304,19 +304,24 @@ function ProductsPage() {
   }
 
   const handleEdit = (product) => {
+    console.log('Editing product:', product) // Debug: see all fields
+
+    // Get category_id as string for proper comparison
+    const categoryId = String(product.ai_category_id || product.category_id || '')
+
     setEditingProduct({
       ...product,
-      id: product.product_id, // For form submission
+      product_id: product.product_id, // For form submission
       image: product.images, // For image preview
     })
     setFormData({
       title: product.title || '',
-      category_id: product.ai_category_id || product.category_id || '',
-      subcategory_id: product.subcategory_id || '',
+      category_id: categoryId,
+      subcategory_id: product.subcategory_id || product.sub_category_id || '',
       upc: product.upc || '',
-      price: product.discounted_price || product.lowest_recorded_price || '',
+      price: product.price || product.lowest_recorded_price || '',
       discount: product.discount || '',
-      quantity: product.ordered_qty || product.quantity || '',
+      quantity: product.DB_qty || product.quantity || '',
       description: product.description || '',
       brand: product.brand || '',
       model: product.model || '',
