@@ -51,6 +51,16 @@ const saveSubcategories = (subcategories) => {
   localStorage.setItem(SUBCATEGORIES_STORAGE_KEY, JSON.stringify(subcategories))
 }
 
+// Generate a unique UPC code for restaurant products
+const generateUPC = () => {
+  const timestamp = Date.now().toString()
+  const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0')
+  return `REST${timestamp}${random}`
+}
+
+// Restaurant category names (case-insensitive check)
+const RESTAURANT_CATEGORIES = ['restaurant', 'restaurants', 'food', 'food & dining', 'dining']
+
 function ProductsPage() {
   const { user } = useAuthStore()
   const [loading, setLoading] = useState(true)
@@ -77,9 +87,20 @@ function ProductsPage() {
     model: '',
     color: '',
     weight: '',
+    product_type: 'New',
     status: 1,
     image: null,
   })
+
+  // Check if selected category is a restaurant category
+  const isRestaurantCategory = () => {
+    if (!formData.category_id) return false
+    const selectedCategory = categories.find(c => c.category_id === formData.category_id)
+    if (!selectedCategory) return false
+    return RESTAURANT_CATEGORIES.some(rc =>
+      selectedCategory.name.toLowerCase().includes(rc.toLowerCase())
+    )
+  }
 
   useEffect(() => {
     loadProducts()
@@ -184,30 +205,52 @@ function ProductsPage() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
+      const isRestaurant = isRestaurantCategory()
       const data = new FormData()
+
+      // Required fields
       data.append('wh_account_id', user.wh_account_id)
       data.append('title', formData.title)
-      data.append('category_id', formData.category_id)
+      data.append('ai_category_id', formData.category_id) // API uses ai_category_id
+      data.append('price', formData.price)
+      data.append('discount', formData.discount || '0')
+      data.append('quantity', formData.quantity || '0')
+      data.append('description', formData.description || '')
+
+      // UPC - auto-generate for restaurant, use form value for others
+      const upcValue = isRestaurant ? generateUPC() : formData.upc
+      data.append('upc', upcValue)
+
+      // For restaurant: send empty values for these fields
+      // For non-restaurant: use form values
+      data.append('brand', isRestaurant ? '' : (formData.brand || ''))
+      data.append('model', isRestaurant ? '' : (formData.model || ''))
+      data.append('color', isRestaurant ? '' : (formData.color || ''))
+      data.append('weight', isRestaurant ? '' : (formData.weight || ''))
+
+      // Product status: Y or N based on status toggle
+      data.append('product_status', formData.status === 1 ? 'Y' : 'N')
+
+      // Product type: New, Used, Used-Like New
+      data.append('product_type', formData.product_type || 'New')
+
+      // Always set is_manual to Y and environment to web
+      data.append('is_manual', 'Y')
+      data.append('environment', 'web')
+
+      // Optional fields
       if (formData.subcategory_id) {
         data.append('subcategory_id', formData.subcategory_id)
       }
-      data.append('upc', formData.upc)
-      data.append('price', formData.price)
-      data.append('discount', formData.discount || 0)
-      data.append('quantity', formData.quantity || 0)
-      data.append('description', formData.description || '')
-      data.append('brand', formData.brand || '')
-      data.append('model', formData.model || '')
-      data.append('color', formData.color || '')
-      data.append('weight', formData.weight || '')
-      data.append('status', formData.status)
+
+      // Image file
       if (formData.image) {
-        data.append('image', formData.image)
+        data.append('manual_product_image', formData.image)
       }
 
       let response
       if (editingProduct) {
-        data.append('product_id', editingProduct.id)
+        data.append('shipper_product_id', editingProduct.id)
         response = await productService.editProduct(data)
       } else {
         response = await productService.addProduct(data)
@@ -248,7 +291,7 @@ function ProductsPage() {
     setEditingProduct(product)
     setFormData({
       title: product.title || '',
-      category_id: product.category_id || '',
+      category_id: product.category_id || product.ai_category_id || '',
       subcategory_id: product.subcategory_id || '',
       upc: product.upc || '',
       price: product.price || '',
@@ -259,7 +302,8 @@ function ProductsPage() {
       model: product.model || '',
       color: product.color || '',
       weight: product.weight || '',
-      status: product.status || 1,
+      product_type: product.product_type || 'New',
+      status: product.product_status === 'Y' ? 1 : (product.status || 1),
       image: null,
     })
     setShowAddModal(true)
@@ -279,6 +323,7 @@ function ProductsPage() {
       model: '',
       color: '',
       weight: '',
+      product_type: 'New',
       status: 1,
       image: null,
     })
@@ -586,16 +631,18 @@ function ProductsPage() {
             </div>
           </div>
 
-          {/* UPC and Price Row */}
+          {/* UPC and Price Row - UPC hidden for restaurant (auto-generated) */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input
-              label="UPC / Barcode"
-              name="upc"
-              value={formData.upc}
-              onChange={handleInputChange}
-              placeholder="Scan or enter UPC"
-              required
-            />
+            {!isRestaurantCategory() && (
+              <Input
+                label="UPC / Barcode"
+                name="upc"
+                value={formData.upc}
+                onChange={handleInputChange}
+                placeholder="Scan or enter UPC"
+                required
+              />
+            )}
             <Input
               label="Product Price ($)"
               name="price"
@@ -605,6 +652,7 @@ function ProductsPage() {
               onChange={handleInputChange}
               placeholder="0.00"
               required
+              className={isRestaurantCategory() ? 'md:col-span-2' : ''}
             />
           </div>
 
@@ -648,43 +696,47 @@ function ProductsPage() {
             />
           </div>
 
-          {/* Brand and Model Row */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input
-              label="Brand"
-              name="brand"
-              value={formData.brand}
-              onChange={handleInputChange}
-              placeholder="Brand name"
-              required
-            />
-            <Input
-              label="Model"
-              name="model"
-              value={formData.model}
-              onChange={handleInputChange}
-              placeholder="Model number"
-            />
-          </div>
+          {/* Brand and Model Row - Hidden for restaurant */}
+          {!isRestaurantCategory() && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Input
+                label="Brand"
+                name="brand"
+                value={formData.brand}
+                onChange={handleInputChange}
+                placeholder="Brand name"
+                required
+              />
+              <Input
+                label="Model"
+                name="model"
+                value={formData.model}
+                onChange={handleInputChange}
+                placeholder="Model number"
+              />
+            </div>
+          )}
 
-          {/* Color and Weight Row */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input
-              label="Color"
-              name="color"
-              value={formData.color}
-              onChange={handleInputChange}
-              placeholder="Product color"
-              required
-            />
-            <Input
-              label="Weight"
-              name="weight"
-              value={formData.weight}
-              onChange={handleInputChange}
-              placeholder="Weight (optional)"
-            />
-          </div>
+          {/* Color and Weight Row - Hidden for restaurant */}
+          {!isRestaurantCategory() && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Input
+                label="Color"
+                name="color"
+                value={formData.color}
+                onChange={handleInputChange}
+                placeholder="Product color"
+                required
+              />
+              <Input
+                label="Weight"
+                name="weight"
+                value={formData.weight}
+                onChange={handleInputChange}
+                placeholder="Weight (optional)"
+              />
+            </div>
+          )}
 
           {/* Image upload */}
           <div>
