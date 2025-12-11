@@ -51,15 +51,16 @@ const saveSubcategories = (subcategories) => {
   localStorage.setItem(SUBCATEGORIES_STORAGE_KEY, JSON.stringify(subcategories))
 }
 
-// Generate a unique UPC code for restaurant products
+// Generate a 13-digit UPC code for restaurant products
 const generateUPC = () => {
-  const timestamp = Date.now().toString()
-  const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0')
-  return `REST${timestamp}${random}`
+  // Generate 13 numeric digits
+  const timestamp = Date.now().toString().slice(-10) // Last 10 digits of timestamp
+  const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0') // 3 random digits
+  return timestamp + random // Total: 13 digits
 }
 
 // Restaurant category names (case-insensitive check)
-const RESTAURANT_CATEGORIES = ['restaurant', 'restaurants', 'food', 'food & dining', 'dining']
+const RESTAURANT_CATEGORIES = ['restaurant', 'restaurants', 'food', 'food & dining', 'dining', 'cafe', 'bakery']
 
 function ProductsPage() {
   const { user } = useAuthStore()
@@ -95,11 +96,13 @@ function ProductsPage() {
   // Check if selected category is a restaurant category
   const isRestaurantCategory = () => {
     if (!formData.category_id) return false
-    const selectedCategory = categories.find(c => c.category_id === formData.category_id)
-    if (!selectedCategory) return false
-    return RESTAURANT_CATEGORIES.some(rc =>
-      selectedCategory.name.toLowerCase().includes(rc.toLowerCase())
+    // Compare as strings to handle type mismatches
+    const selectedCat = categories.find(c =>
+      String(c.category_id) === String(formData.category_id)
     )
+    if (!selectedCat) return false
+    const categoryName = selectedCat.name?.toLowerCase() || ''
+    return RESTAURANT_CATEGORIES.some(rc => categoryName.includes(rc.toLowerCase()))
   }
 
   useEffect(() => {
@@ -112,9 +115,22 @@ function ProductsPage() {
   const loadProducts = async () => {
     try {
       setLoading(true)
-      const response = await productService.getSellerProducts(user.wh_account_id)
+      // Use getShipperProducts API with correct request structure
+      const response = await productService.getShipperProducts({
+        wh_account_id: user.wh_account_id,
+        upc: '',
+        ai_category_id: '',
+        ai_product_id: '',
+        product_id: '',
+        zipcode: '',
+      })
+      console.log('Products API response:', response)
+
       if (response.status === 1) {
-        setProducts(response.data?.products || [])
+        // Response structure: data.getSellerProducts[]
+        const productsData = response.data?.getSellerProducts || response.data?.products || []
+        console.log('Products loaded:', productsData.length)
+        setProducts(productsData)
       }
     } catch (error) {
       console.error('Failed to load products:', error)
@@ -274,9 +290,9 @@ function ProductsPage() {
   const handleToggleStatus = async (product) => {
     try {
       const response = await productService.toggleProductStatus({
-        product_id: product.id,
+        product_id: product.product_id,
         wh_account_id: user.wh_account_id,
-        status: product.status === 1 ? 0 : 1,
+        status: product.status === 'Y' ? 'N' : 'Y',
       })
       if (response.status === 1) {
         toast.success('Product status updated!')
@@ -288,22 +304,26 @@ function ProductsPage() {
   }
 
   const handleEdit = (product) => {
-    setEditingProduct(product)
+    setEditingProduct({
+      ...product,
+      id: product.product_id, // For form submission
+      image: product.images, // For image preview
+    })
     setFormData({
       title: product.title || '',
-      category_id: product.category_id || product.ai_category_id || '',
+      category_id: product.ai_category_id || product.category_id || '',
       subcategory_id: product.subcategory_id || '',
       upc: product.upc || '',
-      price: product.price || '',
+      price: product.discounted_price || product.lowest_recorded_price || '',
       discount: product.discount || '',
-      quantity: product.quantity || '',
+      quantity: product.ordered_qty || product.quantity || '',
       description: product.description || '',
       brand: product.brand || '',
       model: product.model || '',
       color: product.color || '',
       weight: product.weight || '',
       product_type: product.product_type || 'New',
-      status: product.product_status === 'Y' ? 1 : (product.status || 1),
+      status: product.status === 'Y' ? 1 : 0,
       image: null,
     })
     setShowAddModal(true)
@@ -333,7 +353,8 @@ function ProductsPage() {
     const matchesSearch =
       product.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       product.upc?.includes(searchQuery)
-    const matchesCategory = !selectedCategory || product.category_id === selectedCategory
+    const matchesCategory = !selectedCategory ||
+      String(product.ai_category_id || product.category_id) === String(selectedCategory)
     return matchesSearch && matchesCategory
   })
 
@@ -418,11 +439,11 @@ function ProductsPage() {
         viewMode === 'grid' ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {filteredProducts.map((product) => (
-              <Card key={product.id} className="overflow-hidden hover:shadow-card-hover transition-shadow">
+              <Card key={product.product_id} className="overflow-hidden hover:shadow-card-hover transition-shadow">
                 <div className="aspect-square bg-gray-100 dark:bg-dark-border relative">
-                  {product.image ? (
+                  {product.images ? (
                     <img
-                      src={product.image}
+                      src={product.images}
                       alt={product.title}
                       className="w-full h-full object-cover"
                     />
@@ -432,10 +453,10 @@ function ProductsPage() {
                     </div>
                   )}
                   <Badge
-                    variant={product.status === 1 ? 'success' : 'danger'}
+                    variant={product.status === 'Y' ? 'success' : 'danger'}
                     className="absolute top-2 right-2"
                   >
-                    {product.status === 1 ? 'Active' : 'Inactive'}
+                    {product.status === 'Y' ? 'Active' : 'Inactive'}
                   </Badge>
                 </div>
                 <CardContent className="p-4">
@@ -443,13 +464,13 @@ function ProductsPage() {
                     {product.title}
                   </h3>
                   <p className="text-xs text-gray-500 dark:text-dark-muted mt-1">
-                    {product.category_name || 'Uncategorized'}
+                    {product.ai_category_name || 'Uncategorized'}
                   </p>
                   <div className="flex items-center justify-between mt-3">
                     <p className="text-lg font-bold text-primary-600">
-                      {formatCurrency(product.price)}
+                      {formatCurrency(product.discounted_price || product.lowest_recorded_price || 0)}
                     </p>
-                    <p className="text-sm text-gray-500">Qty: {product.quantity}</p>
+                    <p className="text-sm text-gray-500">Sold: {product.ordered_qty || 0}</p>
                   </div>
                   <div className="flex gap-2 mt-4">
                     <Button
@@ -462,11 +483,11 @@ function ProductsPage() {
                       Edit
                     </Button>
                     <Button
-                      variant={product.status === 1 ? 'secondary' : 'primary'}
+                      variant={product.status === 'Y' ? 'secondary' : 'primary'}
                       size="sm"
                       onClick={() => handleToggleStatus(product)}
                     >
-                      {product.status === 1 ? (
+                      {product.status === 'Y' ? (
                         <ToggleRight className="h-4 w-4" />
                       ) : (
                         <ToggleLeft className="h-4 w-4" />
@@ -493,13 +514,13 @@ function ProductsPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-dark-border">
                   {filteredProducts.map((product) => (
-                    <tr key={product.id} className="hover:bg-gray-50 dark:hover:bg-dark-border">
+                    <tr key={product.product_id} className="hover:bg-gray-50 dark:hover:bg-dark-border">
                       <td className="table-cell">
                         <div className="flex items-center gap-3">
                           <div className="h-10 w-10 rounded-lg bg-gray-100 dark:bg-dark-border flex items-center justify-center overflow-hidden">
-                            {product.image ? (
+                            {product.images ? (
                               <img
-                                src={product.image}
+                                src={product.images}
                                 alt={product.title}
                                 className="h-full w-full object-cover"
                               />
@@ -510,14 +531,14 @@ function ProductsPage() {
                           <span className="font-medium">{product.title}</span>
                         </div>
                       </td>
-                      <td className="table-cell">{product.category_name || '-'}</td>
+                      <td className="table-cell">{product.ai_category_name || '-'}</td>
                       <td className="table-cell font-medium">
-                        {formatCurrency(product.price)}
+                        {formatCurrency(product.discounted_price || product.lowest_recorded_price || 0)}
                       </td>
-                      <td className="table-cell">{product.quantity}</td>
+                      <td className="table-cell">{product.ordered_qty || 0}</td>
                       <td className="table-cell">
-                        <Badge variant={product.status === 1 ? 'success' : 'danger'}>
-                          {product.status === 1 ? 'Active' : 'Inactive'}
+                        <Badge variant={product.status === 'Y' ? 'success' : 'danger'}>
+                          {product.status === 'Y' ? 'Active' : 'Inactive'}
                         </Badge>
                       </td>
                       <td className="table-cell">
@@ -534,7 +555,7 @@ function ProductsPage() {
                             size="icon"
                             onClick={() => handleToggleStatus(product)}
                           >
-                            {product.status === 1 ? (
+                            {product.status === 'Y' ? (
                               <ToggleRight className="h-4 w-4 text-green-500" />
                             ) : (
                               <ToggleLeft className="h-4 w-4 text-gray-400" />
