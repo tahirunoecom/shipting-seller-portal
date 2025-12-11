@@ -10,10 +10,10 @@ import DashboardPage from '@/pages/dashboard/DashboardPage'
 import ProductsPage from '@/pages/products/ProductsPage'
 import OrdersPage from '@/pages/orders/OrdersPage'
 import SettingsPage from '@/pages/settings/SettingsPage'
+import WhatsAppPage from '@/pages/whatsapp/WhatsAppPage'
 
 // Placeholder pages (to be built)
 const CatalogPage = () => <PlaceholderPage title="Catalog" description="Manage your WhatsApp product catalog" />
-const WhatsAppPage = () => <PlaceholderPage title="WhatsApp Bot" description="Configure your WhatsApp bot settings" />
 const DriversPage = () => <PlaceholderPage title="Find Driver" description="Find and manage delivery drivers" />
 const PaymentsPage = () => <PlaceholderPage title="Payments" description="Manage your payment settings and Stripe integration" />
 const BillingPage = () => <PlaceholderPage title="Billing" description="View your billing history and statements" />
