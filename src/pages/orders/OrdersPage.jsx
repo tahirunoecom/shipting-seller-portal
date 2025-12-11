@@ -14,7 +14,6 @@ import {
 import { formatCurrency, formatDateTime } from '@/utils/helpers'
 import {
   Search,
-  Filter,
   Eye,
   CheckCircle,
   Package,
@@ -25,25 +24,31 @@ import {
   Mail,
   Clock,
   ShoppingBag,
+  User,
+  Navigation,
+  Car,
+  ChevronDown,
+  ChevronUp,
+  Camera,
+  FileText,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const ORDER_TABS = [
-  { key: 'all', label: 'All Orders' },
+  { key: 'all', label: 'All' },
   { key: 'pending', label: 'Pending' },
   { key: 'accepted', label: 'Accepted' },
   { key: 'packed', label: 'Packed' },
   { key: 'shipped', label: 'In Transit' },
   { key: 'delivered', label: 'Delivered' },
-  { key: 'cancelled', label: 'Cancelled' },
 ]
 
 const STATUS_COLORS = {
   Pending: 'warning',
   Accepted: 'info',
   Packed: 'info',
-  Shipped: 'info',
-  'In Transit': 'info',
+  Shipped: 'primary',
+  'In Transit': 'primary',
   Delivered: 'success',
   Cancelled: 'danger',
 }
@@ -56,18 +61,30 @@ function OrdersPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [showOrderModal, setShowOrderModal] = useState(false)
+  const [showDeliveryModal, setShowDeliveryModal] = useState(false)
   const [processing, setProcessing] = useState(false)
+  const [expandedOrders, setExpandedOrders] = useState({})
+
+  // Delivery confirmation form
+  const [deliveryForm, setDeliveryForm] = useState({
+    package_received_by: '',
+    driver_note: '',
+    visible_drunk: 'N',
+    delivery_proof: null,
+    customer_signature: null,
+  })
 
   useEffect(() => {
     loadOrders()
-  }, [activeTab])
+  }, [])
 
   const loadOrders = async () => {
     try {
       setLoading(true)
-      const response = await orderService.getShipperOrders(user.wh_account_id, {
-        status: activeTab === 'all' ? undefined : activeTab,
+      const response = await orderService.getShipperOrders({
+        wh_account_id: user.wh_account_id,
       })
+      console.log('Orders API response:', response)
       if (response.status === 1) {
         setOrders(response.data?.orders || [])
       }
@@ -79,60 +96,65 @@ function OrdersPage() {
     }
   }
 
+  const toggleOrderExpand = (orderId) => {
+    setExpandedOrders(prev => ({
+      ...prev,
+      [orderId]: !prev[orderId]
+    }))
+  }
+
   const handleViewOrder = (order) => {
     setSelectedOrder(order)
     setShowOrderModal(true)
   }
 
-  const handleAcceptOrder = async (orderId) => {
+  // Change delivery type (self/driver)
+  const handleDeliveryTypeChange = async (orderId, type) => {
     try {
       setProcessing(true)
-      const response = await orderService.acceptOrder(orderId, user.wh_account_id)
+      const response = await orderService.changeDeliveryType(orderId, type)
       if (response.status === 1) {
-        toast.success('Order accepted!')
+        toast.success(type === 'self' ? 'Self delivery selected' : 'Finding nearest driver...')
+        // After selecting delivery type, accept the order
+        await handleUpdateStatus(orderId, 'OrderAccept')
         loadOrders()
-        setShowOrderModal(false)
       } else {
-        toast.error(response.message || 'Failed to accept order')
+        toast.error(response.message || 'Failed to change delivery type')
       }
     } catch (error) {
-      toast.error('Failed to accept order')
+      toast.error('Failed to change delivery type')
     } finally {
       setProcessing(false)
     }
   }
 
-  const handlePackOrder = async (orderId) => {
+  // Update order status
+  const handleUpdateStatus = async (orderId, statusType, additionalData = {}) => {
     try {
       setProcessing(true)
-      const response = await orderService.packOrder(orderId, user.wh_account_id)
+      const response = await orderService.updateOrderStatus({
+        wh_account_id: user.wh_account_id,
+        order_id: orderId,
+        status: 'Y',
+        status_type: statusType,
+        ...additionalData,
+      })
       if (response.status === 1) {
-        toast.success('Order marked as packed!')
+        const messages = {
+          'OrderAccept': 'Order accepted!',
+          'OrderPacked': 'Order packed!',
+          'OrderShipped': 'Order is out for delivery!',
+          'OrderDelivered': 'Order delivered successfully!',
+        }
+        toast.success(messages[statusType] || 'Status updated!')
         loadOrders()
         setShowOrderModal(false)
+        setShowDeliveryModal(false)
       } else {
-        toast.error(response.message || 'Failed to update order')
+        toast.error(response.message || 'Failed to update status')
       }
     } catch (error) {
-      toast.error('Failed to update order')
-    } finally {
-      setProcessing(false)
-    }
-  }
-
-  const handleShipOrder = async (orderId) => {
-    try {
-      setProcessing(true)
-      const response = await orderService.shipOrder(orderId, user.wh_account_id)
-      if (response.status === 1) {
-        toast.success('Order shipped!')
-        loadOrders()
-        setShowOrderModal(false)
-      } else {
-        toast.error(response.message || 'Failed to ship order')
-      }
-    } catch (error) {
-      toast.error('Failed to ship order')
+      toast.error('Failed to update status')
     } finally {
       setProcessing(false)
     }
@@ -142,7 +164,7 @@ function OrdersPage() {
     if (!confirm('Are you sure you want to cancel this order?')) return
     try {
       setProcessing(true)
-      const response = await orderService.cancelOrder(orderId, user.wh_account_id)
+      const response = await orderService.cancelOrder(orderId)
       if (response.status === 1) {
         toast.success('Order cancelled!')
         loadOrders()
@@ -157,33 +179,140 @@ function OrdersPage() {
     }
   }
 
+  const handleDeliveryConfirm = async () => {
+    if (!selectedOrder) return
+    await handleUpdateStatus(selectedOrder.order_id, 'OrderDelivered', {
+      package_received_by: deliveryForm.package_received_by,
+      driver_note: deliveryForm.driver_note,
+      visible_drunk: deliveryForm.visible_drunk,
+      delivery_proof: deliveryForm.delivery_proof,
+      customer_signature: deliveryForm.customer_signature,
+    })
+    setDeliveryForm({
+      package_received_by: '',
+      driver_note: '',
+      visible_drunk: 'N',
+      delivery_proof: null,
+      customer_signature: null,
+    })
+  }
+
+  // Get order status from flags
+  const getOrderStatus = (order) => {
+    if (order.cancelled === 'Y') return 'Cancelled'
+    if (order.delivered === 'Y') return 'Delivered'
+    if (order.Shipped === 'Y') return 'In Transit'
+    if (order.packed === 'Y') return 'Packed'
+    if (order.accepted === 'Y') return 'Accepted'
+    return 'Pending'
+  }
+
+  // Filter orders by tab
   const filteredOrders = orders.filter((order) => {
-    const matchesSearch =
-      order.id?.toString().includes(searchQuery) ||
-      order.customer_name?.toLowerCase().includes(searchQuery.toLowerCase())
-    return matchesSearch
+    const status = getOrderStatus(order)
+    const matchesTab = activeTab === 'all' ||
+      (activeTab === 'pending' && status === 'Pending') ||
+      (activeTab === 'accepted' && status === 'Accepted') ||
+      (activeTab === 'packed' && status === 'Packed') ||
+      (activeTab === 'shipped' && (status === 'In Transit' || status === 'Shipped')) ||
+      (activeTab === 'delivered' && status === 'Delivered')
+
+    const matchesSearch = !searchQuery ||
+      order.order_id?.toString().includes(searchQuery) ||
+      order.name?.toLowerCase().includes(searchQuery.toLowerCase())
+
+    return matchesTab && matchesSearch
   })
 
+  // Count orders by status
   const getStatusCounts = () => {
-    const counts = {
-      all: orders.length,
-      pending: 0,
-      accepted: 0,
-      packed: 0,
-      shipped: 0,
-      delivered: 0,
-      cancelled: 0,
-    }
+    const counts = { all: orders.length, pending: 0, accepted: 0, packed: 0, shipped: 0, delivered: 0 }
     orders.forEach((order) => {
-      const status = order.status?.toLowerCase()
-      if (counts.hasOwnProperty(status)) {
-        counts[status]++
-      }
+      const status = getOrderStatus(order)
+      if (status === 'Pending') counts.pending++
+      else if (status === 'Accepted') counts.accepted++
+      else if (status === 'Packed') counts.packed++
+      else if (status === 'In Transit' || status === 'Shipped') counts.shipped++
+      else if (status === 'Delivered') counts.delivered++
     })
     return counts
   }
 
   const statusCounts = getStatusCounts()
+
+  // Get next action buttons based on status
+  const getActionButtons = (order) => {
+    const status = getOrderStatus(order)
+    const buttons = []
+
+    if (status === 'Pending') {
+      // Show delivery type options
+      buttons.push(
+        <div key="delivery-options" className="flex gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => handleDeliveryTypeChange(order.order_id, 'self')}
+            disabled={processing}
+            className="text-green-600 border-green-600 hover:bg-green-50"
+          >
+            <Navigation className="h-4 w-4" />
+            Self Delivery
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => handleDeliveryTypeChange(order.order_id, 'driver')}
+            disabled={processing}
+          >
+            <Car className="h-4 w-4" />
+            Find Driver
+          </Button>
+        </div>
+      )
+    } else if (status === 'Accepted') {
+      buttons.push(
+        <Button
+          key="pack"
+          size="sm"
+          onClick={() => handleUpdateStatus(order.order_id, 'OrderPacked')}
+          disabled={processing}
+        >
+          <Package className="h-4 w-4" />
+          Mark Packed
+        </Button>
+      )
+    } else if (status === 'Packed') {
+      buttons.push(
+        <Button
+          key="ship"
+          size="sm"
+          onClick={() => handleUpdateStatus(order.order_id, 'OrderShipped')}
+          disabled={processing}
+        >
+          <Truck className="h-4 w-4" />
+          Out for Delivery
+        </Button>
+      )
+    } else if (status === 'In Transit' && order.delivery_type === 'self') {
+      buttons.push(
+        <Button
+          key="deliver"
+          size="sm"
+          variant="success"
+          onClick={() => {
+            setSelectedOrder(order)
+            setShowDeliveryModal(true)
+          }}
+          disabled={processing}
+        >
+          <CheckCircle className="h-4 w-4" />
+          Mark Delivered
+        </Button>
+      )
+    }
+
+    return buttons
+  }
 
   if (loading && orders.length === 0) {
     return <PageLoader />
@@ -195,111 +324,216 @@ function OrdersPage() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-dark-text">Orders</h1>
         <p className="text-gray-500 dark:text-dark-muted">
-          Manage and track your customer orders
+          Manage and fulfill customer orders
         </p>
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200 dark:border-dark-border overflow-x-auto">
-        <nav className="flex gap-1 -mb-px">
-          {ORDER_TABS.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
-                activeTab === tab.key
-                  ? 'border-primary-500 text-primary-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              {tab.label}
-              {statusCounts[tab.key] > 0 && (
-                <span
-                  className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
-                    activeTab === tab.key
-                      ? 'bg-primary-100 text-primary-600'
-                      : 'bg-gray-100 text-gray-600'
-                  }`}
-                >
-                  {statusCounts[tab.key]}
-                </span>
-              )}
-            </button>
-          ))}
-        </nav>
+      <div className="flex flex-wrap gap-2">
+        {ORDER_TABS.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+              activeTab === tab.key
+                ? 'bg-primary-500 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-dark-border dark:text-dark-muted'
+            }`}
+          >
+            {tab.label}
+            {statusCounts[tab.key] > 0 && (
+              <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
+                activeTab === tab.key ? 'bg-white/20' : 'bg-gray-200 dark:bg-dark-bg'
+              }`}>
+                {statusCounts[tab.key]}
+              </span>
+            )}
+          </button>
+        ))}
       </div>
 
       {/* Search */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Search by order ID or customer name..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-        </CardContent>
-      </Card>
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <Input
+          placeholder="Search by Order ID or customer name..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-10"
+        />
+      </div>
 
       {/* Orders List */}
       {filteredOrders.length > 0 ? (
         <div className="space-y-4">
-          {filteredOrders.map((order) => (
-            <Card key={order.id} className="hover:shadow-card-hover transition-shadow">
-              <CardContent className="p-4">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  {/* Order Info */}
-                  <div className="flex items-start gap-4">
-                    <div className="h-12 w-12 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
-                      <ShoppingBag className="h-6 w-6 text-primary-600" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-3">
-                        <h3 className="font-semibold text-gray-900 dark:text-dark-text">
-                          Order #{order.id}
-                        </h3>
-                        <Badge variant={STATUS_COLORS[order.status] || 'default'}>
-                          {order.status}
-                        </Badge>
+          {filteredOrders.map((order) => {
+            const status = getOrderStatus(order)
+            const isExpanded = expandedOrders[order.order_id]
+
+            return (
+              <Card key={order.order_id} className="overflow-hidden">
+                <CardContent className="p-0">
+                  {/* Order Header */}
+                  <div
+                    className="p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-border"
+                    onClick={() => toggleOrderExpand(order.order_id)}
+                  >
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div className="flex items-start gap-4">
+                        <div className="h-12 w-12 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center shrink-0">
+                          <ShoppingBag className="h-6 w-6 text-primary-600" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="font-semibold text-gray-900 dark:text-dark-text">
+                              Order #{order.order_id}
+                            </h3>
+                            <Badge variant={STATUS_COLORS[status] || 'default'}>
+                              {status}
+                            </Badge>
+                            {order.delivery_type === 'driver' && status === 'In Transit' && (
+                              <Badge variant="info">Driver Assigned</Badge>
+                            )}
+                            {order.delivery_type === 'self' && (
+                              <Badge variant="secondary">Self Delivery</Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-600 dark:text-dark-muted mt-1">
+                            {order.name || 'Customer'}
+                          </p>
+                          <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-gray-500">
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {formatDateTime(order.order_date)}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Package className="h-3 w-3" />
+                              {order.total_product_quantity || order.OrderProducts?.length || 0} items
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                      <p className="text-sm text-gray-500 dark:text-dark-muted mt-1">
-                        {order.customer_name || 'Customer'}
-                      </p>
-                      <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {formatDateTime(order.date_added)}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Package className="h-3 w-3" />
-                          {order.items_count || 1} items
-                        </span>
+
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <p className="text-lg font-bold text-primary-600">
+                            {formatCurrency(order.total_amount || order.order_amount)}
+                          </p>
+                        </div>
+                        {isExpanded ? (
+                          <ChevronUp className="h-5 w-5 text-gray-400" />
+                        ) : (
+                          <ChevronDown className="h-5 w-5 text-gray-400" />
+                        )}
                       </div>
                     </div>
                   </div>
 
-                  {/* Price and Actions */}
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
-                      <p className="text-lg font-bold text-gray-900 dark:text-dark-text">
-                        {formatCurrency(order.total)}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {order.payment_status || 'Paid'}
-                      </p>
+                  {/* Expanded Content */}
+                  {isExpanded && (
+                    <div className="border-t dark:border-dark-border">
+                      {/* Customer & Address */}
+                      <div className="p-4 bg-gray-50 dark:bg-dark-bg grid md:grid-cols-2 gap-4">
+                        <div>
+                          <h4 className="text-xs font-medium text-gray-500 uppercase mb-2">Customer</h4>
+                          <div className="space-y-1 text-sm">
+                            <p className="flex items-center gap-2">
+                              <User className="h-4 w-4 text-gray-400" />
+                              {order.name || 'Customer'}
+                            </p>
+                            {order.phone && (
+                              <p className="flex items-center gap-2">
+                                <Phone className="h-4 w-4 text-gray-400" />
+                                <a href={`tel:${order.phone}`} className="text-primary-600 hover:underline">
+                                  {order.phone}
+                                </a>
+                              </p>
+                            )}
+                            {order.email && (
+                              <p className="flex items-center gap-2">
+                                <Mail className="h-4 w-4 text-gray-400" />
+                                {order.email}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-medium text-gray-500 uppercase mb-2">Delivery Address</h4>
+                          <p className="flex items-start gap-2 text-sm">
+                            <MapPin className="h-4 w-4 text-gray-400 mt-0.5 shrink-0" />
+                            <span>
+                              {order.address}
+                              {order.city && `, ${order.city}`}
+                              {order.state && `, ${order.state}`}
+                              {order.zip_code && ` ${order.zip_code}`}
+                            </span>
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Products */}
+                      <div className="p-4">
+                        <h4 className="text-xs font-medium text-gray-500 uppercase mb-3">Order Items</h4>
+                        <div className="space-y-3">
+                          {(order.OrderProducts || []).map((item, index) => (
+                            <div key={index} className="flex items-center gap-3">
+                              <div className="h-12 w-12 rounded-lg bg-gray-100 dark:bg-dark-border overflow-hidden shrink-0">
+                                {item.images || item.image ? (
+                                  <img
+                                    src={item.images || item.image}
+                                    alt={item.title}
+                                    className="h-full w-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="h-full w-full flex items-center justify-center">
+                                    <Package className="h-5 w-5 text-gray-400" />
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-gray-900 dark:text-dark-text truncate">
+                                  {item.title}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  {item.ai_category_name} &bull; Qty: {item.quantity}
+                                </p>
+                              </div>
+                              <p className="font-medium text-gray-900 dark:text-dark-text">
+                                {formatCurrency(item.total_price || item.price)}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="p-4 border-t dark:border-dark-border flex flex-wrap items-center justify-between gap-4">
+                        <div className="flex items-center gap-2">
+                          {status !== 'Delivered' && status !== 'Cancelled' && (
+                            <Button
+                              size="sm"
+                              variant="danger"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleCancelOrder(order.order_id)
+                              }}
+                              disabled={processing}
+                            >
+                              <XCircle className="h-4 w-4" />
+                              Cancel
+                            </Button>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                          {getActionButtons(order)}
+                        </div>
+                      </div>
                     </div>
-                    <Button variant="outline" onClick={() => handleViewOrder(order)}>
-                      <Eye className="h-4 w-4" />
-                      View
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                  )}
+                </CardContent>
+              </Card>
+            )
+          })}
         </div>
       ) : (
         <Card>
@@ -317,155 +551,69 @@ function OrdersPage() {
         </Card>
       )}
 
-      {/* Order Detail Modal */}
+      {/* Delivery Confirmation Modal */}
       <Modal
-        isOpen={showOrderModal}
-        onClose={() => setShowOrderModal(false)}
-        title={`Order #${selectedOrder?.id}`}
-        size="lg"
+        isOpen={showDeliveryModal}
+        onClose={() => setShowDeliveryModal(false)}
+        title="Confirm Delivery"
+        size="md"
       >
-        {selectedOrder && (
-          <div className="space-y-6">
-            {/* Status */}
-            <div className="flex items-center justify-between">
-              <Badge
-                variant={STATUS_COLORS[selectedOrder.status] || 'default'}
-                className="text-sm px-3 py-1"
-              >
-                {selectedOrder.status}
-              </Badge>
-              <span className="text-sm text-gray-500">
-                {formatDateTime(selectedOrder.date_added)}
-              </span>
-            </div>
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600 dark:text-dark-muted">
+            Please fill in delivery confirmation details for Order #{selectedOrder?.order_id}
+          </p>
 
-            {/* Customer Info */}
-            <div className="p-4 bg-gray-50 rounded-lg dark:bg-dark-bg">
-              <h4 className="font-medium text-gray-900 dark:text-dark-text mb-3">
-                Customer Information
-              </h4>
-              <div className="space-y-2 text-sm">
-                <p className="flex items-center gap-2 text-gray-600 dark:text-dark-muted">
-                  <span className="font-medium text-gray-900 dark:text-dark-text">
-                    {selectedOrder.customer_name || 'Customer'}
-                  </span>
-                </p>
-                {selectedOrder.customer_email && (
-                  <p className="flex items-center gap-2 text-gray-600 dark:text-dark-muted">
-                    <Mail className="h-4 w-4" />
-                    {selectedOrder.customer_email}
-                  </p>
-                )}
-                {selectedOrder.customer_phone && (
-                  <p className="flex items-center gap-2 text-gray-600 dark:text-dark-muted">
-                    <Phone className="h-4 w-4" />
-                    {selectedOrder.customer_phone}
-                  </p>
-                )}
-                {selectedOrder.shipping_address && (
-                  <p className="flex items-start gap-2 text-gray-600 dark:text-dark-muted">
-                    <MapPin className="h-4 w-4 mt-0.5" />
-                    {selectedOrder.shipping_address}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Order Items */}
-            <div>
-              <h4 className="font-medium text-gray-900 dark:text-dark-text mb-3">
-                Order Items
-              </h4>
-              <div className="border rounded-lg divide-y dark:border-dark-border dark:divide-dark-border">
-                {(selectedOrder.items || []).map((item, index) => (
-                  <div key={index} className="flex items-center justify-between p-3">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded bg-gray-100 dark:bg-dark-border flex items-center justify-center">
-                        <Package className="h-5 w-5 text-gray-400" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900 dark:text-dark-text">
-                          {item.name || item.title}
-                        </p>
-                        <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
-                      </div>
-                    </div>
-                    <p className="font-medium">{formatCurrency(item.price)}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Order Total */}
-            <div className="border-t pt-4 dark:border-dark-border">
-              <div className="flex justify-between text-sm mb-2">
-                <span className="text-gray-500">Subtotal</span>
-                <span>{formatCurrency(selectedOrder.subtotal || selectedOrder.total)}</span>
-              </div>
-              {selectedOrder.delivery_fee > 0 && (
-                <div className="flex justify-between text-sm mb-2">
-                  <span className="text-gray-500">Delivery Fee</span>
-                  <span>{formatCurrency(selectedOrder.delivery_fee)}</span>
-                </div>
-              )}
-              <div className="flex justify-between text-lg font-bold">
-                <span>Total</span>
-                <span className="text-primary-600">
-                  {formatCurrency(selectedOrder.total)}
-                </span>
-              </div>
-            </div>
-
-            {/* Actions */}
-            <ModalFooter>
-              {selectedOrder.status === 'Pending' && (
-                <>
-                  <Button
-                    variant="danger"
-                    onClick={() => handleCancelOrder(selectedOrder.id)}
-                    disabled={processing}
-                  >
-                    <XCircle className="h-4 w-4" />
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={() => handleAcceptOrder(selectedOrder.id)}
-                    disabled={processing}
-                    isLoading={processing}
-                  >
-                    <CheckCircle className="h-4 w-4" />
-                    Accept Order
-                  </Button>
-                </>
-              )}
-              {selectedOrder.status === 'Accepted' && (
-                <Button
-                  onClick={() => handlePackOrder(selectedOrder.id)}
-                  disabled={processing}
-                  isLoading={processing}
-                >
-                  <Package className="h-4 w-4" />
-                  Mark as Packed
-                </Button>
-              )}
-              {selectedOrder.status === 'Packed' && (
-                <Button
-                  onClick={() => handleShipOrder(selectedOrder.id)}
-                  disabled={processing}
-                  isLoading={processing}
-                >
-                  <Truck className="h-4 w-4" />
-                  Ship Order
-                </Button>
-              )}
-              {['Delivered', 'Cancelled'].includes(selectedOrder.status) && (
-                <Button variant="outline" onClick={() => setShowOrderModal(false)}>
-                  Close
-                </Button>
-              )}
-            </ModalFooter>
+          <div>
+            <label className="label">Received By</label>
+            <Input
+              placeholder="Name of person who received the order"
+              value={deliveryForm.package_received_by}
+              onChange={(e) => setDeliveryForm(prev => ({ ...prev, package_received_by: e.target.value }))}
+            />
           </div>
-        )}
+
+          <div>
+            <label className="label">Delivery Note (Optional)</label>
+            <Input
+              placeholder="Any notes about the delivery"
+              value={deliveryForm.driver_note}
+              onChange={(e) => setDeliveryForm(prev => ({ ...prev, driver_note: e.target.value }))}
+            />
+          </div>
+
+          <div>
+            <label className="label">Delivery Proof (Optional)</label>
+            <div className="flex items-center gap-4">
+              <label className="flex items-center gap-2 px-4 py-2 border rounded-lg cursor-pointer hover:bg-gray-50 dark:border-dark-border dark:hover:bg-dark-border">
+                <Camera className="h-4 w-4" />
+                <span className="text-sm">Upload Photo</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => setDeliveryForm(prev => ({ ...prev, delivery_proof: e.target.files[0] }))}
+                />
+              </label>
+              {deliveryForm.delivery_proof && (
+                <span className="text-sm text-green-600">Photo selected</span>
+              )}
+            </div>
+          </div>
+
+          <ModalFooter>
+            <Button variant="outline" onClick={() => setShowDeliveryModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleDeliveryConfirm}
+              disabled={processing}
+              isLoading={processing}
+            >
+              <CheckCircle className="h-4 w-4" />
+              Confirm Delivery
+            </Button>
+          </ModalFooter>
+        </div>
       </Modal>
     </div>
   )
