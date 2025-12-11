@@ -67,6 +67,7 @@ function ProductsPage() {
   const [loading, setLoading] = useState(true)
   const [products, setProducts] = useState([])
   const [categories, setCategories] = useState([])
+  const [defaultCategoryId, setDefaultCategoryId] = useState('') // Restaurant category ID
   const [subcategories, setSubcategories] = useState({}) // { category_id: [{id, name}] }
   const [viewMode, setViewMode] = useState('grid') // 'grid' or 'list'
   const [searchQuery, setSearchQuery] = useState('')
@@ -160,6 +161,15 @@ function ProductsPage() {
 
         console.log('Normalized categories:', normalizedCategories)
         setCategories(normalizedCategories)
+
+        // Find Restaurant category and set as default
+        const restaurantCat = normalizedCategories.find(cat =>
+          cat.name?.toLowerCase().includes('restaurant')
+        )
+        if (restaurantCat) {
+          setDefaultCategoryId(String(restaurantCat.category_id))
+          console.log('Default category set to Restaurant:', restaurantCat.category_id)
+        }
 
         if (normalizedCategories.length === 0) {
           console.warn('No categories found in response')
@@ -334,10 +344,33 @@ function ProductsPage() {
     setShowAddModal(true)
   }
 
+  // Open Add Product modal with Restaurant category as default
+  const openAddProductModal = () => {
+    setEditingProduct(null)
+    setFormData({
+      title: '',
+      category_id: defaultCategoryId, // Default to Restaurant
+      subcategory_id: '',
+      upc: '',
+      price: '',
+      discount: '',
+      quantity: '',
+      description: '',
+      brand: '',
+      model: '',
+      color: '',
+      weight: '',
+      product_type: 'New',
+      status: 1,
+      image: null,
+    })
+    setShowAddModal(true)
+  }
+
   const resetForm = () => {
     setFormData({
       title: '',
-      category_id: '',
+      category_id: defaultCategoryId, // Keep Restaurant as default
       subcategory_id: '',
       upc: '',
       price: '',
@@ -377,7 +410,7 @@ function ProductsPage() {
             Manage your product inventory
           </p>
         </div>
-        <Button onClick={() => setShowAddModal(true)}>
+        <Button onClick={openAddProductModal}>
           <Plus className="h-4 w-4" />
           Add Product
         </Button>
@@ -588,7 +621,7 @@ function ProductsPage() {
                 : 'Add your first product to get started'}
             </p>
             {!searchQuery && !selectedCategory && (
-              <Button className="mt-4" onClick={() => setShowAddModal(true)}>
+              <Button className="mt-4" onClick={openAddProductModal}>
                 <Plus className="h-4 w-4" />
                 Add Product
               </Button>
