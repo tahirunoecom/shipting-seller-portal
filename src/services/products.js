@@ -81,6 +81,18 @@ export const productService = {
     const response = await api.post('/getShipperProductsTotalCount', { wh_account_id })
     return response.data
   },
+
+  // Get subcategories for a category
+  async getSubcategories(category_id, wh_account_id) {
+    const response = await api.post('/getSubcategories', { category_id, wh_account_id })
+    return response.data
+  },
+
+  // Add a new subcategory
+  async addSubcategory(data) {
+    const response = await api.post('/addSubcategory', data)
+    return response.data
+  },
 }
 
 export default productService
