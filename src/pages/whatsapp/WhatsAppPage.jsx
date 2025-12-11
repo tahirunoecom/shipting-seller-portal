@@ -35,11 +35,15 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
+// Demo mode - set to true to simulate API responses when backend isn't ready
+const DEMO_MODE = true
+
 function WhatsAppPage() {
   const { user, userDetails } = useAuthStore()
   const [activeTab, setActiveTab] = useState('connection')
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [demoModeActive, setDemoModeActive] = useState(DEMO_MODE)
 
   // Connection state
   const [isConnected, setIsConnected] = useState(false)
@@ -98,6 +102,12 @@ function WhatsAppPage() {
   }, [])
 
   const loadWhatsAppConfig = async () => {
+    // Skip API call in demo mode
+    if (demoModeActive) {
+      setLoading(false)
+      return
+    }
+
     try {
       setLoading(true)
       const response = await whatsappService.getWhatsAppConfig(userDetails?.wh_account_id)
@@ -133,6 +143,17 @@ function WhatsAppPage() {
     }
     try {
       setConnectionStatus('connecting')
+
+      if (demoModeActive) {
+        // Demo mode - simulate successful connection
+        await new Promise(resolve => setTimeout(resolve, 1500))
+        setIsConnected(true)
+        setConnectionStatus('connected')
+        setWhatsappId(`wa_${Date.now()}`)
+        toast.success('WhatsApp connected successfully! (Demo Mode)')
+        return
+      }
+
       const response = await whatsappService.connectWhatsApp(
         userDetails?.wh_account_id,
         phoneNumber
@@ -147,14 +168,32 @@ function WhatsAppPage() {
         toast.error(response.message || 'Failed to connect WhatsApp')
       }
     } catch (error) {
-      setConnectionStatus('error')
-      toast.error('Failed to connect WhatsApp. Please try again.')
+      // Check if it's a 404 error (API not implemented yet)
+      if (error.response?.status === 404) {
+        setConnectionStatus('disconnected')
+        toast.error('WhatsApp API not available. Enable Demo Mode to test the UI.')
+      } else {
+        setConnectionStatus('error')
+        toast.error('Failed to connect WhatsApp. Please try again.')
+      }
     }
   }
 
   const handleDisconnect = async () => {
     try {
       setConnectionStatus('connecting')
+
+      if (demoModeActive) {
+        // Demo mode - simulate disconnect
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        setIsConnected(false)
+        setConnectionStatus('disconnected')
+        setPhoneNumber('')
+        setWhatsappId('')
+        toast.success('WhatsApp disconnected successfully (Demo Mode)')
+        return
+      }
+
       const response = await whatsappService.disconnectWhatsApp(userDetails?.wh_account_id)
       if (response.status === 1) {
         setIsConnected(false)
@@ -175,6 +214,14 @@ function WhatsAppPage() {
   const handleTestConnection = async () => {
     try {
       setSaving(true)
+
+      if (demoModeActive) {
+        // Demo mode - simulate test
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        toast.success('Connection test successful! (Demo Mode)')
+        return
+      }
+
       const response = await whatsappService.testWhatsAppConnection(userDetails?.wh_account_id)
       if (response.status === 1) {
         toast.success('Connection test successful!')
@@ -196,6 +243,14 @@ function WhatsAppPage() {
   const handleSaveBotSettings = async () => {
     try {
       setSaving(true)
+
+      if (demoModeActive) {
+        // Demo mode - simulate save
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        toast.success('Bot settings saved successfully! (Demo Mode)')
+        return
+      }
+
       const response = await whatsappService.saveWhatsAppConfig({
         wh_account_id: userDetails?.wh_account_id,
         bot_settings: botSettings,
@@ -313,6 +368,14 @@ function WhatsAppPage() {
     }
     try {
       setSendingTest(true)
+
+      if (demoModeActive) {
+        // Demo mode - simulate sending
+        await new Promise(resolve => setTimeout(resolve, 1500))
+        toast.success(`Test message sent to ${testPhone}! (Demo Mode)`)
+        return
+      }
+
       const response = await whatsappService.sendTestMessage(
         userDetails?.wh_account_id,
         testPhone,
@@ -353,6 +416,26 @@ function WhatsAppPage() {
 
   return (
     <div className="space-y-6">
+      {/* Demo Mode Banner */}
+      {demoModeActive && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-center justify-between dark:bg-amber-900/20 dark:border-amber-800">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-5 w-5 text-amber-500" />
+            <span className="text-sm text-amber-700 dark:text-amber-300">
+              <strong>Demo Mode Active</strong> - API calls are simulated. Data is not saved to the server.
+            </span>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setDemoModeActive(false)}
+            className="text-amber-700 border-amber-300 hover:bg-amber-100"
+          >
+            Disable Demo Mode
+          </Button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -365,6 +448,7 @@ function WhatsAppPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {demoModeActive && <Badge variant="warning">Demo</Badge>}
           {getConnectionStatusBadge()}
         </div>
       </div>
