@@ -62,6 +62,16 @@ const generateUPC = () => {
 // Restaurant category names (case-insensitive check)
 const RESTAURANT_CATEGORIES = ['restaurant', 'restaurants', 'food', 'food & dining', 'dining', 'cafe', 'bakery']
 
+// Convert file to base64 string
+const fileToBase64 = (file) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.readAsDataURL(file)
+    reader.onload = () => resolve(reader.result)
+    reader.onerror = (error) => reject(error)
+  })
+}
+
 function ProductsPage() {
   const { user } = useAuthStore()
   const [loading, setLoading] = useState(true)
@@ -259,9 +269,11 @@ function ProductsPage() {
         data.append('subcategory_id', formData.subcategory_id)
       }
 
-      // Image file
+      // Image file - convert to base64 for web environment
+      // API expects: when environment='web', $images = $request->file (base64 string)
       if (formData.image) {
-        data.append('manual_product_image', formData.image)
+        const base64Image = await fileToBase64(formData.image)
+        data.append('file', base64Image)
       }
 
       let response
