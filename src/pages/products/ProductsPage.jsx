@@ -29,33 +29,54 @@ import {
   Upload,
   Camera,
   X,
+  FolderPlus,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
-// Helper to normalize category data from different API response formats
-const normalizeCategory = (cat) => ({
-  category_id: cat.category_id || cat.id || cat.categoryId || '',
-  name: cat.name || cat.category_name || cat.categoryName || cat.title || '',
-})
+// Local storage key for subcategories
+const SUBCATEGORIES_STORAGE_KEY = 'shipting_subcategories'
+
+// Get subcategories from localStorage
+const getStoredSubcategories = () => {
+  try {
+    const stored = localStorage.getItem(SUBCATEGORIES_STORAGE_KEY)
+    return stored ? JSON.parse(stored) : {}
+  } catch {
+    return {}
+  }
+}
+
+// Save subcategories to localStorage
+const saveSubcategories = (subcategories) => {
+  localStorage.setItem(SUBCATEGORIES_STORAGE_KEY, JSON.stringify(subcategories))
+}
 
 function ProductsPage() {
   const { user } = useAuthStore()
   const [loading, setLoading] = useState(true)
   const [products, setProducts] = useState([])
   const [categories, setCategories] = useState([])
+  const [subcategories, setSubcategories] = useState({}) // { category_id: [{id, name}] }
   const [viewMode, setViewMode] = useState('grid') // 'grid' or 'list'
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('')
   const [showAddModal, setShowAddModal] = useState(false)
+  const [showSubcategoryModal, setShowSubcategoryModal] = useState(false)
+  const [newSubcategoryName, setNewSubcategoryName] = useState('')
   const [editingProduct, setEditingProduct] = useState(null)
   const [formData, setFormData] = useState({
     title: '',
     category_id: '',
+    subcategory_id: '',
     upc: '',
     price: '',
     discount: '',
     quantity: '',
-    condition: 'New',
+    description: '',
+    brand: '',
+    model: '',
+    color: '',
+    weight: '',
     status: 1,
     image: null,
   })
@@ -63,6 +84,8 @@ function ProductsPage() {
   useEffect(() => {
     loadProducts()
     loadCategories()
+    // Load stored subcategories
+    setSubcategories(getStoredSubcategories())
   }, [])
 
   const loadProducts = async () => {
@@ -82,22 +105,22 @@ function ProductsPage() {
 
   const loadCategories = async () => {
     try {
-      const response = await productService.getCategories()
+      // Use getCategoryList API - response structure: data.getCategories[]
+      const response = await productService.getCategoryList()
       console.log('Categories API response:', response)
 
       if (response.status === 1) {
-        // Handle different response structures
-        let rawCategories = []
-        if (Array.isArray(response.data?.categories)) {
-          rawCategories = response.data.categories
-        } else if (Array.isArray(response.data)) {
-          rawCategories = response.data
-        } else if (Array.isArray(response.categories)) {
-          rawCategories = response.categories
-        }
+        // API returns data.getCategories array with id, name, image, status
+        let rawCategories = response.data?.getCategories || response.data?.categories || []
 
         // Normalize categories to consistent format
-        const normalizedCategories = rawCategories.map(normalizeCategory)
+        const normalizedCategories = rawCategories.map(cat => ({
+          category_id: cat.id || cat.category_id || '',
+          name: cat.name || cat.category_name || '',
+          image: cat.image || '',
+          status: cat.status || 1,
+        }))
+
         console.log('Normalized categories:', normalizedCategories)
         setCategories(normalizedCategories)
 
@@ -109,27 +132,42 @@ function ProductsPage() {
       }
     } catch (error) {
       console.error('Failed to load categories:', error)
-      // Try alternative endpoint
-      try {
-        const altResponse = await productService.getCategoryList()
-        console.log('CategoryList API response:', altResponse)
-        if (altResponse.status === 1) {
-          let rawCategories = []
-          if (Array.isArray(altResponse.data?.categories)) {
-            rawCategories = altResponse.data.categories
-          } else if (Array.isArray(altResponse.data)) {
-            rawCategories = altResponse.data
-          } else if (Array.isArray(altResponse.categories)) {
-            rawCategories = altResponse.categories
-          }
-          const normalizedCategories = rawCategories.map(normalizeCategory)
-          setCategories(normalizedCategories)
-        }
-      } catch (altError) {
-        console.error('Both category endpoints failed')
-      }
+      toast.error('Failed to load categories')
     }
   }
+
+  // Add a new subcategory for a category (stored locally)
+  const handleAddSubcategory = () => {
+    if (!formData.category_id) {
+      toast.error('Please select a category first')
+      return
+    }
+    if (!newSubcategoryName.trim()) {
+      toast.error('Please enter a subcategory name')
+      return
+    }
+
+    const categoryId = formData.category_id
+    const newSubcategory = {
+      id: `sub_${Date.now()}`,
+      name: newSubcategoryName.trim(),
+    }
+
+    const updatedSubcategories = {
+      ...subcategories,
+      [categoryId]: [...(subcategories[categoryId] || []), newSubcategory],
+    }
+
+    setSubcategories(updatedSubcategories)
+    saveSubcategories(updatedSubcategories)
+    setFormData(prev => ({ ...prev, subcategory_id: newSubcategory.id }))
+    setNewSubcategoryName('')
+    setShowSubcategoryModal(false)
+    toast.success('Subcategory added!')
+  }
+
+  // Get subcategories for selected category
+  const currentSubcategories = formData.category_id ? (subcategories[formData.category_id] || []) : []
 
   const handleInputChange = (e) => {
     const { name, value } = e.target
@@ -150,11 +188,18 @@ function ProductsPage() {
       data.append('wh_account_id', user.wh_account_id)
       data.append('title', formData.title)
       data.append('category_id', formData.category_id)
+      if (formData.subcategory_id) {
+        data.append('subcategory_id', formData.subcategory_id)
+      }
       data.append('upc', formData.upc)
       data.append('price', formData.price)
       data.append('discount', formData.discount || 0)
-      data.append('quantity', formData.quantity)
-      data.append('condition', formData.condition)
+      data.append('quantity', formData.quantity || 0)
+      data.append('description', formData.description || '')
+      data.append('brand', formData.brand || '')
+      data.append('model', formData.model || '')
+      data.append('color', formData.color || '')
+      data.append('weight', formData.weight || '')
       data.append('status', formData.status)
       if (formData.image) {
         data.append('image', formData.image)
@@ -204,11 +249,16 @@ function ProductsPage() {
     setFormData({
       title: product.title || '',
       category_id: product.category_id || '',
+      subcategory_id: product.subcategory_id || '',
       upc: product.upc || '',
       price: product.price || '',
       discount: product.discount || '',
       quantity: product.quantity || '',
-      condition: product.condition || 'New',
+      description: product.description || '',
+      brand: product.brand || '',
+      model: product.model || '',
+      color: product.color || '',
+      weight: product.weight || '',
       status: product.status || 1,
       image: null,
     })
@@ -219,11 +269,16 @@ function ProductsPage() {
     setFormData({
       title: '',
       category_id: '',
+      subcategory_id: '',
       upc: '',
       price: '',
       discount: '',
       quantity: '',
-      condition: 'New',
+      description: '',
+      brand: '',
+      model: '',
+      color: '',
+      weight: '',
       status: 1,
       image: null,
     })
@@ -482,10 +537,158 @@ function ProductsPage() {
         title={editingProduct ? 'Edit Product' : 'Add New Product'}
         size="lg"
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+          {/* Category and Subcategory Row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Select
+              label="Category"
+              name="category_id"
+              value={formData.category_id}
+              onChange={(e) => {
+                handleInputChange(e)
+                // Reset subcategory when category changes
+                setFormData(prev => ({ ...prev, category_id: e.target.value, subcategory_id: '' }))
+              }}
+              options={categories.map((cat) => ({
+                value: cat.category_id,
+                label: cat.name,
+              }))}
+              placeholder="Select category"
+              required
+            />
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="label mb-0">Subcategory</label>
+                {formData.category_id && (
+                  <button
+                    type="button"
+                    onClick={() => setShowSubcategoryModal(true)}
+                    className="text-xs text-primary-600 hover:text-primary-700 flex items-center gap-1"
+                  >
+                    <FolderPlus className="h-3 w-3" />
+                    Add New
+                  </button>
+                )}
+              </div>
+              <Select
+                name="subcategory_id"
+                value={formData.subcategory_id}
+                onChange={handleInputChange}
+                options={[
+                  { value: '', label: 'Select subcategory (optional)' },
+                  ...currentSubcategories.map((sub) => ({
+                    value: sub.id,
+                    label: sub.name,
+                  })),
+                ]}
+                disabled={!formData.category_id}
+              />
+            </div>
+          </div>
+
+          {/* UPC and Price Row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label="UPC / Barcode"
+              name="upc"
+              value={formData.upc}
+              onChange={handleInputChange}
+              placeholder="Scan or enter UPC"
+              required
+            />
+            <Input
+              label="Product Price ($)"
+              name="price"
+              type="number"
+              step="0.01"
+              value={formData.price}
+              onChange={handleInputChange}
+              placeholder="0.00"
+              required
+            />
+          </div>
+
+          {/* Discount and Quantity Row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label="Discount (%)"
+              name="discount"
+              type="number"
+              value={formData.discount}
+              onChange={handleInputChange}
+              placeholder="0"
+              required
+            />
+            <Input
+              label="Quantity"
+              name="quantity"
+              type="number"
+              value={formData.quantity}
+              onChange={handleInputChange}
+              placeholder="0"
+            />
+          </div>
+
+          {/* Title and Description Row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label="Title"
+              name="title"
+              value={formData.title}
+              onChange={handleInputChange}
+              placeholder="Product title"
+              required
+            />
+            <Input
+              label="Description"
+              name="description"
+              value={formData.description}
+              onChange={handleInputChange}
+              placeholder="Product description"
+            />
+          </div>
+
+          {/* Brand and Model Row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label="Brand"
+              name="brand"
+              value={formData.brand}
+              onChange={handleInputChange}
+              placeholder="Brand name"
+              required
+            />
+            <Input
+              label="Model"
+              name="model"
+              value={formData.model}
+              onChange={handleInputChange}
+              placeholder="Model number"
+            />
+          </div>
+
+          {/* Color and Weight Row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label="Color"
+              name="color"
+              value={formData.color}
+              onChange={handleInputChange}
+              placeholder="Product color"
+              required
+            />
+            <Input
+              label="Weight"
+              name="weight"
+              value={formData.weight}
+              onChange={handleInputChange}
+              placeholder="Weight (optional)"
+            />
+          </div>
+
           {/* Image upload */}
           <div>
-            <label className="label">Product Image</label>
+            <label className="label">Upload Image</label>
             <div className="flex gap-4">
               <div className="h-24 w-24 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden dark:border-dark-border">
                 {formData.image ? (
@@ -507,21 +710,10 @@ function ProductsPage() {
               <div className="flex flex-col gap-2">
                 <label className="btn-secondary cursor-pointer inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm">
                   <Upload className="h-4 w-4" />
-                  Upload
+                  Choose File
                   <input
                     type="file"
                     accept="image/*"
-                    onChange={handleImageChange}
-                    className="hidden"
-                  />
-                </label>
-                <label className="btn-outline cursor-pointer inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm">
-                  <Camera className="h-4 w-4" />
-                  Take Photo
-                  <input
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
                     onChange={handleImageChange}
                     className="hidden"
                   />
@@ -530,110 +722,33 @@ function ProductsPage() {
             </div>
           </div>
 
-          {/* Product name */}
-          <Input
-            label="Product Name"
-            name="title"
-            value={formData.title}
-            onChange={handleInputChange}
-            placeholder="Enter product name"
-            required
-          />
-
-          {/* Category */}
-          <Select
-            label="Category"
-            name="category_id"
-            value={formData.category_id}
-            onChange={handleInputChange}
-            options={categories.map((cat) => ({
-              value: cat.category_id,
-              label: cat.name,
-            }))}
-            placeholder="Select category"
-            required
-          />
-
-          {/* UPC */}
-          <Input
-            label="UPC / Barcode"
-            name="upc"
-            value={formData.upc}
-            onChange={handleInputChange}
-            placeholder="Scan or enter UPC"
-          />
-
-          {/* Price row */}
-          <div className="grid grid-cols-2 gap-4">
-            <Input
-              label="Price"
-              name="price"
-              type="number"
-              step="0.01"
-              value={formData.price}
-              onChange={handleInputChange}
-              placeholder="0.00"
-              required
-            />
-            <Input
-              label="Discount (%)"
-              name="discount"
-              type="number"
-              value={formData.discount}
-              onChange={handleInputChange}
-              placeholder="0"
-            />
-          </div>
-
-          {/* Quantity and Condition */}
-          <div className="grid grid-cols-2 gap-4">
-            <Input
-              label="Quantity"
-              name="quantity"
-              type="number"
-              value={formData.quantity}
-              onChange={handleInputChange}
-              placeholder="0"
-              required
-            />
-            <Select
-              label="Condition"
-              name="condition"
-              value={formData.condition}
-              onChange={handleInputChange}
-              options={[
-                { value: 'New', label: 'New' },
-                { value: 'Used', label: 'Used' },
-                { value: 'Refurbished', label: 'Refurbished' },
-              ]}
-            />
-          </div>
-
           {/* Status toggle */}
-          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg dark:bg-dark-bg">
-            <div>
-              <p className="font-medium text-gray-900 dark:text-dark-text">
-                Product Status
-              </p>
-              <p className="text-sm text-gray-500 dark:text-dark-muted">
-                Enable to make this product visible
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() =>
-                setFormData((prev) => ({ ...prev, status: prev.status === 1 ? 0 : 1 }))
-              }
-              className={`relative w-12 h-6 rounded-full transition-colors ${
-                formData.status === 1 ? 'bg-primary-500' : 'bg-gray-300'
-              }`}
-            >
-              <span
-                className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                  formData.status === 1 ? 'translate-x-7' : 'translate-x-1'
+          <div>
+            <label className="label">Product Status</label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setFormData((prev) => ({ ...prev, status: 1 }))}
+                className={`px-6 py-2 rounded-full text-sm font-medium transition-colors ${
+                  formData.status === 1
+                    ? 'bg-primary-500 text-white'
+                    : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
                 }`}
-              />
-            </button>
+              >
+                Active
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData((prev) => ({ ...prev, status: 0 }))}
+                className={`px-6 py-2 rounded-full text-sm font-medium transition-colors ${
+                  formData.status === 0
+                    ? 'bg-gray-500 text-white'
+                    : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                }`}
+              >
+                Inactive
+              </button>
+            </div>
           </div>
 
           <ModalFooter>
@@ -653,6 +768,48 @@ function ProductsPage() {
             </Button>
           </ModalFooter>
         </form>
+      </Modal>
+
+      {/* Add Subcategory Modal */}
+      <Modal
+        isOpen={showSubcategoryModal}
+        onClose={() => {
+          setShowSubcategoryModal(false)
+          setNewSubcategoryName('')
+        }}
+        title="Create Subcategory"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-500">
+            Adding subcategory for: <strong>{categories.find(c => c.category_id === formData.category_id)?.name}</strong>
+          </p>
+          <Input
+            label="Subcategory Name"
+            value={newSubcategoryName}
+            onChange={(e) => setNewSubcategoryName(e.target.value)}
+            placeholder="e.g., KIDS, COMBO, SPECIAL"
+            autoFocus
+          />
+          <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
+            Note: Subcategories are stored locally. For production, consider creating a backend API.
+          </p>
+          <ModalFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setShowSubcategoryModal(false)
+                setNewSubcategoryName('')
+              }}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleAddSubcategory}>
+              Create
+            </Button>
+          </ModalFooter>
+        </div>
       </Modal>
     </div>
   )
