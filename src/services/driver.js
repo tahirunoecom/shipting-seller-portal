@@ -79,12 +79,19 @@ export const driverService = {
    * 8 = Confirm pickup by shipper
    */
   async changeDriverOrderStatus(params) {
-    const response = await api.post('/change-driver-order-status', {
-      order_id: params.order_id,
-      driver_id: params.driver_id,
-      user_id: params.user_id || params.driver_id,
-      status: params.status,
-      shipper_id: params.shipper_id || '',
+    // Use FormData instead of JSON - backend expects form-data format
+    const formData = new FormData()
+    formData.append('order_id', params.order_id)
+    formData.append('driver_id', params.driver_id)
+    formData.append('status', params.status)
+    if (params.shipper_id) {
+      formData.append('shipper_id', params.shipper_id)
+    }
+
+    const response = await api.post('/change-driver-order-status', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
     })
     return response.data
   },
