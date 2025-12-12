@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuthStore } from '@/store'
 import { orderService } from '@/services'
 import {
@@ -48,6 +48,7 @@ const ORDER_TABS = [
 const STATUS_COLORS = {
   Pending: 'warning',
   'Searching for Driver': 'info',
+  'Driver Assigned': 'success',
   Accepted: 'info',
   Packed: 'info',
   Shipped: 'primary',
@@ -81,11 +82,12 @@ function OrdersPage() {
     customer_signature: null,
   })
 
-  useEffect(() => {
-    loadOrders()
-  }, [])
+  // Auto-polling interval ref
+  const pollingRef = useRef(null)
+  const POLLING_INTERVAL = 30000 // 30 seconds
 
-  const loadOrders = async () => {
+  // Load orders (with loading spinner)
+  const loadOrders = useCallback(async () => {
     try {
       setLoading(true)
       const response = await orderService.getShipperOrders({
@@ -101,7 +103,60 @@ function OrdersPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [user.wh_account_id])
+
+  // Silent refresh (no loading spinner) for polling
+  const silentRefresh = useCallback(async () => {
+    try {
+      const response = await orderService.getShipperOrders({
+        wh_account_id: user.wh_account_id,
+      })
+      if (response.status === 1) {
+        setOrders(response.data?.orders || [])
+      }
+    } catch (error) {
+      console.error('Silent refresh failed:', error)
+    }
+  }, [user.wh_account_id])
+
+  // Check if any orders are searching for driver
+  const hasSearchingOrders = useCallback(() => {
+    return orders.some(order =>
+      order.delivery_type === 'driver' &&
+      order.accepted !== 'Y' &&
+      !order.driver_accepted &&
+      !order.driver_id
+    )
+  }, [orders])
+
+  // Initial load
+  useEffect(() => {
+    loadOrders()
+  }, [loadOrders])
+
+  // Auto-polling when there are orders searching for driver
+  useEffect(() => {
+    if (hasSearchingOrders()) {
+      // Start polling
+      pollingRef.current = setInterval(() => {
+        console.log('Auto-refreshing orders (searching for driver)...')
+        silentRefresh()
+      }, POLLING_INTERVAL)
+    } else {
+      // Stop polling
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current)
+        pollingRef.current = null
+      }
+    }
+
+    // Cleanup on unmount
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current)
+      }
+    }
+  }, [hasSearchingOrders, silentRefresh])
 
   const toggleOrderExpand = (orderId) => {
     setExpandedOrders(prev => ({
@@ -216,8 +271,14 @@ function OrdersPage() {
     if (order.Shipped === 'Y') return 'In Transit'
     if (order.packed === 'Y') return 'Packed'
     if (order.accepted === 'Y') return 'Accepted'
-    // Pending but searching for driver
-    if (order.delivery_type === 'driver') return 'Searching for Driver'
+    // Pending with driver delivery type
+    if (order.delivery_type === 'driver') {
+      // Check if driver has accepted (driver_accepted comes from sods table)
+      if (order.driver_accepted === 'Y' || order.driver_id) {
+        return 'Driver Assigned'
+      }
+      return 'Searching for Driver'
+    }
     return 'Pending'
   }
 
@@ -296,9 +357,23 @@ function OrdersPage() {
     } else if (status === 'Searching for Driver') {
       // Waiting for driver to accept - no action needed, just show status
       buttons.push(
-        <span key="waiting" className="text-sm text-gray-500 italic">
-          Waiting for driver to accept...
+        <span key="waiting" className="text-sm text-gray-500 italic flex items-center gap-2">
+          <span className="inline-block w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
+          Waiting for driver... (auto-refreshing)
         </span>
+      )
+    } else if (status === 'Driver Assigned') {
+      // Driver accepted - seller can now pack the order
+      buttons.push(
+        <Button
+          key="pack"
+          size="sm"
+          onClick={() => handleUpdateStatus(order.order_id, 'OrderPacked')}
+          disabled={processing}
+        >
+          <Package className="h-4 w-4" />
+          Mark Packed
+        </Button>
       )
     } else if (status === 'Accepted') {
       buttons.push(
