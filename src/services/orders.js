@@ -8,7 +8,7 @@ export const orderService = {
       order_id: params.order_id || '',
       page: params.page || 1,
       items: params.items || 1000,
-      type: params.type || 'AI',
+      type: params.type || 'All',  // 'All' triggers shipper_id filter in backend
     })
     return response.data
   },
