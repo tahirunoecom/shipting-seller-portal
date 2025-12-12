@@ -166,7 +166,7 @@ function DriverDeliveriesPage() {
     try {
       setLoading(true)
       const response = await driverService.getDriverActiveOrders({
-        driver_id: user.wh_account_id,
+        driver_id: user.id,
         status: 0,
       })
 
@@ -179,7 +179,7 @@ function DriverDeliveriesPage() {
     } finally {
       setLoading(false)
     }
-  }, [user.wh_account_id])
+  }, [user.id])
 
   useEffect(() => {
     loadOrders()
