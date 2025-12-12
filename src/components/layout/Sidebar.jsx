@@ -13,9 +13,14 @@ import {
   Store,
   Truck,
   X,
+  MapPin,
+  Clock,
+  Navigation,
+  ArrowLeftRight,
 } from 'lucide-react'
 
-const menuItems = [
+// Seller/Store Owner menu items
+const sellerMenuItems = [
   {
     title: 'Dashboard',
     href: '/dashboard',
@@ -63,13 +68,60 @@ const menuItems = [
   },
 ]
 
+// Driver menu items
+const driverMenuItems = [
+  {
+    title: 'Available Orders',
+    href: '/driver/orders',
+    icon: MapPin,
+  },
+  {
+    title: 'My Deliveries',
+    href: '/driver/deliveries',
+    icon: Navigation,
+  },
+  {
+    title: 'Earnings',
+    href: '/driver/earnings',
+    icon: CreditCard,
+  },
+  {
+    title: 'History',
+    href: '/driver/history',
+    icon: Clock,
+  },
+  {
+    title: 'Settings',
+    href: '/driver/settings',
+    icon: Settings,
+  },
+]
+
 function Sidebar({ isOpen, onClose }) {
   const navigate = useNavigate()
-  const { logout, userDetails } = useAuthStore()
+  const { logout, userDetails, userTypes, activeMode, setActiveMode, user } = useAuthStore()
+
+  // Determine if user has multiple roles
+  const hasMultipleRoles = userTypes.scanSell && userTypes.localDelivery
+
+  // Get menu items based on active mode
+  const menuItems = activeMode === 'driver' ? driverMenuItems : sellerMenuItems
 
   const handleLogout = () => {
     logout()
     navigate('/login')
+  }
+
+  const handleSwitchMode = () => {
+    const newMode = activeMode === 'seller' ? 'driver' : 'seller'
+    setActiveMode(newMode)
+    // Navigate to the appropriate home page
+    if (newMode === 'driver') {
+      navigate('/driver/orders')
+    } else {
+      navigate('/dashboard')
+    }
+    onClose?.()
   }
 
   return (
@@ -110,15 +162,41 @@ function Sidebar({ isOpen, onClose }) {
             </button>
           </div>
 
-          {/* Store Info */}
+          {/* Mode Indicator & Store/Driver Info */}
           <div className="px-4 py-4 border-b border-gray-200 dark:border-dark-border">
-            <p className="text-xs text-gray-500 dark:text-dark-muted uppercase tracking-wider">
-              Store
-            </p>
-            <p className="mt-1 font-medium text-gray-900 dark:text-dark-text truncate">
-              {userDetails?.company || 'My Store'}
-            </p>
+            {activeMode === 'driver' ? (
+              <>
+                <p className="text-xs text-gray-500 dark:text-dark-muted uppercase tracking-wider">
+                  Driver Mode
+                </p>
+                <p className="mt-1 font-medium text-gray-900 dark:text-dark-text truncate">
+                  {user?.firstname} {user?.lastname}
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-xs text-gray-500 dark:text-dark-muted uppercase tracking-wider">
+                  Store
+                </p>
+                <p className="mt-1 font-medium text-gray-900 dark:text-dark-text truncate">
+                  {userDetails?.company || 'My Store'}
+                </p>
+              </>
+            )}
           </div>
+
+          {/* Mode Switcher (only for users with multiple roles) */}
+          {hasMultipleRoles && (
+            <div className="px-3 py-3 border-b border-gray-200 dark:border-dark-border">
+              <button
+                onClick={handleSwitchMode}
+                className="flex items-center justify-center gap-2 w-full rounded-lg px-3 py-2.5 text-sm font-medium bg-primary-50 text-primary-600 hover:bg-primary-100 transition-colors dark:bg-primary-500/10 dark:text-primary-400 dark:hover:bg-primary-500/20"
+              >
+                <ArrowLeftRight className="h-4 w-4" />
+                Switch to {activeMode === 'seller' ? 'Driver' : 'Seller'} Mode
+              </button>
+            </div>
+          )}
 
           {/* Navigation */}
           <nav className="flex-1 overflow-y-auto py-4 px-3 scrollbar-thin">

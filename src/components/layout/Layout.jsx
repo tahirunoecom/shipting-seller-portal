@@ -6,11 +6,17 @@ import Header from './Header'
 
 function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const { isAuthenticated } = useAuthStore()
+  const { isAuthenticated, userTypes, activeMode } = useAuthStore()
 
   // Redirect to login if not authenticated
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />
+  }
+
+  // Redirect to mode selection if user has multiple roles but hasn't selected one
+  const hasMultipleRoles = userTypes?.scanSell && userTypes?.localDelivery
+  if (hasMultipleRoles && !activeMode) {
+    return <Navigate to="/select-mode" replace />
   }
 
   return (

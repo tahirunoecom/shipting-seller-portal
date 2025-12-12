@@ -14,6 +14,16 @@ const useAuthStore = create(
       isLoading: false,
       error: null,
 
+      // User type flags (from login API)
+      userTypes: {
+        scanSell: false,      // Store Owner / Seller
+        fulfillment: false,   // Warehouse Manager (future)
+        localDelivery: false, // Driver
+      },
+
+      // Current active mode (for users with multiple roles)
+      activeMode: null, // 'seller' | 'driver' | null
+
       // Actions
       setLoading: (loading) => set({ isLoading: loading }),
       setError: (error) => set({ error }),
@@ -27,10 +37,31 @@ const useAuthStore = create(
           
           if (response.status === 1) {
             const { user, access_token, user_details } = response.data
-            
+
             // Save token to localStorage for API interceptor
             localStorage.setItem('access_token', access_token)
-            
+
+            // Parse user type flags from response
+            const userTypes = {
+              scanSell: user.scanSell === '1' || user.scanSell === 1,
+              fulfillment: user.fulfillment === '1' || user.fulfillment === 1,
+              localDelivery: user.localDelivery === '1' || user.localDelivery === 1,
+            }
+
+            // Determine initial active mode
+            // If user has multiple roles, they'll choose after login
+            // If only one role, set it automatically
+            let activeMode = null
+            const roles = []
+            if (userTypes.scanSell) roles.push('seller')
+            if (userTypes.localDelivery) roles.push('driver')
+            // fulfillment ignored for now
+
+            if (roles.length === 1) {
+              activeMode = roles[0]
+            }
+            // If multiple roles, activeMode stays null and user chooses
+
             set({
               user,
               userDetails: user_details,
@@ -38,6 +69,8 @@ const useAuthStore = create(
               isAuthenticated: true,
               isLoading: false,
               error: null,
+              userTypes,
+              activeMode,
             })
             
             toast.success('Login successful!')
@@ -124,6 +157,11 @@ const useAuthStore = create(
         }
       },
 
+      // Set active mode (for users with multiple roles)
+      setActiveMode: (mode) => {
+        set({ activeMode: mode })
+      },
+
       // Logout
       logout: () => {
         localStorage.removeItem('access_token')
@@ -133,6 +171,12 @@ const useAuthStore = create(
           accessToken: null,
           isAuthenticated: false,
           error: null,
+          userTypes: {
+            scanSell: false,
+            fulfillment: false,
+            localDelivery: false,
+          },
+          activeMode: null,
         })
         toast.success('Logged out successfully')
       },
@@ -172,6 +216,8 @@ const useAuthStore = create(
         userDetails: state.userDetails,
         accessToken: state.accessToken,
         isAuthenticated: state.isAuthenticated,
+        userTypes: state.userTypes,
+        activeMode: state.activeMode,
       }),
     }
   )

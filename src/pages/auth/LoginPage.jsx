@@ -43,7 +43,21 @@ function LoginPage() {
 
     const result = await login(formData.email, formData.password)
     if (result.success) {
-      navigate('/dashboard')
+      const userData = result.data?.user
+      // Check if user has multiple roles
+      const isSeller = userData?.scanSell === '1' || userData?.scanSell === 1
+      const isDriver = userData?.localDelivery === '1' || userData?.localDelivery === 1
+
+      if (isSeller && isDriver) {
+        // User has multiple roles - let them choose
+        navigate('/select-mode')
+      } else if (isDriver) {
+        // Driver only
+        navigate('/driver/orders')
+      } else {
+        // Seller (default)
+        navigate('/dashboard')
+      }
     }
   }
 
