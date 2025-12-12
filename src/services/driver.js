@@ -82,6 +82,7 @@ export const driverService = {
     const response = await api.post('/change-driver-order-status', {
       order_id: params.order_id,
       driver_id: params.driver_id,
+      user_id: params.user_id || params.driver_id,
       status: params.status,
       shipper_id: params.shipper_id || '',
     })
@@ -96,6 +97,7 @@ export const driverService = {
     const formData = new FormData()
     formData.append('order_id', data.order_id)
     formData.append('driver_id', data.driver_id)
+    formData.append('user_id', data.user_id || data.driver_id)
     formData.append('status', DRIVER_STATUS.DELIVERED)
     formData.append('package_received_by', data.package_received_by || '')
     formData.append('driver_note', data.driver_note || '')

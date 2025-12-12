@@ -1,37 +1,21 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '@/store'
-import { driverService, DRIVER_STATUS_LABELS } from '@/services'
-import {
-  Card,
-  CardContent,
-  Badge,
-  PageLoader,
-} from '@/components/ui'
+import { driverService } from '@/services'
 import { formatCurrency, formatDateTime } from '@/utils/helpers'
 import {
   Package,
   Clock,
-  Store,
   CheckCircle,
   Truck,
   ChevronRight,
-  Circle,
   MapPin,
-  Hash,
-  RefreshCw,
+  Navigation,
+  Route,
+  Sparkles,
+  ArrowRight,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-
-const STATUS_COLORS = {
-  1: 'info',
-  2: 'info',
-  3: 'primary',
-  4: 'info',
-  5: 'primary',
-  6: 'warning',
-  7: 'success',
-}
 
 const STATUS_LABELS = {
   1: 'Accepted',
@@ -41,6 +25,126 @@ const STATUS_LABELS = {
   5: 'On The Way',
   6: 'At Customer',
   7: 'Delivered',
+}
+
+// Order Card with state-based image handling
+function DeliveryCard({ order, onClick, statusCode, isCompleted }) {
+  const [imgError, setImgError] = useState(false)
+  const orderAmount = order.order_amount || order.total_amount || 0
+
+  return (
+    <div
+      onClick={onClick}
+      className="group relative cursor-pointer"
+    >
+      {/* Hover glow */}
+      <div className={`absolute -inset-0.5 rounded-2xl opacity-0 group-hover:opacity-20 blur transition-opacity duration-300 ${
+        isCompleted ? 'bg-emerald-500' : 'bg-gradient-to-r from-violet-600 to-indigo-600'
+      }`} />
+
+      <div className="relative bg-white dark:bg-slate-800 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 transition-all duration-300 group-hover:shadow-xl">
+        {/* Status bar */}
+        <div className={`h-1 ${
+          isCompleted
+            ? 'bg-gradient-to-r from-emerald-500 to-teal-500'
+            : 'bg-gradient-to-r from-violet-500 via-purple-500 to-indigo-500'
+        }`} />
+
+        <div className="p-5">
+          {/* Header */}
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex items-center gap-3">
+              {/* Store Image */}
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-100 to-indigo-100 dark:from-violet-900/30 dark:to-indigo-900/30 flex items-center justify-center overflow-hidden">
+                {order.store_img && !imgError ? (
+                  <img
+                    src={order.store_img}
+                    alt=""
+                    className="w-full h-full object-cover"
+                    onError={() => setImgError(true)}
+                  />
+                ) : (
+                  <Truck className="w-5 h-5 text-violet-500" />
+                )}
+              </div>
+              <div>
+                <h3 className="font-semibold text-slate-900 dark:text-white">
+                  {order.store_name || order.shipper_name || 'Store'}
+                </h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  Order #{order.id}
+                </p>
+              </div>
+            </div>
+
+            {/* Status & Price */}
+            <div className="text-right">
+              <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
+                isCompleted
+                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                  : 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400'
+              }`}>
+                {STATUS_LABELS[statusCode] || 'Unknown'}
+              </span>
+              <p className="text-lg font-bold text-slate-900 dark:text-white mt-1">
+                {formatCurrency(orderAmount)}
+              </p>
+            </div>
+          </div>
+
+          {/* Quick Stats */}
+          <div className="flex items-center gap-4 mb-4 text-sm text-slate-500 dark:text-slate-400">
+            <span className="flex items-center gap-1.5">
+              <Package className="w-4 h-4" />
+              {order.total_product || 1} items
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Clock className="w-4 h-4" />
+              {formatDateTime(order.order_date)}
+            </span>
+          </div>
+
+          {/* Route Summary */}
+          <div className="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-3">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
+                <div className="w-2 h-2 rounded-full bg-violet-500" />
+              </div>
+              <span className="text-sm text-slate-600 dark:text-slate-400 truncate flex-1">
+                {order.pickup?.store_city || order.pickup?.city || 'Pickup'}
+              </span>
+              <Route className="w-4 h-4 text-slate-400" />
+              <div className="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
+                <MapPin className="w-3 h-3 text-indigo-500" />
+              </div>
+              <span className="text-sm text-slate-600 dark:text-slate-400 truncate flex-1">
+                {order.drop_off?.city || 'Delivery'}
+              </span>
+              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </div>
+
+          {/* Continue Button for active deliveries */}
+          {!isCompleted && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onClick()
+              }}
+              className="w-full mt-4 relative overflow-hidden bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-semibold py-3 px-6 rounded-xl transition-all group/btn"
+            >
+              <span className="relative z-10 flex items-center justify-center gap-2">
+                Continue Delivery
+                <ArrowRight className="w-4 h-4 transition-transform group-hover/btn:translate-x-1" />
+              </span>
+              {/* Shine effect */}
+              <div className="absolute inset-0 -translate-x-full group-hover/btn:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function DriverDeliveriesPage() {
@@ -66,7 +170,7 @@ function DriverDeliveriesPage() {
         status: 0,
       })
 
-      if (response.status === 1) {
+      if (response.status === 1 || response.status === 0) {
         setOrders(response.data || [])
       }
     } catch (error) {
@@ -101,31 +205,49 @@ function DriverDeliveriesPage() {
   const completedCount = orders.filter(o => getStatusCode(o) === 7).length
 
   if (loading && orders.length === 0) {
-    return <PageLoader />
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="text-center">
+          <div className="relative">
+            <div className="w-16 h-16 rounded-full bg-gradient-to-r from-violet-500 to-indigo-500 animate-pulse mx-auto" />
+            <Package className="w-8 h-8 text-white absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+          </div>
+          <p className="mt-4 text-slate-500 dark:text-slate-400">Loading deliveries...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-xl font-semibold text-gray-900 dark:text-dark-text">My Deliveries</h1>
-        <p className="text-sm text-gray-500 dark:text-dark-muted">Track your active and completed deliveries</p>
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+          <Navigation className="w-6 h-6 text-violet-500" />
+          My Deliveries
+        </h1>
+        <p className="text-slate-500 dark:text-slate-400 mt-1">
+          Track your active and completed deliveries
+        </p>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2">
+      <div className="flex gap-3">
         <button
           onClick={() => setActiveTab('active')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
             activeTab === 'active'
-              ? 'bg-emerald-500 text-white shadow-sm'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-dark-border dark:text-dark-muted'
+              ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/25'
+              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
           }`}
         >
+          <Truck className="w-4 h-4" />
           Active
           {activeCount > 0 && (
-            <span className={`ml-2 px-1.5 py-0.5 rounded text-xs ${
-              activeTab === 'active' ? 'bg-white/20' : 'bg-gray-200 dark:bg-dark-bg'
+            <span className={`px-2 py-0.5 rounded-full text-xs ${
+              activeTab === 'active'
+                ? 'bg-white/20 text-white'
+                : 'bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400'
             }`}>
               {activeCount}
             </span>
@@ -133,16 +255,19 @@ function DriverDeliveriesPage() {
         </button>
         <button
           onClick={() => setActiveTab('completed')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
             activeTab === 'completed'
-              ? 'bg-emerald-500 text-white shadow-sm'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-dark-border dark:text-dark-muted'
+              ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/25'
+              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
           }`}
         >
+          <CheckCircle className="w-4 h-4" />
           Completed
           {completedCount > 0 && (
-            <span className={`ml-2 px-1.5 py-0.5 rounded text-xs ${
-              activeTab === 'completed' ? 'bg-white/20' : 'bg-gray-200 dark:bg-dark-bg'
+            <span className={`px-2 py-0.5 rounded-full text-xs ${
+              activeTab === 'completed'
+                ? 'bg-white/20 text-white'
+                : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400'
             }`}>
               {completedCount}
             </span>
@@ -152,128 +277,47 @@ function DriverDeliveriesPage() {
 
       {/* Orders List */}
       {filteredOrders.length > 0 ? (
-        <div className="space-y-3">
+        <div className="grid gap-4">
           {filteredOrders.map((order) => {
             const statusCode = getStatusCode(order)
             const isCompleted = statusCode === 7
-            const orderAmount = order.order_amount || order.total_amount || 0
 
             return (
-              <div
+              <DeliveryCard
                 key={order.id}
+                order={order}
+                statusCode={statusCode}
+                isCompleted={isCompleted}
                 onClick={() => navigate(`/driver/order/${order.id}`)}
-                className="bg-white dark:bg-dark-card rounded-xl border border-gray-200 dark:border-dark-border overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
-              >
-                <div className="p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-gray-100 dark:bg-dark-border overflow-hidden flex-shrink-0">
-                        {order.store_img ? (
-                          <img
-                            src={order.store_img}
-                            alt=""
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              e.target.style.display = 'none'
-                            }}
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <Store className="w-5 h-5 text-gray-400" />
-                          </div>
-                        )}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-gray-500 flex items-center gap-1">
-                            <Hash className="h-3 w-3" />
-                            {order.id}
-                          </span>
-                          <Badge variant={STATUS_COLORS[statusCode] || 'default'}>
-                            {STATUS_LABELS[statusCode] || 'Unknown'}
-                          </Badge>
-                        </div>
-                        <h3 className="font-medium text-gray-900 dark:text-dark-text text-sm mt-0.5">
-                          {order.store_name || order.shipper_name || 'Store'}
-                        </h3>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-gray-900 dark:text-dark-text">
-                        {formatCurrency(orderAmount)}
-                      </span>
-                      <ChevronRight className="h-4 w-4 text-gray-400" />
-                    </div>
-                  </div>
-
-                  {/* Quick Info */}
-                  <div className="flex items-center gap-4 text-xs text-gray-500">
-                    <span className="flex items-center gap-1">
-                      <Package className="h-3 w-3" />
-                      {order.total_product} items
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      {formatDateTime(order.order_date)}
-                    </span>
-                  </div>
-
-                  {/* Route Summary */}
-                  <div className="mt-3 pt-3 border-t border-gray-100 dark:border-dark-border">
-                    <div className="flex items-center gap-2 text-xs">
-                      <Circle className="h-2.5 w-2.5 text-emerald-500 fill-current" />
-                      <span className="text-gray-600 dark:text-dark-muted truncate flex-1">
-                        {order.pickup?.store_city || order.pickup?.city || 'Pickup'}
-                      </span>
-                      <span className="text-gray-400">→</span>
-                      <MapPin className="h-3 w-3 text-red-500" />
-                      <span className="text-gray-600 dark:text-dark-muted truncate flex-1">
-                        {order.drop_off?.city || 'Delivery'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Continue Button */}
-                  {!isCompleted && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        navigate(`/driver/order/${order.id}`)
-                      }}
-                      className="w-full mt-3 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium rounded-lg transition-colors"
-                    >
-                      Continue Delivery
-                    </button>
-                  )}
-                </div>
-              </div>
+              />
             )
           })}
         </div>
       ) : (
-        <div className="bg-white dark:bg-dark-card rounded-xl border border-gray-200 dark:border-dark-border p-12 text-center">
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900 p-12 text-center">
           {activeTab === 'active' ? (
-            <>
-              <div className="w-14 h-14 rounded-full bg-gray-100 dark:bg-dark-border flex items-center justify-center mx-auto mb-4">
-                <Truck className="h-7 w-7 text-gray-400" />
+            <div className="relative">
+              <div className="w-20 h-20 rounded-full bg-white dark:bg-slate-700 shadow-xl flex items-center justify-center mx-auto mb-6">
+                <Truck className="w-10 h-10 text-slate-400" />
               </div>
-              <h3 className="font-medium text-gray-900 dark:text-dark-text">No Active Deliveries</h3>
-              <p className="text-sm text-gray-500 mt-1">Accept orders to start delivering</p>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">No Active Deliveries</h3>
+              <p className="text-slate-500 dark:text-slate-400 mb-6">Accept orders to start delivering</p>
               <button
                 onClick={() => navigate('/driver/orders')}
-                className="mt-4 px-6 py-2 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600 transition-colors"
+                className="inline-flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-semibold rounded-xl hover:from-violet-700 hover:to-indigo-700 transition-all shadow-lg shadow-violet-500/25"
               >
+                <Sparkles className="w-5 h-5" />
                 View Available Orders
               </button>
-            </>
+            </div>
           ) : (
-            <>
-              <div className="w-14 h-14 rounded-full bg-gray-100 dark:bg-dark-border flex items-center justify-center mx-auto mb-4">
-                <CheckCircle className="h-7 w-7 text-gray-400" />
+            <div className="relative">
+              <div className="w-20 h-20 rounded-full bg-white dark:bg-slate-700 shadow-xl flex items-center justify-center mx-auto mb-6">
+                <CheckCircle className="w-10 h-10 text-slate-400" />
               </div>
-              <h3 className="font-medium text-gray-900 dark:text-dark-text">No Completed Deliveries</h3>
-              <p className="text-sm text-gray-500 mt-1">Your completed deliveries will appear here</p>
-            </>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">No Completed Deliveries</h3>
+              <p className="text-slate-500 dark:text-slate-400">Your completed deliveries will appear here</p>
+            </div>
           )}
         </div>
       )}

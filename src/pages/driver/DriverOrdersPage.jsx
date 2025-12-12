@@ -2,32 +2,149 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store'
 import { driverService } from '@/services'
-import {
-  Card,
-  CardContent,
-  Button,
-  Badge,
-  PageLoader,
-} from '@/components/ui'
 import { formatCurrency } from '@/utils/helpers'
 import {
   MapPin,
   Package,
-  Clock,
   Navigation,
   Map,
   List,
   Truck,
-  Store,
   RefreshCw,
-  Circle,
   ChevronRight,
-  MapPinned,
   Timer,
-  DollarSign,
-  Hash,
+  Zap,
+  Power,
+  PowerOff,
+  ArrowRight,
+  Route,
+  Sparkles,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+
+// Reusable Order Card Component
+function OrderCard({ order, onAccept, processing }) {
+  const [imgError, setImgError] = useState(false)
+
+  return (
+    <div className="group relative">
+      {/* Glow effect on hover */}
+      <div className="absolute -inset-0.5 bg-gradient-to-r from-violet-600 to-indigo-600 rounded-2xl opacity-0 group-hover:opacity-20 blur transition-opacity duration-300" />
+
+      <div className="relative bg-white dark:bg-slate-800 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 transition-all duration-300 group-hover:shadow-xl group-hover:shadow-violet-500/10">
+        {/* Top gradient bar */}
+        <div className="h-1 bg-gradient-to-r from-violet-500 via-purple-500 to-indigo-500" />
+
+        {/* Card Content */}
+        <div className="p-5">
+          {/* Header Row */}
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex items-center gap-3">
+              {/* Store Avatar */}
+              <div className="relative">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-100 to-indigo-100 dark:from-violet-900/30 dark:to-indigo-900/30 flex items-center justify-center overflow-hidden">
+                  {order.store_img && !imgError ? (
+                    <img
+                      src={order.store_img}
+                      alt=""
+                      className="w-full h-full object-cover"
+                      onError={() => setImgError(true)}
+                    />
+                  ) : (
+                    <Truck className="w-6 h-6 text-violet-500" />
+                  )}
+                </div>
+                {/* Online indicator */}
+                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-400 rounded-full border-2 border-white dark:border-slate-800" />
+              </div>
+
+              <div>
+                <h3 className="font-semibold text-slate-900 dark:text-white">
+                  {order.store_name || order.shipper_name || 'Pickup Point'}
+                </h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  Order #{order.id}
+                </p>
+              </div>
+            </div>
+
+            {/* Price Badge */}
+            <div className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/30 dark:to-teal-900/30 px-4 py-2 rounded-xl">
+              <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
+                {formatCurrency(order.order_amount || order.total_amount)}
+              </p>
+            </div>
+          </div>
+
+          {/* Stats Row */}
+          <div className="flex items-center gap-4 mb-5">
+            <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+              <Package className="w-4 h-4" />
+              <span className="text-sm">{order.total_product || 1} items</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+              <Route className="w-4 h-4" />
+              <span className="text-sm">{order.distance || '2.5 mi'}</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+              <Timer className="w-4 h-4" />
+              <span className="text-sm">{order.time || order.minutes_to_be_delivered_on || 15} min</span>
+            </div>
+          </div>
+
+          {/* Route Visualization */}
+          <div className="relative bg-slate-50 dark:bg-slate-900/50 rounded-xl p-4 mb-5">
+            <div className="flex items-start gap-3">
+              {/* Timeline */}
+              <div className="flex flex-col items-center">
+                <div className="w-3 h-3 rounded-full bg-violet-500 ring-4 ring-violet-100 dark:ring-violet-900/50" />
+                <div className="w-0.5 h-12 bg-gradient-to-b from-violet-500 to-indigo-500 my-1" />
+                <div className="w-3 h-3 rounded-full bg-indigo-500 ring-4 ring-indigo-100 dark:ring-indigo-900/50" />
+              </div>
+
+              {/* Addresses */}
+              <div className="flex-1 space-y-4">
+                <div>
+                  <p className="text-xs font-medium text-violet-600 dark:text-violet-400 uppercase tracking-wider mb-1">Pickup</p>
+                  <p className="text-sm text-slate-700 dark:text-slate-300 line-clamp-1">
+                    {driverService.formatPickupAddress(order) || 'Store Location'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-indigo-600 dark:text-indigo-400 uppercase tracking-wider mb-1">Dropoff</p>
+                  <p className="text-sm text-slate-700 dark:text-slate-300 line-clamp-1">
+                    {driverService.formatDropoffAddress(order) || 'Customer Location'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Button */}
+          <button
+            onClick={() => onAccept(order)}
+            disabled={processing === order.id}
+            className="w-full relative overflow-hidden group/btn bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-semibold py-3.5 px-6 rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <span className="relative z-10 flex items-center justify-center gap-2">
+              {processing === order.id ? (
+                <RefreshCw className="w-5 h-5 animate-spin" />
+              ) : (
+                <>
+                  <Zap className="w-5 h-5" />
+                  Accept Order
+                  <ArrowRight className="w-5 h-5 transition-transform group-hover/btn:translate-x-1" />
+                </>
+              )}
+            </span>
+            {/* Shine effect */}
+            <div className="absolute inset-0 -translate-x-full group-hover/btn:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function DriverOrdersPage() {
   const navigate = useNavigate()
@@ -70,9 +187,7 @@ function DriverOrdersPage() {
         long: location.long,
       })
 
-      console.log('Driver orders response:', response)
-
-      if (response.status === 1) {
+      if (response.status === 1 || response.status === 0) {
         setOrders(response.data || [])
       }
     } catch (error) {
@@ -108,10 +223,9 @@ function DriverOrdersPage() {
       const response = await driverService.changeDriverOrderStatus({
         order_id: order.id,
         driver_id: user.wh_account_id,
+        user_id: user.id,
         status: 1,
       })
-
-      console.log('Accept order response:', response)
 
       if (response.status === 1 || response.code === 200 || response.status === 0) {
         toast.success('Order accepted!')
@@ -135,60 +249,82 @@ function DriverOrdersPage() {
   }
 
   if (loading && orders.length === 0) {
-    return <PageLoader />
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="text-center">
+          <div className="relative">
+            <div className="w-16 h-16 rounded-full bg-gradient-to-r from-violet-500 to-indigo-500 animate-pulse mx-auto" />
+            <Truck className="w-8 h-8 text-white absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+          </div>
+          <p className="mt-4 text-slate-500 dark:text-slate-400">Loading orders...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900 dark:text-dark-text">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <Sparkles className="w-6 h-6 text-violet-500" />
             Available Orders
           </h1>
-          <p className="text-sm text-gray-500 dark:text-dark-muted">
-            {isOnline ? `${orders.length} orders nearby` : 'You are offline'}
+          <p className="text-slate-500 dark:text-slate-400 mt-1">
+            {isOnline ? `${orders.length} delivery requests nearby` : 'You are currently offline'}
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Online/Offline Toggle */}
-          <div className="flex items-center bg-gray-100 dark:bg-dark-border rounded-full p-0.5">
-            <button
-              onClick={() => !isOnline && handleToggleOnline()}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                !isOnline ? 'bg-gray-600 text-white shadow-sm' : 'text-gray-500'
-              }`}
-            >
-              Offline
-            </button>
-            <button
-              onClick={() => isOnline || handleToggleOnline()}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                isOnline ? 'bg-green-500 text-white shadow-sm' : 'text-gray-500'
-              }`}
-            >
-              Online
-            </button>
-          </div>
+        {/* Controls */}
+        <div className="flex items-center gap-3">
+          {/* Status Toggle */}
+          <button
+            onClick={handleToggleOnline}
+            className={`relative flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all duration-300 ${
+              isOnline
+                ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/25'
+                : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+            }`}
+          >
+            {isOnline ? (
+              <>
+                <Power className="w-4 h-4" />
+                <span>Online</span>
+                <span className="flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-white opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
+                </span>
+              </>
+            ) : (
+              <>
+                <PowerOff className="w-4 h-4" />
+                <span>Offline</span>
+              </>
+            )}
+          </button>
 
           {/* View Toggle */}
-          <div className="flex items-center bg-gray-100 dark:bg-dark-border rounded-lg p-0.5">
-            <button
-              onClick={() => setViewMode('map')}
-              className={`p-1.5 rounded transition-all ${
-                viewMode === 'map' ? 'bg-white shadow-sm text-primary-600 dark:bg-dark-card' : 'text-gray-400'
-              }`}
-            >
-              <Map className="h-4 w-4" />
-            </button>
+          <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-1">
             <button
               onClick={() => setViewMode('list')}
-              className={`p-1.5 rounded transition-all ${
-                viewMode === 'list' ? 'bg-white shadow-sm text-primary-600 dark:bg-dark-card' : 'text-gray-400'
+              className={`p-2 rounded-lg transition-all ${
+                viewMode === 'list'
+                  ? 'bg-white dark:bg-slate-700 text-violet-600 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-600'
               }`}
             >
-              <List className="h-4 w-4" />
+              <List className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('map')}
+              className={`p-2 rounded-lg transition-all ${
+                viewMode === 'map'
+                  ? 'bg-white dark:bg-slate-700 text-violet-600 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              <Map className="w-4 h-4" />
             </button>
           </div>
 
@@ -197,184 +333,91 @@ function DriverOrdersPage() {
             <button
               onClick={() => loadOrders(false)}
               disabled={refreshing}
-              className="p-1.5 rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-dark-border"
+              className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-violet-600 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-all"
             >
-              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
             </button>
           )}
         </div>
       </div>
 
-      {/* Alert Banner */}
-      {isOnline && orders.length > 0 && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 dark:bg-emerald-900/20 dark:border-emerald-800">
-          <p className="text-emerald-700 dark:text-emerald-400 text-sm flex items-center gap-2">
-            <Circle className="h-2 w-2 fill-current animate-pulse" />
-            You have {orders.length} new requests
-          </p>
-        </div>
-      )}
-
-      {/* Offline State */}
+      {/* Offline Banner */}
       {!isOnline && (
-        <Card>
-          <CardContent className="py-16 text-center">
-            <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-dark-border flex items-center justify-center mx-auto mb-4">
-              <Truck className="h-8 w-8 text-gray-400" />
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-800 to-slate-900 p-8 text-center">
+          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjAzKSIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2dyaWQpIi8+PC9zdmc+')] opacity-50" />
+          <div className="relative">
+            <div className="w-20 h-20 rounded-full bg-slate-700 flex items-center justify-center mx-auto mb-4">
+              <PowerOff className="w-10 h-10 text-slate-400" />
             </div>
-            <h3 className="font-medium text-gray-900 dark:text-dark-text">You're Offline</h3>
-            <p className="text-sm text-gray-500 mt-1">Go online to receive delivery requests</p>
+            <h3 className="text-xl font-bold text-white mb-2">You're Offline</h3>
+            <p className="text-slate-400 mb-6">Go online to start receiving delivery requests</p>
             <button
               onClick={handleToggleOnline}
-              className="mt-4 px-6 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-colors"
+              className="inline-flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-semibold rounded-xl hover:from-emerald-600 hover:to-teal-600 transition-all shadow-lg shadow-emerald-500/25"
             >
+              <Power className="w-5 h-5" />
               Go Online
             </button>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
       {/* Map View Placeholder */}
       {isOnline && viewMode === 'map' && (
-        <Card>
-          <CardContent className="py-16 text-center">
-            <Map className="h-12 w-12 mx-auto text-gray-300 mb-4" />
-            <h3 className="font-medium text-gray-900 dark:text-dark-text">Map View</h3>
-            <p className="text-sm text-gray-500 mt-1">Coming soon...</p>
-          </CardContent>
-        </Card>
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-50 to-indigo-50 dark:from-slate-800 dark:to-slate-900 p-12 text-center">
+          <div className="relative">
+            <div className="w-20 h-20 rounded-full bg-white dark:bg-slate-700 shadow-lg flex items-center justify-center mx-auto mb-4">
+              <Map className="w-10 h-10 text-violet-500" />
+            </div>
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Map View</h3>
+            <p className="text-slate-500 dark:text-slate-400">Coming soon...</p>
+          </div>
+        </div>
       )}
 
       {/* Orders List */}
       {isOnline && viewMode === 'list' && (
         <>
+          {/* Active orders banner */}
+          {orders.length > 0 && (
+            <div className="flex items-center gap-3 bg-gradient-to-r from-violet-50 to-indigo-50 dark:from-violet-900/20 dark:to-indigo-900/20 border border-violet-200 dark:border-violet-800 rounded-xl px-4 py-3">
+              <div className="flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-violet-500 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-violet-500" />
+              </div>
+              <p className="text-sm font-medium text-violet-700 dark:text-violet-300">
+                {orders.length} new delivery {orders.length === 1 ? 'request' : 'requests'} available
+              </p>
+            </div>
+          )}
+
           {orders.length > 0 ? (
-            <div className="space-y-3">
+            <div className="grid gap-4">
               {orders.map((order) => (
-                <div
+                <OrderCard
                   key={order.id}
-                  className="bg-white dark:bg-dark-card rounded-xl border border-gray-200 dark:border-dark-border overflow-hidden hover:shadow-md transition-shadow"
-                >
-                  {/* Order Header */}
-                  <div className="p-4 border-b border-gray-100 dark:border-dark-border">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        {/* Store Image */}
-                        <div className="w-11 h-11 rounded-xl bg-gray-100 dark:bg-dark-border overflow-hidden flex-shrink-0">
-                          {order.store_img ? (
-                            <img
-                              src={order.store_img}
-                              alt=""
-                              className="w-full h-full object-cover"
-                              onError={(e) => {
-                                e.target.onerror = null
-                                e.target.src = ''
-                                e.target.parentElement.innerHTML = '<div class="w-full h-full flex items-center justify-center"><svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg></div>'
-                              }}
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <Store className="w-5 h-5 text-gray-400" />
-                            </div>
-                          )}
-                        </div>
-                        <div>
-                          <h3 className="font-medium text-gray-900 dark:text-dark-text text-sm">
-                            {order.store_name || order.shipper_name || 'Store'}
-                          </h3>
-                          <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-500">
-                            <span className="flex items-center gap-1">
-                              <Hash className="h-3 w-3" />
-                              {order.id}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Package className="h-3 w-3" />
-                              {order.total_product} item{order.total_product > 1 ? 's' : ''}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Navigation className="h-3 w-3" />
-                              {order.distance || '0 Miles'}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Timer className="h-3 w-3" />
-                              {order.time || order.minutes_to_be_delivered_on || 0} min
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-semibold text-gray-900 dark:text-dark-text">
-                          {formatCurrency(order.order_amount)}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Addresses */}
-                  <div className="px-4 py-3 space-y-2.5 bg-gray-50/50 dark:bg-dark-bg/50">
-                    {/* Pickup */}
-                    <div className="flex items-start gap-2">
-                      <div className="w-5 h-5 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <Circle className="w-2 h-2 text-green-600 fill-current" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[10px] text-gray-400 uppercase tracking-wider font-medium">PICK UP</p>
-                        <p className="text-sm text-gray-700 dark:text-dark-text truncate">
-                          {driverService.formatPickupAddress(order)}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Connector Line */}
-                    <div className="ml-2.5 w-px h-2 bg-gray-300 dark:bg-dark-border"></div>
-
-                    {/* Dropoff */}
-                    <div className="flex items-start gap-2">
-                      <div className="w-5 h-5 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <MapPin className="w-3 h-3 text-red-600" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[10px] text-gray-400 uppercase tracking-wider font-medium">DROP OFF</p>
-                        <p className="text-sm text-gray-700 dark:text-dark-text truncate">
-                          {driverService.formatDropoffAddress(order)}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="px-4 py-3 flex gap-2">
-                    <button
-                      className="flex-1 py-2 px-3 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors dark:border-red-800 dark:hover:bg-red-900/20"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={() => handleAcceptOrder(order)}
-                      disabled={processing === order.id}
-                      className="flex-1 py-2 px-3 text-sm font-medium text-white bg-emerald-500 rounded-lg hover:bg-emerald-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
-                    >
-                      {processing === order.id ? (
-                        <RefreshCw className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <>Accept</>
-                      )}
-                    </button>
-                  </div>
-                </div>
+                  order={order}
+                  onAccept={handleAcceptOrder}
+                  processing={processing}
+                />
               ))}
             </div>
           ) : (
-            <Card>
-              <CardContent className="py-16 text-center">
-                <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-dark-border flex items-center justify-center mx-auto mb-4">
-                  <MapPinned className="h-8 w-8 text-gray-400" />
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900 p-12 text-center">
+              <div className="relative">
+                <div className="w-24 h-24 rounded-full bg-white dark:bg-slate-700 shadow-xl flex items-center justify-center mx-auto mb-6">
+                  <Navigation className="w-12 h-12 text-slate-300 dark:text-slate-500" />
                 </div>
-                <h3 className="font-medium text-gray-900 dark:text-dark-text">No Orders Available</h3>
-                <p className="text-sm text-gray-500 mt-1">New delivery requests will appear here</p>
-                <p className="text-xs text-gray-400 mt-3">Auto-refreshing every 30 seconds</p>
-              </CardContent>
-            </Card>
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">No Orders Yet</h3>
+                <p className="text-slate-500 dark:text-slate-400 mb-2">
+                  New delivery requests will appear here
+                </p>
+                <p className="text-xs text-slate-400 dark:text-slate-500 flex items-center justify-center gap-1">
+                  <RefreshCw className="w-3 h-3" />
+                  Auto-refreshing every 30 seconds
+                </p>
+              </div>
+            </div>
           )}
         </>
       )}
