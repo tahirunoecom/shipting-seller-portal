@@ -8,19 +8,14 @@ import {
   ArrowLeft,
   MapPin,
   Package,
-  Navigation,
   Map,
-  Trash2,
   Phone,
   CheckCircle,
   Camera,
-  Timer,
   RefreshCw,
   Truck,
   ChevronRight,
-  Sparkles,
   Route,
-  Clock,
   X,
   Shield,
   FileText,
@@ -67,7 +62,6 @@ function DriverOrderDetailPage() {
   const [processing, setProcessing] = useState(false)
   const [showPickupModal, setShowPickupModal] = useState(false)
   const [showDeliveryModal, setShowDeliveryModal] = useState(false)
-  const [pickupTime, setPickupTime] = useState({ hours: 0, minutes: 0, seconds: 0 })
   const [imgError, setImgError] = useState(false)
 
   const [deliveryForm, setDeliveryForm] = useState({
@@ -105,21 +99,6 @@ function DriverOrderDetailPage() {
   useEffect(() => {
     loadOrder()
   }, [loadOrder])
-
-  useEffect(() => {
-    if (!order) return
-    const interval = setInterval(() => {
-      const orderDate = new Date(order.order_date)
-      const now = new Date()
-      const diff = Math.floor((now - orderDate) / 1000)
-      setPickupTime({
-        hours: Math.floor(diff / 3600),
-        minutes: Math.floor((diff % 3600) / 60),
-        seconds: diff % 60,
-      })
-    }, 1000)
-    return () => clearInterval(interval)
-  }, [order])
 
   const getStatusCode = () => {
     if (!order) return 0
@@ -203,11 +182,6 @@ function DriverOrderDetailPage() {
     else handleStatusUpdate(config.nextStatus)
   }
 
-  const formatTimer = () => {
-    const { hours, minutes, seconds } = pickupTime
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
-  }
-
   // Get step index for progress
   const getStepIndex = (status) => {
     return STATUS_STEPS.findIndex(s => s.status === status)
@@ -259,26 +233,6 @@ function DriverOrderDetailPage() {
             : 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400'
         }`}>
           {isDelivered ? 'Completed' : 'Active'}
-        </div>
-      </div>
-
-      {/* Timer Card */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-800 to-slate-900 p-6">
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjAzKSIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2dyaWQpIi8+PC9zdmc+')] opacity-50" />
-        <div className="relative flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center">
-              <Timer className="w-6 h-6 text-violet-400" />
-            </div>
-            <div>
-              <p className="text-slate-400 text-sm">Elapsed Time</p>
-              <p className="text-white text-2xl font-mono font-bold">{formatTimer()}</p>
-            </div>
-          </div>
-          <div className="text-right">
-            <p className="text-slate-400 text-sm">Earnings</p>
-            <p className="text-2xl font-bold text-emerald-400">{formatCurrency(orderAmount)}</p>
-          </div>
         </div>
       </div>
 
