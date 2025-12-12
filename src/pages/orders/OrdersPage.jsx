@@ -47,6 +47,7 @@ const ORDER_TABS = [
 
 const STATUS_COLORS = {
   Pending: 'warning',
+  'Searching for Driver': 'info',
   Accepted: 'info',
   Packed: 'info',
   Shipped: 'primary',
@@ -120,10 +121,15 @@ function OrdersPage() {
       setProcessing(true)
       const response = await orderService.changeDeliveryType(orderId, type)
       if (response.status === 1) {
-        toast.success(type === 'self' ? 'Self delivery selected' : 'Finding nearest driver...')
-        // After selecting delivery type, accept the order
-        await handleUpdateStatus(orderId, 'OrderAccept')
-        loadOrders()
+        if (type === 'self') {
+          // Self delivery: accept the order immediately
+          toast.success('Self delivery selected')
+          await handleUpdateStatus(orderId, 'OrderAccept')
+        } else {
+          // Driver: just change delivery type, don't accept - will show "Searching for Driver"
+          toast.success('Searching for nearest driver...')
+          loadOrders()
+        }
       } else {
         toast.error(response.message || 'Failed to change delivery type')
       }
@@ -210,6 +216,8 @@ function OrdersPage() {
     if (order.Shipped === 'Y') return 'In Transit'
     if (order.packed === 'Y') return 'Packed'
     if (order.accepted === 'Y') return 'Accepted'
+    // Pending but searching for driver
+    if (order.delivery_type === 'driver') return 'Searching for Driver'
     return 'Pending'
   }
 
@@ -284,6 +292,13 @@ function OrdersPage() {
             Find Driver
           </Button>
         </div>
+      )
+    } else if (status === 'Searching for Driver') {
+      // Waiting for driver to accept - no action needed, just show status
+      buttons.push(
+        <span key="waiting" className="text-sm text-gray-500 italic">
+          Waiting for driver to accept...
+        </span>
       )
     } else if (status === 'Accepted') {
       buttons.push(
