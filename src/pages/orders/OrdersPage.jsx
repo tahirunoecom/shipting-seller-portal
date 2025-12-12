@@ -49,6 +49,11 @@ const STATUS_COLORS = {
   Pending: 'warning',
   'Searching for Driver': 'info',
   'Driver Assigned': 'success',
+  'Packed - Waiting for Driver': 'info',
+  'Driver On Way to Store': 'primary',
+  'Driver Picked Up': 'primary',
+  'Out for Delivery': 'primary',
+  'Reached Customer': 'primary',
   Accepted: 'info',
   Packed: 'info',
   Shipped: 'primary',
@@ -119,14 +124,14 @@ function OrdersPage() {
     }
   }, [user.wh_account_id])
 
-  // Check if any orders are searching for driver
-  const hasSearchingOrders = useCallback(() => {
-    return orders.some(order =>
-      order.delivery_type === 'driver' &&
-      order.accepted !== 'Y' &&
-      !order.driver_accepted &&
-      !order.driver_id
-    )
+  // Check if any orders need auto-refresh (driver delivery in progress)
+  const hasDriverOrdersInProgress = useCallback(() => {
+    return orders.some(order => {
+      if (order.delivery_type !== 'driver') return false
+      if (order.delivered === 'Y' || order.cancelled === 'Y' || order.driver_delivered === 'Y') return false
+      // Auto-refresh for: searching for driver, driver assigned, or any driver delivery in progress
+      return true
+    })
   }, [orders])
 
   // Initial load
@@ -134,12 +139,12 @@ function OrdersPage() {
     loadOrders()
   }, [loadOrders])
 
-  // Auto-polling when there are orders searching for driver
+  // Auto-polling when there are driver orders in progress
   useEffect(() => {
-    if (hasSearchingOrders()) {
+    if (hasDriverOrdersInProgress()) {
       // Start polling
       pollingRef.current = setInterval(() => {
-        console.log('Auto-refreshing orders (searching for driver)...')
+        console.log('Auto-refreshing orders (driver delivery in progress)...')
         silentRefresh()
       }, POLLING_INTERVAL)
     } else {
@@ -156,7 +161,7 @@ function OrdersPage() {
         clearInterval(pollingRef.current)
       }
     }
-  }, [hasSearchingOrders, silentRefresh])
+  }, [hasDriverOrdersInProgress, silentRefresh])
 
   const toggleOrderExpand = (orderId) => {
     setExpandedOrders(prev => ({
@@ -268,17 +273,23 @@ function OrdersPage() {
   const getOrderStatus = (order) => {
     if (order.cancelled === 'Y') return 'Cancelled'
     if (order.delivered === 'Y') return 'Delivered'
+
+    // For driver delivery, show driver-specific statuses
+    if (order.delivery_type === 'driver') {
+      if (order.driver_delivered === 'Y') return 'Delivered'
+      if (order.reached_at_customer === 'Y') return 'Reached Customer'
+      if (order.on_the_way_to_the_customer === 'Y') return 'Out for Delivery'
+      if (order.confirm_pickup === 'Y') return 'Driver Picked Up'
+      if (order.go_to_pickup === 'Y') return 'Driver On Way to Store'
+      if (order.packed === 'Y') return 'Packed - Waiting for Driver'
+      if (order.driver_accepted === 'Y' || order.driver_id) return 'Driver Assigned'
+      return 'Searching for Driver'
+    }
+
+    // For self delivery
     if (order.Shipped === 'Y') return 'In Transit'
     if (order.packed === 'Y') return 'Packed'
     if (order.accepted === 'Y') return 'Accepted'
-    // Pending with driver delivery type
-    if (order.delivery_type === 'driver') {
-      // Check if driver has accepted (driver_accepted comes from sods table)
-      if (order.driver_accepted === 'Y' || order.driver_id) {
-        return 'Driver Assigned'
-      }
-      return 'Searching for Driver'
-    }
     return 'Pending'
   }
 
@@ -329,6 +340,7 @@ function OrdersPage() {
   const getActionButtons = (order) => {
     const status = getOrderStatus(order)
     const buttons = []
+    const isDriverDelivery = order.delivery_type === 'driver'
 
     if (status === 'Pending') {
       // Show delivery type options
@@ -355,7 +367,7 @@ function OrdersPage() {
         </div>
       )
     } else if (status === 'Searching for Driver') {
-      // Waiting for driver to accept - no action needed, just show status
+      // Waiting for driver to accept
       buttons.push(
         <span key="waiting" className="text-sm text-gray-500 italic flex items-center gap-2">
           <span className="inline-block w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
@@ -375,7 +387,16 @@ function OrdersPage() {
           Mark Packed
         </Button>
       )
+    } else if (isDriverDelivery && ['Packed - Waiting for Driver', 'Driver On Way to Store', 'Driver Picked Up', 'Out for Delivery', 'Reached Customer'].includes(status)) {
+      // Driver delivery after packed - show status with auto-refresh, no action buttons
+      buttons.push(
+        <span key="driver-status" className="text-sm text-primary-600 font-medium flex items-center gap-2">
+          <span className="inline-block w-2 h-2 bg-primary-500 rounded-full animate-pulse"></span>
+          {status} (auto-refreshing)
+        </span>
+      )
     } else if (status === 'Accepted') {
+      // Self delivery - accepted, can pack
       buttons.push(
         <Button
           key="pack"
@@ -387,7 +408,8 @@ function OrdersPage() {
           Mark Packed
         </Button>
       )
-    } else if (status === 'Packed') {
+    } else if (status === 'Packed' && !isDriverDelivery) {
+      // Self delivery - packed, can ship
       buttons.push(
         <Button
           key="ship"
@@ -399,7 +421,8 @@ function OrdersPage() {
           Out for Delivery
         </Button>
       )
-    } else if (status === 'In Transit' && order.delivery_type === 'self') {
+    } else if (status === 'In Transit' && !isDriverDelivery) {
+      // Self delivery - in transit, can mark delivered
       buttons.push(
         <Button
           key="deliver"
@@ -615,7 +638,8 @@ function OrdersPage() {
                       {/* Actions */}
                       <div className="p-4 border-t dark:border-dark-border flex flex-wrap items-center justify-between gap-4">
                         <div className="flex items-center gap-2">
-                          {status !== 'Delivered' && status !== 'Cancelled' && (
+                          {/* Cancel button only visible before choosing delivery type (Pending status) */}
+                          {status === 'Pending' && (
                             <Button
                               size="sm"
                               variant="danger"
