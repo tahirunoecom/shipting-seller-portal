@@ -8,10 +8,15 @@ export function cn(...inputs) {
 
 // Format currency
 export function formatCurrency(amount, currency = 'USD') {
+  // Handle undefined, null, NaN, or invalid values
+  const numAmount = parseFloat(amount)
+  if (isNaN(numAmount) || amount === undefined || amount === null) {
+    return '$0.00'
+  }
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency,
-  }).format(amount)
+  }).format(numAmount)
 }
 
 // Format date

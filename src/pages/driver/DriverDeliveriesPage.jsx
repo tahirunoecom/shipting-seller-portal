@@ -5,32 +5,42 @@ import { driverService, DRIVER_STATUS_LABELS } from '@/services'
 import {
   Card,
   CardContent,
-  Button,
   Badge,
   PageLoader,
 } from '@/components/ui'
 import { formatCurrency, formatDateTime } from '@/utils/helpers'
 import {
-  MapPin,
   Package,
   Clock,
-  Navigation,
   Store,
   CheckCircle,
   Truck,
   ChevronRight,
+  Circle,
+  MapPin,
+  Hash,
+  RefreshCw,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
-// Status badge colors
 const STATUS_COLORS = {
-  1: 'info',      // Accepted
-  2: 'info',      // Going to pickup
-  3: 'primary',   // Pickup confirmed
-  4: 'info',      // Reached store
-  5: 'primary',   // On the way
-  6: 'warning',   // Reached customer
-  7: 'success',   // Delivered
+  1: 'info',
+  2: 'info',
+  3: 'primary',
+  4: 'info',
+  5: 'primary',
+  6: 'warning',
+  7: 'success',
+}
+
+const STATUS_LABELS = {
+  1: 'Accepted',
+  2: 'Going to Pickup',
+  3: 'Picked Up',
+  4: 'At Store',
+  5: 'On The Way',
+  6: 'At Customer',
+  7: 'Delivered',
 }
 
 function DriverDeliveriesPage() {
@@ -39,24 +49,21 @@ function DriverDeliveriesPage() {
   const { user } = useAuthStore()
   const [loading, setLoading] = useState(true)
   const [orders, setOrders] = useState([])
-  const [activeTab, setActiveTab] = useState('active') // 'active' or 'completed'
+  const [activeTab, setActiveTab] = useState('active')
 
-  // Show completion toast if coming from completed delivery
   useEffect(() => {
     if (location.state?.completed) {
       toast.success(`Delivery #${location.state.completed.id} completed!`)
-      // Clear the state
       window.history.replaceState({}, document.title)
     }
   }, [location.state])
 
-  // Load orders
   const loadOrders = useCallback(async () => {
     try {
       setLoading(true)
       const response = await driverService.getDriverActiveOrders({
         driver_id: user.wh_account_id,
-        status: 0, // Get all
+        status: 0,
       })
 
       if (response.status === 1) {
@@ -74,16 +81,14 @@ function DriverDeliveriesPage() {
     loadOrders()
   }, [loadOrders])
 
-  // Get status code from order
   const getStatusCode = (order) => {
     const status = order.driver_order_status
     if (typeof status === 'object') {
-      return status.driver_order_status || 0
+      return status.driver_order_status || status.status || 0
     }
     return status || 0
   }
 
-  // Filter orders by tab
   const filteredOrders = orders.filter(order => {
     const statusCode = getStatusCode(order)
     if (activeTab === 'active') {
@@ -92,61 +97,54 @@ function DriverDeliveriesPage() {
     return statusCode === 7
   })
 
-  // Get status label
-  const getStatusLabel = (order) => {
-    const statusCode = getStatusCode(order)
-    return DRIVER_STATUS_LABELS[statusCode] || 'Unknown'
-  }
+  const activeCount = orders.filter(o => getStatusCode(o) > 0 && getStatusCode(o) < 7).length
+  const completedCount = orders.filter(o => getStatusCode(o) === 7).length
 
   if (loading && orders.length === 0) {
     return <PageLoader />
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-dark-text">
-          My Deliveries
-        </h1>
-        <p className="text-gray-500 dark:text-dark-muted">
-          Track your active and completed deliveries
-        </p>
+        <h1 className="text-xl font-semibold text-gray-900 dark:text-dark-text">My Deliveries</h1>
+        <p className="text-sm text-gray-500 dark:text-dark-muted">Track your active and completed deliveries</p>
       </div>
 
       {/* Tabs */}
       <div className="flex gap-2">
         <button
           onClick={() => setActiveTab('active')}
-          className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
             activeTab === 'active'
-              ? 'bg-primary-500 text-white'
+              ? 'bg-emerald-500 text-white shadow-sm'
               : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-dark-border dark:text-dark-muted'
           }`}
         >
           Active
-          {orders.filter(o => getStatusCode(o) > 0 && getStatusCode(o) < 7).length > 0 && (
-            <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
+          {activeCount > 0 && (
+            <span className={`ml-2 px-1.5 py-0.5 rounded text-xs ${
               activeTab === 'active' ? 'bg-white/20' : 'bg-gray-200 dark:bg-dark-bg'
             }`}>
-              {orders.filter(o => getStatusCode(o) > 0 && getStatusCode(o) < 7).length}
+              {activeCount}
             </span>
           )}
         </button>
         <button
           onClick={() => setActiveTab('completed')}
-          className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
             activeTab === 'completed'
-              ? 'bg-primary-500 text-white'
+              ? 'bg-emerald-500 text-white shadow-sm'
               : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-dark-border dark:text-dark-muted'
           }`}
         >
           Completed
-          {orders.filter(o => getStatusCode(o) === 7).length > 0 && (
-            <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
+          {completedCount > 0 && (
+            <span className={`ml-2 px-1.5 py-0.5 rounded text-xs ${
               activeTab === 'completed' ? 'bg-white/20' : 'bg-gray-200 dark:bg-dark-bg'
             }`}>
-              {orders.filter(o => getStatusCode(o) === 7).length}
+              {completedCount}
             </span>
           )}
         </button>
@@ -154,129 +152,130 @@ function DriverDeliveriesPage() {
 
       {/* Orders List */}
       {filteredOrders.length > 0 ? (
-        <div className="space-y-4">
+        <div className="space-y-3">
           {filteredOrders.map((order) => {
             const statusCode = getStatusCode(order)
             const isCompleted = statusCode === 7
+            const orderAmount = order.order_amount || order.total_amount || 0
 
             return (
-              <Card
+              <div
                 key={order.id}
-                className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
                 onClick={() => navigate(`/driver/order/${order.id}`)}
+                className="bg-white dark:bg-dark-card rounded-xl border border-gray-200 dark:border-dark-border overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
               >
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between">
+                <div className="p-4">
+                  <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
-                      {/* Store Image */}
-                      <div className="h-12 w-12 rounded-lg bg-gray-100 dark:bg-dark-border overflow-hidden shrink-0">
+                      <div className="w-10 h-10 rounded-lg bg-gray-100 dark:bg-dark-border overflow-hidden flex-shrink-0">
                         {order.store_img ? (
                           <img
                             src={order.store_img}
-                            alt={order.store_name}
-                            className="h-full w-full object-cover"
+                            alt=""
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.target.style.display = 'none'
+                            }}
                           />
                         ) : (
-                          <div className="h-full w-full flex items-center justify-center">
-                            <Store className="h-6 w-6 text-gray-400" />
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Store className="w-5 h-5 text-gray-400" />
                           </div>
                         )}
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <h3 className="font-semibold text-gray-900 dark:text-dark-text">
-                            #{order.id}
-                          </h3>
+                          <span className="text-xs text-gray-500 flex items-center gap-1">
+                            <Hash className="h-3 w-3" />
+                            {order.id}
+                          </span>
                           <Badge variant={STATUS_COLORS[statusCode] || 'default'}>
-                            {getStatusLabel(order)}
+                            {STATUS_LABELS[statusCode] || 'Unknown'}
                           </Badge>
                         </div>
-                        <p className="text-sm text-gray-600 dark:text-dark-muted">
-                          {order.store_name || order.shipper_name}
-                        </p>
-                        <div className="flex flex-wrap items-center gap-3 mt-1 text-xs text-gray-500">
-                          <span className="flex items-center gap-1">
-                            <Package className="h-3 w-3" />
-                            {order.total_product} items
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {formatDateTime(order.order_date)}
-                          </span>
-                        </div>
+                        <h3 className="font-medium text-gray-900 dark:text-dark-text text-sm mt-0.5">
+                          {order.store_name || order.shipper_name || 'Store'}
+                        </h3>
                       </div>
                     </div>
-
                     <div className="flex items-center gap-2">
-                      <p className="text-lg font-bold text-primary-600">
-                        {formatCurrency(order.order_amount)}
-                      </p>
-                      <ChevronRight className="h-5 w-5 text-gray-400" />
+                      <span className="font-semibold text-gray-900 dark:text-dark-text">
+                        {formatCurrency(orderAmount)}
+                      </span>
+                      <ChevronRight className="h-4 w-4 text-gray-400" />
                     </div>
                   </div>
 
-                  {/* Quick Address Info */}
-                  <div className="mt-3 pt-3 border-t dark:border-dark-border grid grid-cols-2 gap-3 text-xs">
-                    <div>
-                      <p className="text-gray-500 uppercase">From</p>
-                      <p className="text-gray-900 dark:text-dark-text truncate">
-                        {order.pickup?.store_city || order.pickup?.city || 'N/A'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-gray-500 uppercase">To</p>
-                      <p className="text-gray-900 dark:text-dark-text truncate">
-                        {order.drop_off?.city || 'N/A'}
-                      </p>
+                  {/* Quick Info */}
+                  <div className="flex items-center gap-4 text-xs text-gray-500">
+                    <span className="flex items-center gap-1">
+                      <Package className="h-3 w-3" />
+                      {order.total_product} items
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {formatDateTime(order.order_date)}
+                    </span>
+                  </div>
+
+                  {/* Route Summary */}
+                  <div className="mt-3 pt-3 border-t border-gray-100 dark:border-dark-border">
+                    <div className="flex items-center gap-2 text-xs">
+                      <Circle className="h-2.5 w-2.5 text-emerald-500 fill-current" />
+                      <span className="text-gray-600 dark:text-dark-muted truncate flex-1">
+                        {order.pickup?.store_city || order.pickup?.city || 'Pickup'}
+                      </span>
+                      <span className="text-gray-400">→</span>
+                      <MapPin className="h-3 w-3 text-red-500" />
+                      <span className="text-gray-600 dark:text-dark-muted truncate flex-1">
+                        {order.drop_off?.city || 'Delivery'}
+                      </span>
                     </div>
                   </div>
 
-                  {/* Continue Button for Active Orders */}
+                  {/* Continue Button */}
                   {!isCompleted && (
-                    <Button
-                      className="w-full mt-3 bg-[#c8e651] hover:bg-[#b8d641] text-gray-900"
+                    <button
                       onClick={(e) => {
                         e.stopPropagation()
                         navigate(`/driver/order/${order.id}`)
                       }}
+                      className="w-full mt-3 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium rounded-lg transition-colors"
                     >
                       Continue Delivery
-                    </Button>
+                    </button>
                   )}
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             )
           })}
         </div>
       ) : (
-        <Card>
-          <CardContent className="py-12 text-center">
-            {activeTab === 'active' ? (
-              <>
-                <Truck className="h-12 w-12 mx-auto text-gray-300 mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 dark:text-dark-text">
-                  No Active Deliveries
-                </h3>
-                <p className="text-gray-500 dark:text-dark-muted mt-1">
-                  Accept orders to start delivering
-                </p>
-                <Button onClick={() => navigate('/driver/orders')} className="mt-4">
-                  View Available Orders
-                </Button>
-              </>
-            ) : (
-              <>
-                <CheckCircle className="h-12 w-12 mx-auto text-gray-300 mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 dark:text-dark-text">
-                  No Completed Deliveries
-                </h3>
-                <p className="text-gray-500 dark:text-dark-muted mt-1">
-                  Your completed deliveries will appear here
-                </p>
-              </>
-            )}
-          </CardContent>
-        </Card>
+        <div className="bg-white dark:bg-dark-card rounded-xl border border-gray-200 dark:border-dark-border p-12 text-center">
+          {activeTab === 'active' ? (
+            <>
+              <div className="w-14 h-14 rounded-full bg-gray-100 dark:bg-dark-border flex items-center justify-center mx-auto mb-4">
+                <Truck className="h-7 w-7 text-gray-400" />
+              </div>
+              <h3 className="font-medium text-gray-900 dark:text-dark-text">No Active Deliveries</h3>
+              <p className="text-sm text-gray-500 mt-1">Accept orders to start delivering</p>
+              <button
+                onClick={() => navigate('/driver/orders')}
+                className="mt-4 px-6 py-2 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600 transition-colors"
+              >
+                View Available Orders
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="w-14 h-14 rounded-full bg-gray-100 dark:bg-dark-border flex items-center justify-center mx-auto mb-4">
+                <CheckCircle className="h-7 w-7 text-gray-400" />
+              </div>
+              <h3 className="font-medium text-gray-900 dark:text-dark-text">No Completed Deliveries</h3>
+              <p className="text-sm text-gray-500 mt-1">Your completed deliveries will appear here</p>
+            </>
+          )}
+        </div>
       )}
     </div>
   )
