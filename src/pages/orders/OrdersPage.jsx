@@ -48,6 +48,7 @@ const ORDER_TABS = [
 const STATUS_COLORS = {
   Pending: 'warning',
   'Searching for Driver': 'info',
+  'Driver Assigned': 'success',
   Accepted: 'info',
   Packed: 'info',
   Shipped: 'primary',
@@ -216,8 +217,14 @@ function OrdersPage() {
     if (order.Shipped === 'Y') return 'In Transit'
     if (order.packed === 'Y') return 'Packed'
     if (order.accepted === 'Y') return 'Accepted'
-    // Pending but searching for driver
-    if (order.delivery_type === 'driver') return 'Searching for Driver'
+    // Pending with driver delivery type
+    if (order.delivery_type === 'driver') {
+      // Check if driver has accepted (driver_accepted comes from sods table)
+      if (order.driver_accepted === 'Y' || order.driver_id) {
+        return 'Driver Assigned'
+      }
+      return 'Searching for Driver'
+    }
     return 'Pending'
   }
 
@@ -299,6 +306,19 @@ function OrdersPage() {
         <span key="waiting" className="text-sm text-gray-500 italic">
           Waiting for driver to accept...
         </span>
+      )
+    } else if (status === 'Driver Assigned') {
+      // Driver accepted - seller can now pack the order
+      buttons.push(
+        <Button
+          key="pack"
+          size="sm"
+          onClick={() => handleUpdateStatus(order.order_id, 'OrderPacked')}
+          disabled={processing}
+        >
+          <Package className="h-4 w-4" />
+          Mark Packed
+        </Button>
       )
     } else if (status === 'Accepted') {
       buttons.push(
