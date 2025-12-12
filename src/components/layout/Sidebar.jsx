@@ -1,4 +1,4 @@
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { cn } from '@/utils/helpers'
 import { useAuthStore } from '@/store'
 import {
@@ -99,6 +99,7 @@ const driverMenuItems = [
 
 function Sidebar({ isOpen, onClose }) {
   const navigate = useNavigate()
+  const location = useLocation()
   const { logout, userDetails, userTypes, activeMode, setActiveMode, user } = useAuthStore()
 
   // Determine if user has multiple roles
@@ -106,6 +107,26 @@ function Sidebar({ isOpen, onClose }) {
 
   // Get menu items based on active mode
   const menuItems = activeMode === 'driver' ? driverMenuItems : sellerMenuItems
+
+  // Check if a nav item should be active (handles nested routes)
+  const isNavActive = (href) => {
+    const currentPath = location.pathname
+
+    // Exact match
+    if (currentPath === href) return true
+
+    // Handle driver order detail page - should highlight "My Deliveries"
+    if (currentPath.startsWith('/driver/order/') && href === '/driver/deliveries') {
+      return true
+    }
+
+    // For other routes, check if path starts with href (but not for root paths)
+    if (href !== '/' && href.length > 1 && currentPath.startsWith(href + '/')) {
+      return true
+    }
+
+    return false
+  }
 
   const handleLogout = () => {
     logout()
@@ -201,25 +222,26 @@ function Sidebar({ isOpen, onClose }) {
           {/* Navigation */}
           <nav className="flex-1 overflow-y-auto py-4 px-3 scrollbar-thin">
             <ul className="space-y-1">
-              {menuItems.map((item) => (
-                <li key={item.href}>
-                  <NavLink
-                    to={item.href}
-                    onClick={onClose}
-                    className={({ isActive }) =>
-                      cn(
+              {menuItems.map((item) => {
+                const active = isNavActive(item.href)
+                return (
+                  <li key={item.href}>
+                    <NavLink
+                      to={item.href}
+                      onClick={onClose}
+                      className={cn(
                         'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
-                        isActive
+                        active
                           ? 'bg-primary-50 text-primary-600 dark:bg-primary-500/10 dark:text-primary-400'
                           : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-dark-muted dark:hover:bg-dark-border dark:hover:text-dark-text'
-                      )
-                    }
-                  >
-                    <item.icon className="h-5 w-5" />
-                    {item.title}
-                  </NavLink>
-                </li>
-              ))}
+                      )}
+                    >
+                      <item.icon className="h-5 w-5" />
+                      {item.title}
+                    </NavLink>
+                  </li>
+                )
+              })}
             </ul>
           </nav>
 
