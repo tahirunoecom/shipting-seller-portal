@@ -4,13 +4,24 @@ import { Layout, AuthLayout } from '@/components/layout'
 // Auth pages
 import LoginPage from '@/pages/auth/LoginPage'
 import RegisterPage from '@/pages/auth/RegisterPage'
+import ModeSelectionPage from '@/pages/auth/ModeSelectionPage'
 
-// Main pages
+// Main pages (Seller)
 import DashboardPage from '@/pages/dashboard/DashboardPage'
 import ProductsPage from '@/pages/products/ProductsPage'
 import OrdersPage from '@/pages/orders/OrdersPage'
 import SettingsPage from '@/pages/settings/SettingsPage'
 import WhatsAppPage from '@/pages/whatsapp/WhatsAppPage'
+
+// Driver pages
+import {
+  DriverOrdersPage,
+  DriverOrderDetailPage,
+  DriverDeliveriesPage,
+  DriverEarningsPage,
+  DriverHistoryPage,
+  DriverSettingsPage,
+} from '@/pages/driver'
 
 // Placeholder pages (to be built)
 const CatalogPage = () => <PlaceholderPage title="Catalog" description="Manage your WhatsApp product catalog" />
@@ -43,7 +54,10 @@ function App() {
         <Route path="/verify-email" element={<PlaceholderPage title="Verify Email" description="Enter the OTP sent to your email" />} />
       </Route>
 
-      {/* Protected routes */}
+      {/* Mode Selection (for users with multiple roles) */}
+      <Route path="/select-mode" element={<ModeSelectionPage />} />
+
+      {/* Protected routes - Seller */}
       <Route element={<Layout />}>
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/products" element={<ProductsPage />} />
@@ -54,6 +68,14 @@ function App() {
         <Route path="/payments" element={<PaymentsPage />} />
         <Route path="/billing" element={<BillingPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+
+        {/* Driver routes */}
+        <Route path="/driver/orders" element={<DriverOrdersPage />} />
+        <Route path="/driver/order/:orderId" element={<DriverOrderDetailPage />} />
+        <Route path="/driver/deliveries" element={<DriverDeliveriesPage />} />
+        <Route path="/driver/earnings" element={<DriverEarningsPage />} />
+        <Route path="/driver/history" element={<DriverHistoryPage />} />
+        <Route path="/driver/settings" element={<DriverSettingsPage />} />
       </Route>
 
       {/* Default redirect */}
