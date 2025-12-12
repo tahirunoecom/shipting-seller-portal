@@ -85,6 +85,10 @@ export const driverService = {
       driver_id: String(params.driver_id),
       status: String(params.status),
       shipper_id: params.shipper_id ? String(params.shipper_id) : '',
+    }, {
+      headers: {
+        'Content-Type': 'application/json',
+      },
     })
     return response.data
   },
