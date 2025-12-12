@@ -182,7 +182,7 @@ function DriverOrdersPage() {
       else setRefreshing(true)
 
       const response = await driverService.getDriverOrders({
-        driver_id: user.wh_account_id,
+        driver_id: user.id,
         lat: location.lat,
         long: location.long,
       })
@@ -197,7 +197,7 @@ function DriverOrdersPage() {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [user.wh_account_id, location.lat, location.long, isOnline])
+  }, [user.id, location.lat, location.long, isOnline])
 
   useEffect(() => {
     if (isOnline) loadOrders()
@@ -222,7 +222,7 @@ function DriverOrdersPage() {
       setProcessing(order.id)
       const response = await driverService.changeDriverOrderStatus({
         order_id: order.id,
-        driver_id: user.wh_account_id,
+        driver_id: user.id,
         user_id: user.id,
         status: 1,
       })

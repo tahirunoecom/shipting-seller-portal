@@ -83,7 +83,7 @@ function DriverOrderDetailPage() {
     try {
       setLoading(true)
       const response = await driverService.getDriverActiveOrders({
-        driver_id: user.wh_account_id,
+        driver_id: user.id,
         order_id: parseInt(orderId),
       })
 
@@ -100,7 +100,7 @@ function DriverOrderDetailPage() {
     } finally {
       setLoading(false)
     }
-  }, [orderId, user.wh_account_id, navigate])
+  }, [orderId, user.id, navigate])
 
   useEffect(() => {
     loadOrder()
@@ -135,7 +135,7 @@ function DriverOrderDetailPage() {
       setProcessing(true)
       const response = await driverService.changeDriverOrderStatus({
         order_id: order.id,
-        driver_id: user.wh_account_id,
+        driver_id: user.id,
         user_id: user.id,
         status: nextStatus,
       })
@@ -160,7 +160,7 @@ function DriverOrderDetailPage() {
       setProcessing(true)
       const response = await driverService.completeDelivery({
         order_id: order.id,
-        driver_id: user.wh_account_id,
+        driver_id: user.id,
         user_id: user.id,
         package_received_by: deliveryForm.package_received_by,
         driver_note: deliveryForm.driver_note,
