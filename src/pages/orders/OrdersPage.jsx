@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useAuthStore } from '@/store'
 import { orderService } from '@/services'
 import {
@@ -70,6 +71,7 @@ const STATUS_COLORS = {
 
 function OrdersPage() {
   const { user } = useAuthStore()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [loading, setLoading] = useState(true)
   const [orders, setOrders] = useState([])
   const [activeTab, setActiveTab] = useState('all')
@@ -79,6 +81,16 @@ function OrdersPage() {
   const [showDeliveryModal, setShowDeliveryModal] = useState(false)
   const [processing, setProcessing] = useState(false)
   const [expandedOrders, setExpandedOrders] = useState({})
+
+  // Auto-expand order from URL query param (from notification click)
+  useEffect(() => {
+    const expandOrderId = searchParams.get('expand')
+    if (expandOrderId) {
+      setExpandedOrders(prev => ({ ...prev, [expandOrderId]: true }))
+      // Clear the query param after expanding
+      setSearchParams({}, { replace: true })
+    }
+  }, [searchParams, setSearchParams])
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1)

@@ -102,7 +102,7 @@ export const notifyNewOrder = (order) => {
     title: 'New Order Received!',
     message: `Order #${order.id} - ${order.total_product || 1} item(s) - $${order.order_amount || order.total_amount || 0}`,
     orderId: order.id,
-    navigateTo: `/orders/${order.id}`,
+    navigateTo: `/orders?expand=${order.id}`,
   })
 
   // Show browser notification
@@ -135,7 +135,7 @@ export const notifyOrderStatusChange = (order, newStatus) => {
     title: `Order #${order.id} Update`,
     message: message,
     orderId: order.id,
-    navigateTo: `/orders/${order.id}`,
+    navigateTo: `/orders?expand=${order.id}`,
   })
 
   // Show browser notification
