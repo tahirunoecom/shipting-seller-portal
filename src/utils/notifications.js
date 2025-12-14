@@ -75,17 +75,42 @@ export const showNotification = (title, options = {}) => {
   }
 }
 
-// Play notification sound
+// Play notification sound using Web Audio API
 export const playNotificationSound = () => {
   try {
-    const audio = new Audio('/notification.mp3')
-    audio.volume = 0.5
-    audio.play().catch(() => {
-      // Autoplay might be blocked
-      console.log('Could not play notification sound')
-    })
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)()
+
+    // Create a pleasant two-tone notification sound
+    const playTone = (frequency, startTime, duration) => {
+      const oscillator = audioContext.createOscillator()
+      const gainNode = audioContext.createGain()
+
+      oscillator.connect(gainNode)
+      gainNode.connect(audioContext.destination)
+
+      oscillator.frequency.value = frequency
+      oscillator.type = 'sine'
+
+      // Fade in and out for smooth sound
+      gainNode.gain.setValueAtTime(0, startTime)
+      gainNode.gain.linearRampToValueAtTime(0.3, startTime + 0.05)
+      gainNode.gain.linearRampToValueAtTime(0, startTime + duration)
+
+      oscillator.start(startTime)
+      oscillator.stop(startTime + duration)
+    }
+
+    const now = audioContext.currentTime
+    // Play two pleasant tones (like a doorbell chime)
+    playTone(880, now, 0.15)        // A5
+    playTone(1174.66, now + 0.15, 0.2) // D6
+
+    // Close audio context after sound finishes
+    setTimeout(() => {
+      audioContext.close()
+    }, 500)
   } catch (error) {
-    console.log('Notification sound not available')
+    console.log('Could not play notification sound:', error)
   }
 }
 
