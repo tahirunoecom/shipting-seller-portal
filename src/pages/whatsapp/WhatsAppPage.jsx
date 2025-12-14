@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useAuthStore } from '@/store'
 import { whatsappService } from '@/services'
 import {
@@ -32,24 +33,38 @@ import {
   AlertCircle,
   Copy,
   RefreshCw,
+  ExternalLink,
+  Facebook,
+  Store,
+  Package,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
-// Demo mode - set to true to simulate API responses when backend isn't ready
-const DEMO_MODE = true
+// Meta App Configuration
+const META_APP_ID = '1559645705059315'
+const META_CONFIG_ID = '4402947513364167'
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://stageshipperapi.thedelivio.com/api'
 
 function WhatsAppPage() {
   const { user, userDetails } = useAuthStore()
+  const [searchParams] = useSearchParams()
   const [activeTab, setActiveTab] = useState('connection')
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [demoModeActive, setDemoModeActive] = useState(DEMO_MODE)
+  const [fbSDKLoaded, setFbSDKLoaded] = useState(false)
 
   // Connection state
-  const [isConnected, setIsConnected] = useState(false)
-  const [connectionStatus, setConnectionStatus] = useState('disconnected') // disconnected, connecting, connected, error
-  const [phoneNumber, setPhoneNumber] = useState('')
-  const [whatsappId, setWhatsappId] = useState('')
+  const [connectionData, setConnectionData] = useState({
+    isConnected: false,
+    status: 'disconnected', // disconnected, connecting, connected, error
+    phoneNumber: '',
+    phoneNumberId: '',
+    wabaId: '',
+    businessId: '',
+    businessName: '',
+    catalogId: '',
+    connectedAt: null,
+  })
 
   // Bot Settings state
   const [botSettings, setBotSettings] = useState({
@@ -83,11 +98,6 @@ function WhatsAppPage() {
   const [editingQuickReply, setEditingQuickReply] = useState(null)
   const [quickReplyForm, setQuickReplyForm] = useState({ shortcut: '', message: '' })
 
-  // Test message state
-  const [testPhone, setTestPhone] = useState('')
-  const [testMessage, setTestMessage] = useState('Hello! This is a test message from Shipting.')
-  const [sendingTest, setSendingTest] = useState(false)
-
   const tabs = [
     { key: 'connection', label: 'Connection', icon: Link },
     { key: 'settings', label: 'Bot Settings', icon: Settings },
@@ -96,172 +106,279 @@ function WhatsAppPage() {
     { key: 'analytics', label: 'Analytics', icon: BarChart3 },
   ]
 
-  // Load initial data
+  // Load Facebook SDK
+  useEffect(() => {
+    const loadFacebookSDK = () => {
+      // Check if already loaded
+      if (window.FB) {
+        setFbSDKLoaded(true)
+        return
+      }
+
+      // Create script element
+      const script = document.createElement('script')
+      script.src = 'https://connect.facebook.net/en_US/sdk.js'
+      script.async = true
+      script.defer = true
+      script.crossOrigin = 'anonymous'
+
+      script.onload = () => {
+        window.fbAsyncInit = function() {
+          window.FB.init({
+            appId: META_APP_ID,
+            autoLogAppEvents: true,
+            xfbml: true,
+            version: 'v21.0'
+          })
+          setFbSDKLoaded(true)
+        }
+        // If FB is already defined, init it
+        if (window.FB) {
+          window.FB.init({
+            appId: META_APP_ID,
+            autoLogAppEvents: true,
+            xfbml: true,
+            version: 'v21.0'
+          })
+          setFbSDKLoaded(true)
+        }
+      }
+
+      document.body.appendChild(script)
+    }
+
+    loadFacebookSDK()
+  }, [])
+
+  // Check URL params for OAuth callback status
+  useEffect(() => {
+    const success = searchParams.get('success')
+    const error = searchParams.get('error')
+    const status = searchParams.get('status')
+
+    if (success === 'true') {
+      toast.success('WhatsApp connection initiated! Completing setup...')
+      if (status === 'connecting') {
+        setConnectionData(prev => ({ ...prev, status: 'connecting' }))
+      }
+      loadWhatsAppConfig()
+    } else if (error) {
+      toast.error(`Connection failed: ${error}`)
+      setConnectionData(prev => ({ ...prev, status: 'error' }))
+    }
+  }, [searchParams])
+
+  // Load WhatsApp config on mount
   useEffect(() => {
     loadWhatsAppConfig()
   }, [])
 
   const loadWhatsAppConfig = async () => {
-    // Skip API call in demo mode
-    if (demoModeActive) {
-      setLoading(false)
-      return
-    }
-
     try {
       setLoading(true)
-      const response = await whatsappService.getWhatsAppConfig(userDetails?.wh_account_id)
+      const response = await whatsappService.getWhatsAppStatus(user?.wh_account_id)
+
       if (response.status === 1 && response.data) {
-        const config = response.data
-        setIsConnected(config.is_connected || false)
-        setConnectionStatus(config.is_connected ? 'connected' : 'disconnected')
-        setPhoneNumber(config.phone_number || '')
-        setWhatsappId(config.whatsapp_id || '')
-        if (config.bot_settings) {
-          setBotSettings(prev => ({ ...prev, ...config.bot_settings }))
-        }
-        if (config.auto_replies) {
-          setAutoReplies(config.auto_replies)
-        }
-        if (config.quick_replies) {
-          setQuickReplies(config.quick_replies)
+        const data = response.data
+        setConnectionData({
+          isConnected: data.is_connected || false,
+          status: data.connection_status || 'disconnected',
+          phoneNumber: data.phone_number || '',
+          phoneNumberId: data.phone_number_id || '',
+          wabaId: data.waba_id || '',
+          businessId: data.business_id || '',
+          businessName: data.business_name || '',
+          catalogId: data.catalog_id || '',
+          connectedAt: data.connected_at || null,
+        })
+        if (data.bot_settings) {
+          setBotSettings(prev => ({ ...prev, ...data.bot_settings }))
         }
       }
     } catch (error) {
-      // Don't show error for initial load - config might not exist yet
-      console.log('No existing WhatsApp config found')
+      console.log('No existing WhatsApp config found:', error)
     } finally {
       setLoading(false)
     }
   }
 
-  // Connection handlers
-  const handleConnect = async () => {
-    if (!phoneNumber) {
-      toast.error('Please enter a phone number')
+  // Launch Meta Embedded Signup
+  const launchEmbeddedSignup = useCallback(() => {
+    if (!fbSDKLoaded || !window.FB) {
+      toast.error('Facebook SDK not loaded. Please refresh the page.')
       return
     }
-    try {
-      setConnectionStatus('connecting')
 
-      if (demoModeActive) {
-        // Demo mode - simulate successful connection
-        await new Promise(resolve => setTimeout(resolve, 1500))
-        setIsConnected(true)
-        setConnectionStatus('connected')
-        setWhatsappId(`wa_${Date.now()}`)
-        toast.success('WhatsApp connected successfully! (Demo Mode)')
-        return
+    setConnectionData(prev => ({ ...prev, status: 'connecting' }))
+
+    // Session info listener - receives WABA ID and Phone Number ID
+    const sessionInfoListener = (event) => {
+      if (event.origin !== 'https://www.facebook.com') return
+
+      try {
+        const data = JSON.parse(event.data)
+        if (data.type === 'WA_EMBEDDED_SIGNUP') {
+          // data contains: { type, data: { phone_number_id, waba_id } }
+          if (data.data?.phone_number_id && data.data?.waba_id) {
+            console.log('Embedded Signup Session Info:', data.data)
+            // Save to backend
+            saveSessionInfo(data.data)
+          }
+        }
+      } catch (e) {
+        // Not JSON or not our message
       }
+    }
 
-      const response = await whatsappService.connectWhatsApp(
-        userDetails?.wh_account_id,
-        phoneNumber
-      )
-      if (response.status === 1) {
-        setIsConnected(true)
-        setConnectionStatus('connected')
-        setWhatsappId(response.data?.whatsapp_id || '')
+    window.addEventListener('message', sessionInfoListener)
+
+    // Launch Facebook Login with Embedded Signup
+    window.FB.login(
+      function(response) {
+        window.removeEventListener('message', sessionInfoListener)
+
+        if (response.authResponse) {
+          const code = response.authResponse.code
+          console.log('OAuth code received:', code)
+
+          // Exchange code for token via backend
+          exchangeCodeForToken(code)
+        } else {
+          console.log('User cancelled login or did not fully authorize.')
+          setConnectionData(prev => ({ ...prev, status: 'disconnected' }))
+          toast.error('WhatsApp connection cancelled')
+        }
+      },
+      {
+        config_id: META_CONFIG_ID,
+        response_type: 'code',
+        override_default_response_type: true,
+        extras: {
+          setup: {},
+          featureType: '',
+          sessionInfoVersion: '3',
+        }
+      }
+    )
+  }, [fbSDKLoaded, user])
+
+  // Exchange OAuth code for token
+  const exchangeCodeForToken = async (code) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/whatsapp/exchange-token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+        },
+        body: JSON.stringify({
+          code,
+          wh_account_id: user?.wh_account_id
+        })
+      })
+
+      const data = await response.json()
+
+      if (data.status === 1) {
         toast.success('WhatsApp connected successfully!')
+        loadWhatsAppConfig()
       } else {
-        setConnectionStatus('error')
-        toast.error(response.message || 'Failed to connect WhatsApp')
+        toast.error(data.message || 'Failed to complete connection')
+        setConnectionData(prev => ({ ...prev, status: 'error' }))
       }
     } catch (error) {
-      // Check if it's a 404 error (API not implemented yet)
-      if (error.response?.status === 404) {
-        setConnectionStatus('disconnected')
-        toast.error('WhatsApp API not available. Enable Demo Mode to test the UI.')
-      } else {
-        setConnectionStatus('error')
-        toast.error('Failed to connect WhatsApp. Please try again.')
-      }
+      console.error('Token exchange error:', error)
+      toast.error('Failed to complete WhatsApp connection')
+      setConnectionData(prev => ({ ...prev, status: 'error' }))
     }
   }
 
-  const handleDisconnect = async () => {
+  // Save session info from Embedded Signup
+  const saveSessionInfo = async (sessionData) => {
     try {
-      setConnectionStatus('connecting')
+      const response = await whatsappService.saveSessionInfo({
+        wh_account_id: user?.wh_account_id,
+        waba_id: sessionData.waba_id,
+        phone_number_id: sessionData.phone_number_id,
+        business_id: sessionData.business_id,
+      })
 
-      if (demoModeActive) {
-        // Demo mode - simulate disconnect
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        setIsConnected(false)
-        setConnectionStatus('disconnected')
-        setPhoneNumber('')
-        setWhatsappId('')
-        toast.success('WhatsApp disconnected successfully (Demo Mode)')
-        return
-      }
-
-      const response = await whatsappService.disconnectWhatsApp(userDetails?.wh_account_id)
       if (response.status === 1) {
-        setIsConnected(false)
-        setConnectionStatus('disconnected')
-        setPhoneNumber('')
-        setWhatsappId('')
-        toast.success('WhatsApp disconnected successfully')
-      } else {
-        setConnectionStatus('connected')
-        toast.error(response.message || 'Failed to disconnect WhatsApp')
+        toast.success('WhatsApp connected successfully!')
+        loadWhatsAppConfig()
       }
     } catch (error) {
-      setConnectionStatus('connected')
-      toast.error('Failed to disconnect WhatsApp')
+      console.error('Save session info error:', error)
     }
   }
 
-  const handleTestConnection = async () => {
+  // Disconnect WhatsApp
+  const handleDisconnect = async () => {
+    if (!confirm('Are you sure you want to disconnect WhatsApp? This will stop all WhatsApp bot functionality.')) {
+      return
+    }
+
     try {
       setSaving(true)
+      const response = await whatsappService.disconnect(user?.wh_account_id)
 
-      if (demoModeActive) {
-        // Demo mode - simulate test
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        toast.success('Connection test successful! (Demo Mode)')
-        return
-      }
-
-      const response = await whatsappService.testWhatsAppConnection(userDetails?.wh_account_id)
       if (response.status === 1) {
-        toast.success('Connection test successful!')
+        setConnectionData({
+          isConnected: false,
+          status: 'disconnected',
+          phoneNumber: '',
+          phoneNumberId: '',
+          wabaId: '',
+          businessId: '',
+          businessName: '',
+          catalogId: '',
+          connectedAt: null,
+        })
+        toast.success('WhatsApp disconnected successfully')
       } else {
-        toast.error(response.message || 'Connection test failed')
+        toast.error(response.message || 'Failed to disconnect')
       }
     } catch (error) {
-      toast.error('Connection test failed')
+      toast.error('Failed to disconnect WhatsApp')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Sync products to catalog
+  const handleSyncCatalog = async () => {
+    try {
+      setSaving(true)
+      const response = await whatsappService.syncCatalog(user?.wh_account_id)
+
+      if (response.status === 1) {
+        toast.success(`Synced ${response.data?.synced || 0} products to WhatsApp Catalog`)
+      } else {
+        toast.error(response.message || 'Failed to sync catalog')
+      }
+    } catch (error) {
+      toast.error('Failed to sync catalog')
     } finally {
       setSaving(false)
     }
   }
 
   // Bot Settings handlers
-  const handleBotSettingChange = (key, value) => {
-    setBotSettings(prev => ({ ...prev, [key]: value }))
-  }
-
   const handleSaveBotSettings = async () => {
     try {
       setSaving(true)
-
-      if (demoModeActive) {
-        // Demo mode - simulate save
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        toast.success('Bot settings saved successfully! (Demo Mode)')
-        return
-      }
-
-      const response = await whatsappService.saveWhatsAppConfig({
-        wh_account_id: userDetails?.wh_account_id,
-        bot_settings: botSettings,
+      const response = await whatsappService.updateBotSettings({
+        wh_account_id: user?.wh_account_id,
+        ...botSettings
       })
+
       if (response.status === 1) {
         toast.success('Bot settings saved successfully!')
       } else {
         toast.error(response.message || 'Failed to save settings')
       }
     } catch (error) {
-      toast.error('Failed to save settings. Please try again.')
+      toast.error('Failed to save settings')
     } finally {
       setSaving(false)
     }
@@ -288,11 +405,9 @@ function WhatsAppPage() {
     try {
       setSaving(true)
       if (editingReply) {
-        // Update existing
         setAutoReplies(prev => prev.map(r => r.id === editingReply.id ? { ...r, ...replyForm } : r))
         toast.success('Auto-reply updated')
       } else {
-        // Add new
         const newReply = { id: Date.now(), ...replyForm }
         setAutoReplies(prev => [...prev, newReply])
         toast.success('Auto-reply added')
@@ -360,41 +475,8 @@ function WhatsAppPage() {
     toast.success('Copied to clipboard!')
   }
 
-  // Test Message handler
-  const handleSendTestMessage = async () => {
-    if (!testPhone) {
-      toast.error('Please enter a phone number')
-      return
-    }
-    try {
-      setSendingTest(true)
-
-      if (demoModeActive) {
-        // Demo mode - simulate sending
-        await new Promise(resolve => setTimeout(resolve, 1500))
-        toast.success(`Test message sent to ${testPhone}! (Demo Mode)`)
-        return
-      }
-
-      const response = await whatsappService.sendTestMessage(
-        userDetails?.wh_account_id,
-        testPhone,
-        testMessage
-      )
-      if (response.status === 1) {
-        toast.success('Test message sent successfully!')
-      } else {
-        toast.error(response.message || 'Failed to send test message')
-      }
-    } catch (error) {
-      toast.error('Failed to send test message')
-    } finally {
-      setSendingTest(false)
-    }
-  }
-
   const getConnectionStatusBadge = () => {
-    switch (connectionStatus) {
+    switch (connectionData.status) {
       case 'connected':
         return <Badge variant="success"><CheckCircle className="h-3 w-3 mr-1" /> Connected</Badge>
       case 'connecting':
@@ -416,26 +498,6 @@ function WhatsAppPage() {
 
   return (
     <div className="space-y-6">
-      {/* Demo Mode Banner */}
-      {demoModeActive && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-center justify-between dark:bg-amber-900/20 dark:border-amber-800">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="h-5 w-5 text-amber-500" />
-            <span className="text-sm text-amber-700 dark:text-amber-300">
-              <strong>Demo Mode Active</strong> - API calls are simulated. Data is not saved to the server.
-            </span>
-          </div>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setDemoModeActive(false)}
-            className="text-amber-700 border-amber-300 hover:bg-amber-100"
-          >
-            Disable Demo Mode
-          </Button>
-        </div>
-      )}
-
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -448,7 +510,6 @@ function WhatsAppPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {demoModeActive && <Badge variant="warning">Demo</Badge>}
           {getConnectionStatusBadge()}
         </div>
       </div>
@@ -489,7 +550,7 @@ function WhatsAppPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {!isConnected ? (
+                  {!connectionData.isConnected ? (
                     <>
                       <div className="p-4 bg-blue-50 rounded-lg dark:bg-blue-900/20">
                         <p className="text-sm text-blue-700 dark:text-blue-300">
@@ -498,57 +559,119 @@ function WhatsAppPage() {
                         </p>
                       </div>
 
+                      {/* Embedded Signup Button */}
                       <div className="space-y-4">
-                        <Input
-                          label="WhatsApp Phone Number"
-                          placeholder="+1 234 567 8900"
-                          value={phoneNumber}
-                          onChange={(e) => setPhoneNumber(e.target.value)}
-                          helper="Enter your WhatsApp Business phone number with country code"
-                        />
-                        <Button
-                          onClick={handleConnect}
-                          isLoading={connectionStatus === 'connecting'}
-                          className="bg-green-500 hover:bg-green-600"
-                        >
-                          <Link className="h-4 w-4" />
-                          Connect WhatsApp
-                        </Button>
+                        <div className="p-6 border-2 border-dashed border-gray-300 rounded-xl text-center dark:border-gray-600">
+                          <Facebook className="h-12 w-12 mx-auto text-blue-600 mb-4" />
+                          <h3 className="text-lg font-semibold text-gray-900 dark:text-dark-text mb-2">
+                            Connect with Facebook
+                          </h3>
+                          <p className="text-sm text-gray-500 dark:text-dark-muted mb-4">
+                            Sign in with Facebook to connect your WhatsApp Business account.
+                            You can create a new account or use an existing one.
+                          </p>
+                          <Button
+                            onClick={launchEmbeddedSignup}
+                            disabled={!fbSDKLoaded || connectionData.status === 'connecting'}
+                            isLoading={connectionData.status === 'connecting'}
+                            className="bg-blue-600 hover:bg-blue-700 text-white"
+                          >
+                            <Facebook className="h-4 w-4" />
+                            {connectionData.status === 'connecting' ? 'Connecting...' : 'Login with Facebook'}
+                          </Button>
+                          {!fbSDKLoaded && (
+                            <p className="text-xs text-amber-600 mt-2">Loading Facebook SDK...</p>
+                          )}
+                        </div>
+
+                        <div className="text-center">
+                          <p className="text-xs text-gray-400">
+                            By connecting, you agree to the{' '}
+                            <a href="https://www.whatsapp.com/legal/business-terms" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                              Meta Terms for WhatsApp Business
+                            </a>
+                          </p>
+                        </div>
                       </div>
                     </>
                   ) : (
                     <>
+                      {/* Connected State */}
                       <div className="p-4 bg-green-50 rounded-lg dark:bg-green-900/20">
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="font-medium text-green-700 dark:text-green-300">
+                            <p className="font-medium text-green-700 dark:text-green-300 flex items-center gap-2">
+                              <CheckCircle className="h-5 w-5" />
                               Connected to WhatsApp Business
                             </p>
-                            <p className="text-sm text-green-600 dark:text-green-400 mt-1">
-                              Phone: {phoneNumber}
-                            </p>
-                            {whatsappId && (
-                              <p className="text-xs text-green-500 mt-1">
-                                ID: {whatsappId}
+                            {connectionData.businessName && (
+                              <p className="text-sm text-green-600 dark:text-green-400 mt-1">
+                                Business: {connectionData.businessName}
+                              </p>
+                            )}
+                            {connectionData.phoneNumber && (
+                              <p className="text-sm text-green-600 dark:text-green-400">
+                                Phone: {connectionData.phoneNumber}
                               </p>
                             )}
                           </div>
-                          <CheckCircle className="h-8 w-8 text-green-500" />
+                          <MessageSquare className="h-10 w-10 text-green-500" />
                         </div>
                       </div>
 
-                      <div className="flex gap-3">
+                      {/* Connection Details */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="p-4 bg-gray-50 rounded-lg dark:bg-dark-bg">
+                          <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Phone Number ID</p>
+                          <p className="font-mono text-sm text-gray-900 dark:text-dark-text">
+                            {connectionData.phoneNumberId || 'N/A'}
+                          </p>
+                        </div>
+                        <div className="p-4 bg-gray-50 rounded-lg dark:bg-dark-bg">
+                          <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">WABA ID</p>
+                          <p className="font-mono text-sm text-gray-900 dark:text-dark-text">
+                            {connectionData.wabaId || 'N/A'}
+                          </p>
+                        </div>
+                        {connectionData.catalogId && (
+                          <div className="p-4 bg-gray-50 rounded-lg dark:bg-dark-bg">
+                            <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Catalog ID</p>
+                            <p className="font-mono text-sm text-gray-900 dark:text-dark-text">
+                              {connectionData.catalogId}
+                            </p>
+                          </div>
+                        )}
+                        {connectionData.connectedAt && (
+                          <div className="p-4 bg-gray-50 rounded-lg dark:bg-dark-bg">
+                            <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Connected Since</p>
+                            <p className="text-sm text-gray-900 dark:text-dark-text">
+                              {new Date(connectionData.connectedAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex flex-wrap gap-3">
                         <Button
                           variant="outline"
-                          onClick={handleTestConnection}
+                          onClick={handleSyncCatalog}
                           isLoading={saving}
                         >
-                          <RefreshCw className="h-4 w-4" />
-                          Test Connection
+                          <Package className="h-4 w-4" />
+                          Sync Products to Catalog
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => window.open('https://business.facebook.com/wa/manage/home/', '_blank')}
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                          WhatsApp Manager
                         </Button>
                         <Button
                           variant="danger"
                           onClick={handleDisconnect}
+                          isLoading={saving}
                         >
                           <Unlink className="h-4 w-4" />
                           Disconnect
@@ -559,41 +682,42 @@ function WhatsAppPage() {
                 </CardContent>
               </Card>
 
-              {/* Test Message */}
-              {isConnected && (
+              {/* How it Works */}
+              {!connectionData.isConnected && (
                 <Card>
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Send className="h-5 w-5" />
-                      Send Test Message
-                    </CardTitle>
+                    <CardTitle>How WhatsApp Bot Works</CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4">
-                    <Input
-                      label="Recipient Phone Number"
-                      placeholder="+1 234 567 8900"
-                      value={testPhone}
-                      onChange={(e) => setTestPhone(e.target.value)}
-                    />
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-dark-text mb-1">
-                        Message
-                      </label>
-                      <textarea
-                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 dark:bg-dark-bg dark:border-dark-border dark:text-dark-text"
-                        rows={3}
-                        value={testMessage}
-                        onChange={(e) => setTestMessage(e.target.value)}
-                      />
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="text-center">
+                        <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                          <span className="text-xl font-bold text-blue-600">1</span>
+                        </div>
+                        <h4 className="font-medium text-gray-900 dark:text-dark-text mb-2">Connect Account</h4>
+                        <p className="text-sm text-gray-500 dark:text-dark-muted">
+                          Connect your WhatsApp Business account using Facebook Login
+                        </p>
+                      </div>
+                      <div className="text-center">
+                        <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                          <span className="text-xl font-bold text-green-600">2</span>
+                        </div>
+                        <h4 className="font-medium text-gray-900 dark:text-dark-text mb-2">Sync Products</h4>
+                        <p className="text-sm text-gray-500 dark:text-dark-muted">
+                          Your products are automatically synced to WhatsApp Catalog
+                        </p>
+                      </div>
+                      <div className="text-center">
+                        <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                          <span className="text-xl font-bold text-purple-600">3</span>
+                        </div>
+                        <h4 className="font-medium text-gray-900 dark:text-dark-text mb-2">Start Selling</h4>
+                        <p className="text-sm text-gray-500 dark:text-dark-muted">
+                          Customers can browse and order via WhatsApp chat
+                        </p>
+                      </div>
                     </div>
-                    <Button
-                      onClick={handleSendTestMessage}
-                      isLoading={sendingTest}
-                      className="bg-green-500 hover:bg-green-600"
-                    >
-                      <Send className="h-4 w-4" />
-                      Send Test Message
-                    </Button>
                   </CardContent>
                 </Card>
               )}
@@ -610,125 +734,124 @@ function WhatsAppPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* Welcome Message */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-dark-text mb-1">
-                    Welcome Message
-                  </label>
-                  <textarea
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 dark:bg-dark-bg dark:border-dark-border dark:text-dark-text"
-                    rows={3}
-                    value={botSettings.welcomeMessage}
-                    onChange={(e) => handleBotSettingChange('welcomeMessage', e.target.value)}
-                    placeholder="Enter welcome message for new customers..."
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    This message is sent when a customer first messages your business
-                  </p>
-                </div>
-
-                {/* Away Message */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-dark-text mb-1">
-                    Away Message
-                  </label>
-                  <textarea
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 dark:bg-dark-bg dark:border-dark-border dark:text-dark-text"
-                    rows={3}
-                    value={botSettings.awayMessage}
-                    onChange={(e) => handleBotSettingChange('awayMessage', e.target.value)}
-                    placeholder="Enter away message..."
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    This message is sent outside business hours
-                  </p>
-                </div>
-
-                {/* Business Hours */}
-                <div className="p-4 bg-gray-50 rounded-lg dark:bg-dark-bg">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-5 w-5 text-gray-500" />
-                      <span className="font-medium text-gray-900 dark:text-dark-text">
-                        Business Hours
-                      </span>
-                    </div>
-                    <button
-                      onClick={() => handleBotSettingChange('businessHoursEnabled', !botSettings.businessHoursEnabled)}
-                      className={`relative w-12 h-6 rounded-full transition-colors ${
-                        botSettings.businessHoursEnabled ? 'bg-green-500' : 'bg-gray-300'
-                      }`}
-                    >
-                      <span
-                        className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                          botSettings.businessHoursEnabled ? 'right-1' : 'left-1'
-                        }`}
-                      />
-                    </button>
+                {!connectionData.isConnected ? (
+                  <div className="text-center py-8">
+                    <AlertCircle className="h-12 w-12 mx-auto text-gray-300 mb-4" />
+                    <p className="text-gray-500">Connect WhatsApp first to configure bot settings</p>
                   </div>
-                  {botSettings.businessHoursEnabled && (
-                    <div className="grid grid-cols-2 gap-4">
-                      <Input
-                        label="Start Time"
-                        type="time"
-                        value={botSettings.businessHoursStart}
-                        onChange={(e) => handleBotSettingChange('businessHoursStart', e.target.value)}
-                      />
-                      <Input
-                        label="End Time"
-                        type="time"
-                        value={botSettings.businessHoursEnd}
-                        onChange={(e) => handleBotSettingChange('businessHoursEnd', e.target.value)}
+                ) : (
+                  <>
+                    {/* Welcome Message */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-dark-text mb-1">
+                        Welcome Message
+                      </label>
+                      <textarea
+                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 dark:bg-dark-bg dark:border-dark-border dark:text-dark-text"
+                        rows={3}
+                        value={botSettings.welcomeMessage}
+                        onChange={(e) => setBotSettings(prev => ({ ...prev, welcomeMessage: e.target.value }))}
+                        placeholder="Enter welcome message for new customers..."
                       />
                     </div>
-                  )}
-                </div>
 
-                {/* Toggle Settings */}
-                <div className="space-y-3">
-                  {[
-                    { key: 'autoReplyEnabled', label: 'Enable Auto-Replies', description: 'Automatically respond to common queries' },
-                    { key: 'orderNotificationsEnabled', label: 'Order Notifications', description: 'Send order status updates via WhatsApp' },
-                    { key: 'catalogEnabled', label: 'Product Catalog', description: 'Allow customers to browse products in WhatsApp' },
-                  ].map((setting) => (
-                    <div
-                      key={setting.key}
-                      className="flex items-center justify-between p-4 bg-gray-50 rounded-lg dark:bg-dark-bg"
-                    >
-                      <div>
-                        <p className="font-medium text-gray-900 dark:text-dark-text">
-                          {setting.label}
-                        </p>
-                        <p className="text-sm text-gray-500 dark:text-dark-muted">
-                          {setting.description}
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => handleBotSettingChange(setting.key, !botSettings[setting.key])}
-                        className={`relative w-12 h-6 rounded-full transition-colors ${
-                          botSettings[setting.key] ? 'bg-green-500' : 'bg-gray-300'
-                        }`}
-                      >
-                        <span
-                          className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                            botSettings[setting.key] ? 'right-1' : 'left-1'
+                    {/* Away Message */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-dark-text mb-1">
+                        Away Message
+                      </label>
+                      <textarea
+                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 dark:bg-dark-bg dark:border-dark-border dark:text-dark-text"
+                        rows={3}
+                        value={botSettings.awayMessage}
+                        onChange={(e) => setBotSettings(prev => ({ ...prev, awayMessage: e.target.value }))}
+                        placeholder="Enter away message..."
+                      />
+                    </div>
+
+                    {/* Business Hours */}
+                    <div className="p-4 bg-gray-50 rounded-lg dark:bg-dark-bg">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-5 w-5 text-gray-500" />
+                          <span className="font-medium text-gray-900 dark:text-dark-text">
+                            Business Hours
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => setBotSettings(prev => ({ ...prev, businessHoursEnabled: !prev.businessHoursEnabled }))}
+                          className={`relative w-12 h-6 rounded-full transition-colors ${
+                            botSettings.businessHoursEnabled ? 'bg-green-500' : 'bg-gray-300'
                           }`}
-                        />
-                      </button>
+                        >
+                          <span
+                            className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                              botSettings.businessHoursEnabled ? 'right-1' : 'left-1'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                      {botSettings.businessHoursEnabled && (
+                        <div className="grid grid-cols-2 gap-4">
+                          <Input
+                            label="Start Time"
+                            type="time"
+                            value={botSettings.businessHoursStart}
+                            onChange={(e) => setBotSettings(prev => ({ ...prev, businessHoursStart: e.target.value }))}
+                          />
+                          <Input
+                            label="End Time"
+                            type="time"
+                            value={botSettings.businessHoursEnd}
+                            onChange={(e) => setBotSettings(prev => ({ ...prev, businessHoursEnd: e.target.value }))}
+                          />
+                        </div>
+                      )}
                     </div>
-                  ))}
-                </div>
 
-                <div className="flex justify-end">
-                  <Button
-                    onClick={handleSaveBotSettings}
-                    isLoading={saving}
-                    className="bg-green-500 hover:bg-green-600"
-                  >
-                    <Save className="h-4 w-4" />
-                    Save Settings
-                  </Button>
-                </div>
+                    {/* Toggle Settings */}
+                    <div className="space-y-3">
+                      {[
+                        { key: 'autoReplyEnabled', label: 'Enable Auto-Replies', description: 'Automatically respond to common queries' },
+                        { key: 'orderNotificationsEnabled', label: 'Order Notifications', description: 'Send order status updates via WhatsApp' },
+                        { key: 'catalogEnabled', label: 'Product Catalog', description: 'Allow customers to browse products in WhatsApp' },
+                      ].map((setting) => (
+                        <div
+                          key={setting.key}
+                          className="flex items-center justify-between p-4 bg-gray-50 rounded-lg dark:bg-dark-bg"
+                        >
+                          <div>
+                            <p className="font-medium text-gray-900 dark:text-dark-text">{setting.label}</p>
+                            <p className="text-sm text-gray-500 dark:text-dark-muted">{setting.description}</p>
+                          </div>
+                          <button
+                            onClick={() => setBotSettings(prev => ({ ...prev, [setting.key]: !prev[setting.key] }))}
+                            className={`relative w-12 h-6 rounded-full transition-colors ${
+                              botSettings[setting.key] ? 'bg-green-500' : 'bg-gray-300'
+                            }`}
+                          >
+                            <span
+                              className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                                botSettings[setting.key] ? 'right-1' : 'left-1'
+                              }`}
+                            />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="flex justify-end">
+                      <Button
+                        onClick={handleSaveBotSettings}
+                        isLoading={saving}
+                        className="bg-green-500 hover:bg-green-600"
+                      >
+                        <Save className="h-4 w-4" />
+                        Save Settings
+                      </Button>
+                    </div>
+                  </>
+                )}
               </CardContent>
             </Card>
           )}
@@ -741,79 +864,57 @@ function WhatsAppPage() {
                   <Zap className="h-5 w-5" />
                   Auto-Replies
                 </CardTitle>
-                <Button size="sm" onClick={handleAddAutoReply}>
+                <Button size="sm" onClick={handleAddAutoReply} disabled={!connectionData.isConnected}>
                   <Plus className="h-4 w-4" />
                   Add Reply
                 </Button>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-gray-500 dark:text-dark-muted mb-4">
-                  Set up automatic responses when customers send messages containing specific keywords.
-                </p>
-                <div className="space-y-3">
-                  {autoReplies.map((reply) => (
-                    <div
-                      key={reply.id}
-                      className={`p-4 border rounded-lg transition-colors ${
-                        reply.enabled
-                          ? 'border-green-200 bg-green-50 dark:bg-green-900/10 dark:border-green-800'
-                          : 'border-gray-200 bg-gray-50 dark:bg-dark-bg dark:border-dark-border'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <Badge variant={reply.enabled ? 'success' : 'default'}>
-                              {reply.trigger}
-                            </Badge>
-                            {!reply.enabled && (
-                              <Badge variant="warning">Disabled</Badge>
-                            )}
+                {!connectionData.isConnected ? (
+                  <div className="text-center py-8">
+                    <AlertCircle className="h-12 w-12 mx-auto text-gray-300 mb-4" />
+                    <p className="text-gray-500">Connect WhatsApp first to manage auto-replies</p>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-sm text-gray-500 dark:text-dark-muted mb-4">
+                      Set up automatic responses when customers send messages containing specific keywords.
+                    </p>
+                    <div className="space-y-3">
+                      {autoReplies.map((reply) => (
+                        <div
+                          key={reply.id}
+                          className={`p-4 border rounded-lg transition-colors ${
+                            reply.enabled
+                              ? 'border-green-200 bg-green-50 dark:bg-green-900/10'
+                              : 'border-gray-200 bg-gray-50 dark:bg-dark-bg'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Badge variant={reply.enabled ? 'success' : 'default'}>{reply.trigger}</Badge>
+                                {!reply.enabled && <Badge variant="warning">Disabled</Badge>}
+                              </div>
+                              <p className="text-sm text-gray-700 dark:text-dark-text">{reply.response}</p>
+                            </div>
+                            <div className="flex items-center gap-2 ml-4">
+                              <button onClick={() => handleToggleAutoReply(reply.id)} className="p-1.5 rounded-lg hover:bg-gray-100">
+                                {reply.enabled ? <CheckCircle className="h-4 w-4 text-green-600" /> : <XCircle className="h-4 w-4 text-gray-400" />}
+                              </button>
+                              <button onClick={() => handleEditAutoReply(reply)} className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-lg">
+                                <Edit2 className="h-4 w-4" />
+                              </button>
+                              <button onClick={() => handleDeleteAutoReply(reply.id)} className="p-1.5 text-red-600 hover:bg-red-100 rounded-lg">
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
                           </div>
-                          <p className="text-sm text-gray-700 dark:text-dark-text">
-                            {reply.response}
-                          </p>
                         </div>
-                        <div className="flex items-center gap-2 ml-4">
-                          <button
-                            onClick={() => handleToggleAutoReply(reply.id)}
-                            className={`p-1.5 rounded-lg transition-colors ${
-                              reply.enabled
-                                ? 'text-green-600 hover:bg-green-100'
-                                : 'text-gray-400 hover:bg-gray-100'
-                            }`}
-                            title={reply.enabled ? 'Disable' : 'Enable'}
-                          >
-                            {reply.enabled ? (
-                              <CheckCircle className="h-4 w-4" />
-                            ) : (
-                              <XCircle className="h-4 w-4" />
-                            )}
-                          </button>
-                          <button
-                            onClick={() => handleEditAutoReply(reply)}
-                            className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
-                          >
-                            <Edit2 className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteAutoReply(reply.id)}
-                            className="p-1.5 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </div>
+                      ))}
                     </div>
-                  ))}
-                  {autoReplies.length === 0 && (
-                    <div className="text-center py-8 text-gray-500">
-                      <Zap className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                      <p>No auto-replies configured</p>
-                      <p className="text-sm">Click "Add Reply" to create your first auto-reply</p>
-                    </div>
-                  )}
-                </div>
+                  </>
+                )}
               </CardContent>
             </Card>
           )}
@@ -833,56 +934,32 @@ function WhatsAppPage() {
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-gray-500 dark:text-dark-muted mb-4">
-                  Create shortcuts for frequently used messages. Use these shortcuts when chatting with customers.
+                  Create shortcuts for frequently used messages.
                 </p>
                 <div className="space-y-3">
                   {quickReplies.map((reply) => (
-                    <div
-                      key={reply.id}
-                      className="p-4 border rounded-lg bg-gray-50 dark:bg-dark-bg dark:border-dark-border"
-                    >
+                    <div key={reply.id} className="p-4 border rounded-lg bg-gray-50 dark:bg-dark-bg">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <code className="px-2 py-1 bg-gray-200 dark:bg-dark-border rounded text-sm font-mono">
-                              {reply.shortcut}
-                            </code>
-                          </div>
-                          <p className="text-sm text-gray-700 dark:text-dark-text">
-                            {reply.message}
-                          </p>
+                          <code className="px-2 py-1 bg-gray-200 dark:bg-dark-border rounded text-sm font-mono">
+                            {reply.shortcut}
+                          </code>
+                          <p className="text-sm text-gray-700 dark:text-dark-text mt-2">{reply.message}</p>
                         </div>
                         <div className="flex items-center gap-2 ml-4">
-                          <button
-                            onClick={() => handleCopyQuickReply(reply.message)}
-                            className="p-1.5 text-gray-600 hover:bg-gray-200 rounded-lg transition-colors"
-                            title="Copy message"
-                          >
+                          <button onClick={() => handleCopyQuickReply(reply.message)} className="p-1.5 text-gray-600 hover:bg-gray-200 rounded-lg">
                             <Copy className="h-4 w-4" />
                           </button>
-                          <button
-                            onClick={() => handleEditQuickReply(reply)}
-                            className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
-                          >
+                          <button onClick={() => handleEditQuickReply(reply)} className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-lg">
                             <Edit2 className="h-4 w-4" />
                           </button>
-                          <button
-                            onClick={() => handleDeleteQuickReply(reply.id)}
-                            className="p-1.5 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
-                          >
+                          <button onClick={() => handleDeleteQuickReply(reply.id)} className="p-1.5 text-red-600 hover:bg-red-100 rounded-lg">
                             <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
                       </div>
                     </div>
                   ))}
-                  {quickReplies.length === 0 && (
-                    <div className="text-center py-8 text-gray-500">
-                      <MessageCircle className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                      <p>No quick replies configured</p>
-                      <p className="text-sm">Click "Add Quick Reply" to create your first quick reply</p>
-                    </div>
-                  )}
                 </div>
               </CardContent>
             </Card>
@@ -890,180 +967,70 @@ function WhatsAppPage() {
 
           {/* Analytics Tab */}
           {activeTab === 'analytics' && (
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <BarChart3 className="h-5 w-5" />
-                    WhatsApp Analytics
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5" />
+                  WhatsApp Analytics
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {!connectionData.isConnected ? (
+                  <div className="text-center py-8">
+                    <AlertCircle className="h-12 w-12 mx-auto text-gray-300 mb-4" />
+                    <p className="text-gray-500">Connect WhatsApp first to view analytics</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="p-4 bg-green-50 rounded-lg dark:bg-green-900/20">
                       <p className="text-sm text-green-600">Messages Sent</p>
-                      <p className="text-2xl font-bold text-green-700">1,234</p>
-                      <p className="text-xs text-green-500">+12% from last week</p>
+                      <p className="text-2xl font-bold text-green-700">--</p>
+                      <p className="text-xs text-green-500">Coming soon</p>
                     </div>
                     <div className="p-4 bg-blue-50 rounded-lg dark:bg-blue-900/20">
                       <p className="text-sm text-blue-600">Messages Received</p>
-                      <p className="text-2xl font-bold text-blue-700">856</p>
-                      <p className="text-xs text-blue-500">+8% from last week</p>
+                      <p className="text-2xl font-bold text-blue-700">--</p>
+                      <p className="text-xs text-blue-500">Coming soon</p>
                     </div>
                     <div className="p-4 bg-purple-50 rounded-lg dark:bg-purple-900/20">
-                      <p className="text-sm text-purple-600">Response Rate</p>
-                      <p className="text-2xl font-bold text-purple-700">94%</p>
-                      <p className="text-xs text-purple-500">+2% from last week</p>
+                      <p className="text-sm text-purple-600">Orders via WhatsApp</p>
+                      <p className="text-2xl font-bold text-purple-700">--</p>
+                      <p className="text-xs text-purple-500">Coming soon</p>
                     </div>
                   </div>
-
-                  <div className="p-4 bg-gray-50 rounded-lg dark:bg-dark-bg">
-                    <h4 className="font-medium text-gray-900 dark:text-dark-text mb-4">
-                      Auto-Reply Performance
-                    </h4>
-                    <div className="space-y-3">
-                      {[
-                        { trigger: 'hours', count: 145, percentage: 35 },
-                        { trigger: 'delivery', count: 98, percentage: 24 },
-                        { trigger: 'payment', count: 76, percentage: 18 },
-                        { trigger: 'other', count: 94, percentage: 23 },
-                      ].map((item) => (
-                        <div key={item.trigger} className="flex items-center gap-4">
-                          <span className="w-20 text-sm text-gray-600 dark:text-dark-muted">
-                            {item.trigger}
-                          </span>
-                          <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-green-500 rounded-full"
-                              style={{ width: `${item.percentage}%` }}
-                            />
-                          </div>
-                          <span className="text-sm font-medium text-gray-700 dark:text-dark-text">
-                            {item.count}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Recent Activity</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {[
-                      { time: '2 min ago', event: 'Auto-reply sent', details: 'Keyword: hours' },
-                      { time: '15 min ago', event: 'Message received', details: 'From: +1 234 567 8900' },
-                      { time: '1 hour ago', event: 'Order notification sent', details: 'Order #12345' },
-                      { time: '2 hours ago', event: 'Welcome message sent', details: 'New customer' },
-                    ].map((activity, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg dark:bg-dark-bg"
-                      >
-                        <div className="h-2 w-2 bg-green-500 rounded-full" />
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-gray-900 dark:text-dark-text">
-                            {activity.event}
-                          </p>
-                          <p className="text-xs text-gray-500">{activity.details}</p>
-                        </div>
-                        <span className="text-xs text-gray-400">{activity.time}</span>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+                )}
+              </CardContent>
+            </Card>
           )}
         </div>
       </div>
 
       {/* Auto-Reply Modal */}
-      <Modal
-        isOpen={showAutoReplyModal}
-        onClose={() => setShowAutoReplyModal(false)}
-        title={editingReply ? 'Edit Auto-Reply' : 'Add Auto-Reply'}
-      >
+      <Modal isOpen={showAutoReplyModal} onClose={() => setShowAutoReplyModal(false)} title={editingReply ? 'Edit Auto-Reply' : 'Add Auto-Reply'}>
         <div className="space-y-4">
-          <Input
-            label="Trigger Keyword"
-            placeholder="e.g., hours, delivery, price"
-            value={replyForm.trigger}
-            onChange={(e) => setReplyForm(prev => ({ ...prev, trigger: e.target.value }))}
-            helper="The keyword that triggers this auto-reply"
-          />
+          <Input label="Trigger Keyword" placeholder="e.g., hours, delivery, price" value={replyForm.trigger} onChange={(e) => setReplyForm(prev => ({ ...prev, trigger: e.target.value }))} />
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-dark-text mb-1">
-              Response Message
-            </label>
-            <textarea
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 dark:bg-dark-bg dark:border-dark-border dark:text-dark-text"
-              rows={4}
-              placeholder="Enter the automated response..."
-              value={replyForm.response}
-              onChange={(e) => setReplyForm(prev => ({ ...prev, response: e.target.value }))}
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="replyEnabled"
-              checked={replyForm.enabled}
-              onChange={(e) => setReplyForm(prev => ({ ...prev, enabled: e.target.checked }))}
-              className="rounded border-gray-300 text-green-500 focus:ring-green-500"
-            />
-            <label htmlFor="replyEnabled" className="text-sm text-gray-700 dark:text-dark-text">
-              Enable this auto-reply
-            </label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-dark-text mb-1">Response Message</label>
+            <textarea className="w-full px-3 py-2 border rounded-lg dark:bg-dark-bg dark:border-dark-border" rows={4} value={replyForm.response} onChange={(e) => setReplyForm(prev => ({ ...prev, response: e.target.value }))} />
           </div>
           <div className="flex justify-end gap-3 pt-4">
-            <Button variant="outline" onClick={() => setShowAutoReplyModal(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSaveAutoReply} isLoading={saving}>
-              {editingReply ? 'Update' : 'Add'} Reply
-            </Button>
+            <Button variant="outline" onClick={() => setShowAutoReplyModal(false)}>Cancel</Button>
+            <Button onClick={handleSaveAutoReply} isLoading={saving}>{editingReply ? 'Update' : 'Add'}</Button>
           </div>
         </div>
       </Modal>
 
       {/* Quick Reply Modal */}
-      <Modal
-        isOpen={showQuickReplyModal}
-        onClose={() => setShowQuickReplyModal(false)}
-        title={editingQuickReply ? 'Edit Quick Reply' : 'Add Quick Reply'}
-      >
+      <Modal isOpen={showQuickReplyModal} onClose={() => setShowQuickReplyModal(false)} title={editingQuickReply ? 'Edit Quick Reply' : 'Add Quick Reply'}>
         <div className="space-y-4">
-          <Input
-            label="Shortcut"
-            placeholder="e.g., /thanks, /track, /help"
-            value={quickReplyForm.shortcut}
-            onChange={(e) => setQuickReplyForm(prev => ({ ...prev, shortcut: e.target.value }))}
-            helper="Start with / for easy recognition"
-          />
+          <Input label="Shortcut" placeholder="e.g., /thanks" value={quickReplyForm.shortcut} onChange={(e) => setQuickReplyForm(prev => ({ ...prev, shortcut: e.target.value }))} />
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-dark-text mb-1">
-              Message
-            </label>
-            <textarea
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 dark:bg-dark-bg dark:border-dark-border dark:text-dark-text"
-              rows={4}
-              placeholder="Enter the quick reply message..."
-              value={quickReplyForm.message}
-              onChange={(e) => setQuickReplyForm(prev => ({ ...prev, message: e.target.value }))}
-            />
+            <label className="block text-sm font-medium text-gray-700 dark:text-dark-text mb-1">Message</label>
+            <textarea className="w-full px-3 py-2 border rounded-lg dark:bg-dark-bg dark:border-dark-border" rows={4} value={quickReplyForm.message} onChange={(e) => setQuickReplyForm(prev => ({ ...prev, message: e.target.value }))} />
           </div>
           <div className="flex justify-end gap-3 pt-4">
-            <Button variant="outline" onClick={() => setShowQuickReplyModal(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSaveQuickReply} isLoading={saving}>
-              {editingQuickReply ? 'Update' : 'Add'} Quick Reply
-            </Button>
+            <Button variant="outline" onClick={() => setShowQuickReplyModal(false)}>Cancel</Button>
+            <Button onClick={handleSaveQuickReply} isLoading={saving}>{editingQuickReply ? 'Update' : 'Add'}</Button>
           </div>
         </div>
       </Modal>
