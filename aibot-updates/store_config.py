@@ -35,6 +35,7 @@ def _is_cache_valid(phone_number_id: str) -> bool:
 def get_seller_by_phone_number_id(phone_number_id: str) -> Optional[Dict[str, Any]]:
     """
     Fetch seller configuration from Laravel API by WhatsApp phone_number_id
+    Falls back to hardcoded mapping if API fails (backward compatibility)
 
     Args:
         phone_number_id: The WhatsApp Business phone number ID (from Meta)
@@ -56,6 +57,11 @@ def get_seller_by_phone_number_id(phone_number_id: str) -> Optional[Dict[str, An
             return _seller_cache[phone_number_id]
 
         logger.info(f"Fetching seller config for phone_number_id: {phone_number_id}")
+
+        # Skip API call if no API key configured (use fallback only)
+        if not SELLER_API_KEY:
+            logger.info("No SELLER_API_KEY configured, using fallback mapping")
+            return _get_fallback_by_phone_number_id(phone_number_id)
 
         # Call Laravel API
         response = requests.post(
@@ -80,8 +86,9 @@ def get_seller_by_phone_number_id(phone_number_id: str) -> Optional[Dict[str, An
                 logger.info(f"Found seller: {seller_config.get('store_name')} (ID: {seller_config.get('store_id')})")
                 return seller_config
 
-        logger.warning(f"No seller found for phone_number_id: {phone_number_id}")
-        return None
+        # API returned no data, try fallback
+        logger.warning(f"No seller found via API for phone_number_id: {phone_number_id}, trying fallback")
+        return _get_fallback_by_phone_number_id(phone_number_id)
 
     except requests.exceptions.RequestException as e:
         logger.error(f"API error fetching seller config: {e}")
@@ -89,16 +96,19 @@ def get_seller_by_phone_number_id(phone_number_id: str) -> Optional[Dict[str, An
         if phone_number_id in _seller_cache:
             logger.info(f"Using expired cache for phone_number_id: {phone_number_id}")
             return _seller_cache[phone_number_id]
-        return None
+        # Try fallback
+        logger.info("API failed, trying fallback mapping")
+        return _get_fallback_by_phone_number_id(phone_number_id)
     except Exception as e:
         logger.error(f"Unexpected error in get_seller_by_phone_number_id: {e}")
-        return None
+        return _get_fallback_by_phone_number_id(phone_number_id)
 
 
 def get_store_from_phone(phone_number: str) -> Optional[Dict[str, Any]]:
     """
     Legacy function - Get store info from display phone number
     This is kept for backward compatibility with existing code
+    Falls back to hardcoded mapping if API fails
 
     For multi-tenant, use get_seller_by_phone_number_id instead
 
@@ -115,6 +125,11 @@ def get_store_from_phone(phone_number: str) -> Optional[Dict[str, Any]]:
             clean_phone = f"+{clean_phone}"
 
         logger.info(f"Looking up store by display phone: {clean_phone}")
+
+        # Skip API call if no API key configured (use fallback only)
+        if not SELLER_API_KEY:
+            logger.info("No SELLER_API_KEY configured, using fallback mapping")
+            return get_store_from_phone_fallback(clean_phone)
 
         # Call Laravel API
         response = requests.post(
@@ -136,11 +151,14 @@ def get_store_from_phone(phone_number: str) -> Optional[Dict[str, Any]]:
                     "store_name": seller.get("store_name")
                 }
 
-        return None
+        # API returned no data, try fallback
+        logger.warning(f"No store found via API for {clean_phone}, trying fallback")
+        return get_store_from_phone_fallback(clean_phone)
 
     except Exception as e:
         logger.error(f"Error in get_store_from_phone: {e}")
-        return None
+        # Try fallback on any error
+        return get_store_from_phone_fallback(phone_number)
 
 
 def clear_cache(phone_number_id: str = None):
@@ -163,16 +181,40 @@ def clear_cache(phone_number_id: str = None):
 
 
 # ============================================
-# FALLBACK: Hardcoded mapping for testing
-# Remove this in production
+# FALLBACK: Hardcoded mapping for backward compatibility
+# This ensures Dear Delhi bot keeps working even if API fails
 # ============================================
 
+# Map phone_number_id to store config (for multi-tenant lookup)
+PHONE_NUMBER_ID_FALLBACK = {
+    "850008814869854": {  # Dear Delhi's phone_number_id from credentials.yml
+        "store_id": "966",
+        "store_name": "Dear Delhi",
+        "phone_number_id": "850008814869854",
+        "access_token": None,  # Will use default from credentials.yml
+        "catalog_id": None,
+    },
+}
+
+# Map display phone number to store (legacy support)
 WHATSAPP_STORE_MAPPING_FALLBACK = {
     "+17158826516": {"store_id": "966", "store_name": "Dear Delhi"},
 }
 
+
+def _get_fallback_by_phone_number_id(phone_number_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Fallback to hardcoded mapping by phone_number_id
+    This keeps Dear Delhi working even without Laravel API
+    """
+    result = PHONE_NUMBER_ID_FALLBACK.get(phone_number_id)
+    if result:
+        logger.info(f"FALLBACK: Found {result['store_name']} for phone_number_id {phone_number_id}")
+    return result
+
+
 def get_store_from_phone_fallback(phone_number: str) -> Optional[Dict[str, Any]]:
-    """Fallback to hardcoded mapping if API fails"""
+    """Fallback to hardcoded mapping by display phone number"""
     clean_phone = phone_number.replace("whatsapp:", "").strip()
     if not clean_phone.startswith("+"):
         clean_phone = f"+{clean_phone}"
