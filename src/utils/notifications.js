@@ -3,6 +3,9 @@
  * Handles push notifications for orders and status updates
  */
 
+// Import in-app toast notification
+import { addNotification } from '@/components/ui/NotificationToast'
+
 // Check if notifications are supported
 export const isNotificationSupported = () => {
   return 'Notification' in window
@@ -92,6 +95,17 @@ export const playNotificationSound = () => {
 
 export const notifyNewOrder = (order) => {
   playNotificationSound()
+
+  // Show in-app toast notification
+  addNotification({
+    type: 'new_order',
+    title: 'New Order Received!',
+    message: `Order #${order.id} - ${order.total_product || 1} item(s) - $${order.order_amount || order.total_amount || 0}`,
+    orderId: order.id,
+    navigateTo: `/orders/${order.id}`,
+  })
+
+  // Show browser notification
   return showNotification('🛒 New Order Received!', {
     body: `Order #${order.id} - ${order.total_product || 1} item(s) - $${order.order_amount || order.total_amount || 0}`,
     tag: `new-order-${order.id}`,
@@ -108,12 +122,23 @@ export const notifyOrderStatusChange = (order, newStatus) => {
     4: 'Driver reached your store',
     5: 'Driver is on the way to customer',
     6: 'Driver reached customer location',
-    7: 'Order delivered successfully! 🎉',
+    7: 'Order delivered successfully!',
   }
 
   const message = statusMessages[newStatus] || `Order status updated to ${newStatus}`
 
   playNotificationSound()
+
+  // Show in-app toast notification
+  addNotification({
+    type: newStatus === 7 ? 'completed' : 'status_change',
+    title: `Order #${order.id} Update`,
+    message: message,
+    orderId: order.id,
+    navigateTo: `/orders/${order.id}`,
+  })
+
+  // Show browser notification
   return showNotification(`📦 Order #${order.id} Update`, {
     body: message,
     tag: `order-status-${order.id}`,
@@ -127,6 +152,17 @@ export const notifyOrderStatusChange = (order, newStatus) => {
 
 export const notifyNewDeliveryRequest = (order) => {
   playNotificationSound()
+
+  // Show in-app toast notification
+  addNotification({
+    type: 'delivery_request',
+    title: 'New Delivery Request!',
+    message: `${order.store_name || 'Store'} - ${order.distance || '0'} miles away`,
+    orderId: order.id,
+    navigateTo: `/driver/order/${order.id}`,
+  })
+
+  // Show browser notification
   return showNotification('🚗 New Delivery Request!', {
     body: `${order.store_name || 'Store'} - ${order.distance || '0'} miles away`,
     tag: `delivery-request-${order.id}`,
@@ -137,6 +173,17 @@ export const notifyNewDeliveryRequest = (order) => {
 
 export const notifyDeliveryReminder = (order, minutesElapsed) => {
   playNotificationSound()
+
+  // Show in-app toast notification
+  addNotification({
+    type: 'reminder',
+    title: 'Delivery Reminder',
+    message: `Order #${order.id} has been pending for ${minutesElapsed} minutes. Please update the status.`,
+    orderId: order.id,
+    navigateTo: `/driver/order/${order.id}`,
+  })
+
+  // Show browser notification
   return showNotification('⏰ Delivery Reminder', {
     body: `Order #${order.id} has been pending for ${minutesElapsed} minutes. Please update the status.`,
     tag: `delivery-reminder-${order.id}`,
@@ -146,6 +193,16 @@ export const notifyDeliveryReminder = (order, minutesElapsed) => {
 }
 
 export const notifyDeliveryCompleted = (order) => {
+  // Show in-app toast notification
+  addNotification({
+    type: 'completed',
+    title: 'Delivery Completed!',
+    message: `Order #${order.id} delivered successfully. Great job!`,
+    orderId: order.id,
+    navigateTo: `/driver/deliveries`,
+  })
+
+  // Show browser notification
   return showNotification('✅ Delivery Completed!', {
     body: `Order #${order.id} delivered successfully. Great job!`,
     tag: `delivery-complete-${order.id}`,
