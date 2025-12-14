@@ -5,6 +5,12 @@ import { driverService, DRIVER_STATUS } from '@/services'
 import { Modal } from '@/components/ui'
 import { formatCurrency } from '@/utils/helpers'
 import {
+  notifyDeliveryReminder,
+  notifyDeliveryCompleted,
+  startDeliveryReminder,
+  stopDeliveryReminder,
+} from '@/utils/notifications'
+import {
   ArrowLeft,
   MapPin,
   Package,
@@ -100,6 +106,29 @@ function DriverOrderDetailPage() {
     loadOrder()
   }, [loadOrder])
 
+  // Set up delivery reminder (notifies driver every 5 minutes if no status change)
+  useEffect(() => {
+    if (!order) return
+
+    const statusCode = typeof order.driver_order_status === 'object'
+      ? order.driver_order_status?.driver_order_status
+      : order.driver_order_status
+
+    // Start reminder if order is in progress (status 1-6, not delivered)
+    if (statusCode && statusCode >= 1 && statusCode < 7) {
+      startDeliveryReminder(order, (o) => {
+        notifyDeliveryReminder(o, 5)
+      }, 5) // 5 minutes
+    }
+
+    // Cleanup: stop reminder on unmount or when order changes
+    return () => {
+      if (order?.id) {
+        stopDeliveryReminder(order.id)
+      }
+    }
+  }, [order])
+
   const getStatusCode = () => {
     if (!order) return 0
     const status = order.driver_order_status
@@ -150,6 +179,8 @@ function DriverOrderDetailPage() {
 
       if (response.status === 1 || response.code === 200 || response.status === 0) {
         toast.success('Delivery completed!')
+        stopDeliveryReminder(order.id) // Stop reminder
+        notifyDeliveryCompleted(order) // Show completion notification
         navigate('/driver/deliveries', { state: { completed: order } })
       } else {
         toast.error(response.message || 'Failed to complete delivery')

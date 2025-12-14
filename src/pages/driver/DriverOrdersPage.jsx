@@ -4,6 +4,10 @@ import { useAuthStore } from '@/store'
 import { driverService } from '@/services'
 import { formatCurrency } from '@/utils/helpers'
 import {
+  notifyNewDeliveryRequest,
+  trackOrdersForNotifications,
+} from '@/utils/notifications'
+import {
   MapPin,
   Package,
   Navigation,
@@ -188,7 +192,16 @@ function DriverOrdersPage() {
       })
 
       if (response.status === 1 || response.status === 0) {
-        setOrders(response.data || [])
+        const newOrders = response.data || []
+
+        // Track for new delivery request notifications (only on polling, not initial load)
+        if (!showLoader) {
+          trackOrdersForNotifications(newOrders, (order) => {
+            notifyNewDeliveryRequest(order)
+          })
+        }
+
+        setOrders(newOrders)
       }
     } catch (error) {
       console.error('Failed to load orders:', error)
