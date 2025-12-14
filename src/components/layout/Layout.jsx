@@ -1,12 +1,18 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Outlet, Navigate } from 'react-router-dom'
 import { useAuthStore } from '@/store'
+import { requestNotificationPermission } from '@/utils/notifications'
 import Sidebar from './Sidebar'
 import Header from './Header'
 
 function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const { isAuthenticated, userTypes, activeMode } = useAuthStore()
+
+  // Request notification permission on mount
+  useEffect(() => {
+    requestNotificationPermission()
+  }, [])
 
   // Redirect to login if not authenticated
   if (!isAuthenticated) {

@@ -13,6 +13,12 @@ import {
 } from '@/components/ui'
 import { formatCurrency, formatDateTime } from '@/utils/helpers'
 import {
+  notifyNewOrder,
+  notifyOrderStatusChange,
+  trackOrdersForNotifications,
+  trackOrderStatusForNotifications,
+} from '@/utils/notifications'
+import {
   Search,
   Eye,
   CheckCircle,
@@ -117,7 +123,19 @@ function OrdersPage() {
         wh_account_id: user.wh_account_id,
       })
       if (response.status === 1) {
-        setOrders(response.data?.orders || [])
+        const newOrders = response.data?.orders || []
+
+        // Track for new order notifications
+        trackOrdersForNotifications(newOrders, (order) => {
+          notifyNewOrder(order)
+        })
+
+        // Track for status change notifications
+        trackOrderStatusForNotifications(newOrders, (order, newStatus) => {
+          notifyOrderStatusChange(order, newStatus)
+        })
+
+        setOrders(newOrders)
       }
     } catch (error) {
       console.error('Silent refresh failed:', error)
