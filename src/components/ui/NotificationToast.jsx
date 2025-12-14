@@ -1,20 +1,21 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { X, ShoppingCart, Truck, Clock, CheckCircle, Bell } from 'lucide-react'
+import { useNotificationStore } from '@/store'
 
-// Global notification state
-let notificationListeners = []
-let notificationId = 0
+// Toast notifications (bottom-right popups) - separate from the persistent notification store
+let toastListeners = []
 
-// Add notification function (can be called from anywhere)
+// Add toast notification (called from notifications.js)
 export const addNotification = (notification) => {
-  const id = ++notificationId
-  const newNotification = {
-    id,
-    ...notification,
-    createdAt: Date.now(),
-  }
-  notificationListeners.forEach(listener => listener(newNotification))
+  // Also save to persistent store for bell icon
+  const store = useNotificationStore.getState()
+  store.addNotification(notification)
+
+  // Show toast popup
+  const id = Date.now()
+  const toast = { id, ...notification, createdAt: Date.now() }
+  toastListeners.forEach(listener => listener({ type: 'add', toast }))
   return id
 }
 
@@ -52,8 +53,8 @@ const NOTIFICATION_TYPES = {
   },
 }
 
-// Single notification item
-function NotificationItem({ notification, onClose, onClick }) {
+// Single toast item
+function ToastItem({ notification, onClose, onClick }) {
   const [isExiting, setIsExiting] = useState(false)
   const config = NOTIFICATION_TYPES[notification.type] || NOTIFICATION_TYPES.default
   const Icon = config.icon
@@ -65,29 +66,16 @@ function NotificationItem({ notification, onClose, onClick }) {
   }
 
   const handleClick = () => {
-    if (notification.onClick) {
-      notification.onClick()
-    }
     if (onClick) {
       onClick(notification)
     }
-    handleClose({ stopPropagation: () => {} })
   }
-
-  // Auto-dismiss after 8 seconds
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsExiting(true)
-      setTimeout(() => onClose(notification.id), 300)
-    }, 8000)
-    return () => clearTimeout(timer)
-  }, [notification.id, onClose])
 
   return (
     <div
       onClick={handleClick}
       className={`
-        relative flex items-start gap-3 p-4 mb-3 rounded-xl shadow-lg cursor-pointer
+        relative flex items-start gap-3 p-4 rounded-xl shadow-lg cursor-pointer
         bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700
         transform transition-all duration-300 ease-out
         hover:scale-[1.02] hover:shadow-xl
@@ -118,90 +106,87 @@ function NotificationItem({ notification, onClose, onClick }) {
         </p>
         {notification.orderId && (
           <p className="text-xs text-slate-400 mt-1">
-            Order #{notification.orderId} • Click to view
+            Order #{notification.orderId} - Click to view
           </p>
         )}
-      </div>
-
-      {/* Progress bar for auto-dismiss */}
-      <div className="absolute bottom-0 left-0 right-0 h-1 bg-slate-100 dark:bg-slate-700 rounded-b-xl overflow-hidden">
-        <div
-          className={`h-full ${config.bgColor} animate-shrink`}
-          style={{ animation: 'shrink 8s linear forwards' }}
-        />
       </div>
     </div>
   )
 }
 
-// Main notification container
+// Main toast container (bottom-right popup area)
 export function NotificationContainer() {
-  const [notifications, setNotifications] = useState([])
+  const [toasts, setToasts] = useState([])
   const navigate = useNavigate()
 
-  // Subscribe to notifications
+  // Subscribe to toast notifications
   useEffect(() => {
-    const listener = (notification) => {
-      setNotifications(prev => {
-        // Limit to 5 notifications max
-        const updated = [notification, ...prev].slice(0, 5)
-        return updated
-      })
+    const listener = (action) => {
+      if (action.type === 'add') {
+        setToasts(prev => {
+          // Prevent duplicate toasts
+          if (prev.some(t => t.id === action.toast.id)) {
+            return prev
+          }
+          // Add new toast, limit to 5
+          return [action.toast, ...prev].slice(0, 5)
+        })
+      }
     }
 
-    notificationListeners.push(listener)
+    toastListeners.push(listener)
     return () => {
-      notificationListeners = notificationListeners.filter(l => l !== listener)
+      toastListeners = toastListeners.filter(l => l !== listener)
     }
   }, [])
 
-  const handleClose = useCallback((id) => {
-    setNotifications(prev => prev.filter(n => n.id !== id))
-  }, [])
+  const handleClose = (id) => {
+    setToasts(prev => prev.filter(t => t.id !== id))
+  }
 
-  const handleClick = useCallback((notification) => {
-    if (notification.orderId && notification.navigateTo) {
+  const handleClick = (notification) => {
+    // Mark as read in store
+    const store = useNotificationStore.getState()
+    store.markAsRead(notification.id)
+
+    // Navigate to order
+    if (notification.navigateTo) {
       navigate(notification.navigateTo)
     }
-  }, [navigate])
 
-  if (notifications.length === 0) return null
+    // Close toast
+    handleClose(notification.id)
+  }
+
+  const handleClearAll = () => {
+    setToasts([])
+  }
+
+  if (toasts.length === 0) return null
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 flex flex-col-reverse">
-      {notifications.map((notification) => (
-        <NotificationItem
-          key={notification.id}
-          notification={notification}
+    <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-3">
+      {/* Clear all button if more than 2 toasts */}
+      {toasts.length > 2 && (
+        <button
+          onClick={handleClearAll}
+          className="self-end px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 bg-white dark:bg-slate-800 rounded-lg shadow border border-slate-200 dark:border-slate-700 transition-colors"
+        >
+          Clear all ({toasts.length})
+        </button>
+      )}
+
+      {/* Toast list */}
+      {toasts.map((toast) => (
+        <ToastItem
+          key={toast.id}
+          notification={toast}
           onClose={handleClose}
           onClick={handleClick}
         />
       ))}
-
-      {/* Clear all button if more than 2 notifications */}
-      {notifications.length > 2 && (
-        <button
-          onClick={() => setNotifications([])}
-          className="self-end mb-2 px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 bg-white dark:bg-slate-800 rounded-lg shadow border border-slate-200 dark:border-slate-700 transition-colors"
-        >
-          Clear all ({notifications.length})
-        </button>
-      )}
     </div>
   )
-}
-
-// CSS animation (add to global styles or use inline)
-const style = document.createElement('style')
-style.textContent = `
-  @keyframes shrink {
-    from { width: 100%; }
-    to { width: 0%; }
-  }
-`
-if (typeof document !== 'undefined' && !document.getElementById('notification-styles')) {
-  style.id = 'notification-styles'
-  document.head.appendChild(style)
 }
 
 export default NotificationContainer

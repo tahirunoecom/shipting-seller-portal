@@ -217,18 +217,50 @@ export const notifyDeliveryCompleted = (order) => {
 // Store previous order IDs to detect new orders
 let previousOrderIds = new Set()
 let previousOrderStatuses = new Map()
+let previousDriverOrderIds = new Set()
+let isFirstSellerLoad = true
+let isFirstDriverLoad = true
 
 export const trackOrdersForNotifications = (orders, onNewOrder) => {
-  const currentIds = new Set(orders.map(o => o.id))
+  const currentIds = new Set(orders.map(o => o.id || o.order_id))
+
+  // Skip notifications on first load (don't notify for existing orders)
+  if (isFirstSellerLoad) {
+    isFirstSellerLoad = false
+    previousOrderIds = currentIds
+    return
+  }
 
   // Find new orders
   orders.forEach(order => {
-    if (!previousOrderIds.has(order.id)) {
-      onNewOrder(order)
+    const orderId = order.id || order.order_id
+    if (!previousOrderIds.has(orderId)) {
+      onNewOrder({ ...order, id: orderId })
     }
   })
 
   previousOrderIds = currentIds
+}
+
+export const trackDriverOrdersForNotifications = (orders, onNewDeliveryRequest) => {
+  const currentIds = new Set(orders.map(o => o.id || o.order_id))
+
+  // Skip notifications on first load (don't notify for existing orders)
+  if (isFirstDriverLoad) {
+    isFirstDriverLoad = false
+    previousDriverOrderIds = currentIds
+    return
+  }
+
+  // Find new delivery requests
+  orders.forEach(order => {
+    const orderId = order.id || order.order_id
+    if (!previousDriverOrderIds.has(orderId)) {
+      onNewDeliveryRequest({ ...order, id: orderId })
+    }
+  })
+
+  previousDriverOrderIds = currentIds
 }
 
 export const trackOrderStatusForNotifications = (orders, onStatusChange) => {
@@ -252,6 +284,9 @@ export const trackOrderStatusForNotifications = (orders, onStatusChange) => {
 export const resetNotificationTracking = () => {
   previousOrderIds = new Set()
   previousOrderStatuses = new Map()
+  previousDriverOrderIds = new Set()
+  isFirstSellerLoad = true
+  isFirstDriverLoad = true
 }
 
 // ============================================
@@ -301,6 +336,7 @@ export default {
   notifyDeliveryReminder,
   notifyDeliveryCompleted,
   trackOrdersForNotifications,
+  trackDriverOrdersForNotifications,
   trackOrderStatusForNotifications,
   resetNotificationTracking,
   startDeliveryReminder,
