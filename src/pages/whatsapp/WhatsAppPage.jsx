@@ -269,6 +269,21 @@ function WhatsAppPage() {
 
       if (response.status === 1) {
         toast.success('WhatsApp connected successfully!')
+
+        // Auto-create catalog after successful connection
+        try {
+          console.log('Auto-creating WhatsApp catalog...')
+          const catalogResponse = await whatsappService.createCatalog(user?.wh_account_id)
+          if (catalogResponse.status === 1) {
+            console.log('Catalog created:', catalogResponse.data?.catalog_id)
+            toast.success('WhatsApp catalog created!')
+          } else {
+            console.log('Catalog creation:', catalogResponse.message)
+          }
+        } catch (catalogError) {
+          console.log('Catalog auto-creation skipped:', catalogError.message)
+        }
+
         loadWhatsAppConfig()
       } else {
         toast.error(response.message || 'Failed to complete connection')
@@ -278,6 +293,27 @@ function WhatsAppPage() {
       console.error('Token exchange error:', error)
       toast.error('Failed to complete WhatsApp connection')
       setConnectionData(prev => ({ ...prev, status: 'error' }))
+    }
+  }
+
+  // Create catalog manually
+  const handleCreateCatalog = async () => {
+    try {
+      setSaving(true)
+      const response = await whatsappService.createCatalog(user?.wh_account_id)
+
+      if (response.status === 1) {
+        toast.success(response.message || 'Catalog created successfully!')
+        setConnectionData(prev => ({ ...prev, catalogId: response.data?.catalog_id }))
+        loadWhatsAppConfig()
+      } else {
+        toast.error(response.message || 'Failed to create catalog')
+      }
+    } catch (error) {
+      console.error('Create catalog error:', error)
+      toast.error('Failed to create catalog')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -652,14 +688,25 @@ function WhatsAppPage() {
 
                       {/* Actions */}
                       <div className="flex flex-wrap gap-3">
-                        <Button
-                          variant="outline"
-                          onClick={handleSyncCatalog}
-                          isLoading={saving}
-                        >
-                          <Package className="h-4 w-4" />
-                          Sync Products to Catalog
-                        </Button>
+                        {!connectionData.catalogId ? (
+                          <Button
+                            onClick={handleCreateCatalog}
+                            isLoading={saving}
+                            className="bg-green-500 hover:bg-green-600"
+                          >
+                            <Store className="h-4 w-4" />
+                            Create Catalog
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            onClick={handleSyncCatalog}
+                            isLoading={saving}
+                          >
+                            <Package className="h-4 w-4" />
+                            Sync Products to Catalog
+                          </Button>
+                        )}
                         <Button
                           variant="outline"
                           onClick={() => window.open('https://business.facebook.com/wa/manage/home/', '_blank')}
