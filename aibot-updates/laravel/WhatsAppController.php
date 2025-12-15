@@ -384,12 +384,12 @@ class WhatsAppController extends Controller
                         ];
                     }
 
-                    // Use items_batch endpoint
+                    // Use items_batch endpoint - requests must be JSON-encoded string
                     $response = Http::withHeaders([
                         'Authorization' => 'Bearer ' . $config->access_token
-                    ])->post("https://graph.facebook.com/v21.0/{$config->catalog_id}/items_batch", [
+                    ])->asForm()->post("https://graph.facebook.com/v21.0/{$config->catalog_id}/items_batch", [
                         'item_type' => 'PRODUCT_ITEM',
-                        'requests' => $batchRequest
+                        'requests' => json_encode($batchRequest)  // Must be JSON string
                     ]);
 
                     // Log response
