@@ -687,17 +687,49 @@ function WhatsAppPage() {
                         )}
                       </div>
 
+                      {/* Catalog Setup Notice */}
+                      {!connectionData.catalogId && (
+                        <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg dark:bg-amber-900/20 dark:border-amber-800">
+                          <div className="flex items-start gap-3">
+                            <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
+                            <div>
+                              <p className="font-medium text-amber-800 dark:text-amber-300">Product Catalog Not Set Up</p>
+                              <p className="text-sm text-amber-700 dark:text-amber-400 mt-1">
+                                To sell products via WhatsApp, you need a product catalog. Click below to set one up, or create one in{' '}
+                                <a
+                                  href="https://business.facebook.com/commerce/catalogs"
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="underline font-medium"
+                                >
+                                  Meta Commerce Manager
+                                </a>.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                       {/* Actions */}
                       <div className="flex flex-wrap gap-3">
                         {!connectionData.catalogId ? (
-                          <Button
-                            onClick={handleCreateCatalog}
-                            isLoading={saving}
-                            className="bg-green-500 hover:bg-green-600"
-                          >
-                            <Store className="h-4 w-4" />
-                            Create Catalog
-                          </Button>
+                          <>
+                            <Button
+                              onClick={handleCreateCatalog}
+                              isLoading={saving}
+                              className="bg-green-500 hover:bg-green-600"
+                            >
+                              <Store className="h-4 w-4" />
+                              Setup Catalog
+                            </Button>
+                            <Button
+                              variant="outline"
+                              onClick={() => window.open('https://business.facebook.com/commerce/catalogs', '_blank')}
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                              Create in Meta
+                            </Button>
+                          </>
                         ) : (
                           <Button
                             variant="outline"
