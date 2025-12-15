@@ -559,39 +559,103 @@ class WhatsAppController extends Controller
                 ]);
             }
 
-            // Get seller's products
-            $products = DB::table('products')
-                ->where('wh_account_id', $whAccountId)
-                ->where('status', 1)
-                ->get();
+            // Get seller's products using getMasterProducts API format
+            $products = $this->getSellerProducts($whAccountId);
+
+            if (empty($products)) {
+                return response()->json([
+                    'status' => 1,
+                    'message' => 'No products found to sync',
+                    'data' => ['synced' => 0, 'total' => 0]
+                ]);
+            }
 
             $synced = 0;
             $errors = [];
+            $seenIds = [];
 
             foreach ($products as $product) {
                 try {
-                    // Create/update product in Meta catalog
+                    // Get product ID
+                    $productId = $product['product_id'] ?? $product['ai_product_id'] ?? $product['id'] ?? null;
+                    if (!$productId) {
+                        continue;
+                    }
+
+                    $productId = trim((string) $productId);
+
+                    // Skip duplicates
+                    if (in_array($productId, $seenIds)) {
+                        continue;
+                    }
+                    $seenIds[] = $productId;
+
+                    // Clean image URL
+                    $rawImage = $product['images'] ?? $product['image'] ?? '';
+                    if (is_string($rawImage) && strpos($rawImage, ',') !== false) {
+                        $imageUrl = trim(explode(',', $rawImage)[0]);
+                    } else {
+                        $imageUrl = (string) $rawImage;
+                    }
+
+                    if ($imageUrl && !str_starts_with($imageUrl, 'http')) {
+                        $imageUrl = "https://stageshipperapi.thedelivio.com/{$imageUrl}";
+                    }
+
+                    if (empty($imageUrl) || strlen($imageUrl) < 5) {
+                        $imageUrl = "https://via.placeholder.com/500";
+                    }
+
+                    // Format price as "12.99 USD"
+                    $rawPrice = $product['product_price'] ?? $product['price'] ?? 0;
+                    $priceClean = str_replace(['$', ','], '', (string) $rawPrice);
+                    $priceVal = floatval($priceClean);
+                    $priceStr = number_format($priceVal, 2, '.', '') . ' USD';
+
+                    // Build batch request using items_batch format
+                    $batchRequest = [[
+                        'method' => 'UPDATE',
+                        'data' => [
+                            'id' => $productId,
+                            'title' => $product['title'] ?? $product['product_name'] ?? $product['name'] ?? 'Product',
+                            'description' => substr($product['description'] ?? 'Product', 0, 5000),
+                            'availability' => ($product['stock'] ?? 1) > 0 ? 'in stock' : 'out of stock',
+                            'condition' => 'new',
+                            'price' => $priceStr,
+                            'brand' => $product['brand'] ?? $config->business_name ?? 'Store',
+                            'link' => $product['url'] ?? config('app.url') . '/products/' . $productId,
+                            'image_link' => $imageUrl
+                        ]
+                    ]];
+
+                    // Use items_batch endpoint
                     $response = Http::withHeaders([
                         'Authorization' => 'Bearer ' . $config->access_token
-                    ])->post("https://graph.facebook.com/v21.0/{$config->catalog_id}/products", [
-                        'retailer_id' => $product->id,
-                        'availability' => $product->stock > 0 ? 'in stock' : 'out of stock',
-                        'brand' => $product->brand ?? '',
-                        'category' => $product->category_name ?? 'Other',
-                        'description' => $product->description ?? '',
-                        'image_url' => $product->image ?? '',
-                        'name' => $product->name,
-                        'price' => ($product->price * 100) . ' ' . ($product->currency ?? 'USD'),
-                        'url' => config('app.url') . '/products/' . $product->id
+                    ])->post("https://graph.facebook.com/v21.0/{$config->catalog_id}/items_batch", [
+                        'item_type' => 'PRODUCT_ITEM',
+                        'requests' => $batchRequest
                     ]);
 
                     if ($response->successful()) {
-                        $synced++;
+                        $resJson = $response->json();
+                        // Check for partial errors inside 200 OK
+                        $validationStatus = $resJson['validation_status'] ?? [];
+                        if (!empty($validationStatus) && !empty($validationStatus[0]['errors'] ?? [])) {
+                            $err = $validationStatus[0]['errors'][0]['message'] ?? 'Unknown error';
+                            $errors[] = "Product {$productId}: {$err}";
+                        } else {
+                            $synced++;
+                        }
                     } else {
-                        $errors[] = "Product {$product->id}: " . $response->body();
+                        $errorMsg = $response->json()['error']['message'] ?? $response->body();
+                        $errors[] = "Product {$productId}: {$errorMsg}";
                     }
+
+                    // Rate limiting - 0.5 second delay
+                    usleep(500000);
+
                 } catch (\Exception $e) {
-                    $errors[] = "Product {$product->id}: " . $e->getMessage();
+                    $errors[] = "Product {$productId}: " . $e->getMessage();
                 }
             }
 
@@ -605,8 +669,8 @@ class WhatsAppController extends Controller
                 'message' => "Synced {$synced} products to WhatsApp Catalog",
                 'data' => [
                     'synced' => $synced,
-                    'total' => $products->count(),
-                    'errors' => count($errors) > 0 ? $errors : null
+                    'total' => count($products),
+                    'errors' => count($errors) > 0 ? array_slice($errors, 0, 10) : null // Limit errors to 10
                 ]
             ]);
         } catch (\Exception $e) {
@@ -615,6 +679,41 @@ class WhatsAppController extends Controller
                 'status' => 0,
                 'message' => 'Failed to sync catalog: ' . $e->getMessage()
             ], 500);
+        }
+    }
+
+    /**
+     * Get seller's products from database or API
+     */
+    private function getSellerProducts($whAccountId)
+    {
+        try {
+            // Try to get products from the getMasterProducts-style table/API
+            // Adjust table name and columns based on your actual database schema
+            $products = DB::table('master_products')
+                ->where('wh_account_id', $whAccountId)
+                ->where('status', 1)
+                ->limit(50) // Sync in batches
+                ->get()
+                ->toArray();
+
+            if (!empty($products)) {
+                return json_decode(json_encode($products), true);
+            }
+
+            // Fallback: try products table
+            $products = DB::table('products')
+                ->where('wh_account_id', $whAccountId)
+                ->where('status', 1)
+                ->limit(50)
+                ->get()
+                ->toArray();
+
+            return json_decode(json_encode($products), true);
+
+        } catch (\Exception $e) {
+            Log::error('getSellerProducts error: ' . $e->getMessage());
+            return [];
         }
     }
 
