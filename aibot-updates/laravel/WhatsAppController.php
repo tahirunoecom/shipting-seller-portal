@@ -539,6 +539,7 @@ class WhatsAppController extends Controller
             $storeName = $config->business_name ?? $config->verified_name ?? "Store_{$whAccountId}";
 
             // Create catalog using Meta Commerce API
+            $this->lastCatalogError = null;
             $catalogId = $this->createMetaCatalog($config, $storeName);
 
             if ($catalogId) {
@@ -553,7 +554,7 @@ class WhatsAppController extends Controller
 
             return response()->json([
                 'status' => 0,
-                'message' => 'Failed to create catalog'
+                'message' => 'Failed to create catalog: ' . ($this->lastCatalogError ?? 'Unknown error')
             ]);
         } catch (\Exception $e) {
             Log::error('createCatalog error: ' . $e->getMessage());
@@ -580,6 +581,8 @@ class WhatsAppController extends Controller
             // Create new catalog under the business
             $businessId = $config->business_id ?? $this->metaBusinessId;
 
+            Log::info("Creating catalog for business_id: {$businessId}, store: {$storeName}");
+
             $response = Http::withHeaders([
                 'Authorization' => 'Bearer ' . $config->access_token
             ])->post("https://graph.facebook.com/v21.0/{$businessId}/owned_product_catalogs", [
@@ -600,15 +603,23 @@ class WhatsAppController extends Controller
                     return $catalogId;
                 }
             } else {
-                Log::error('Failed to create catalog: ' . $response->body());
+                $errorBody = $response->json();
+                $errorMessage = $errorBody['error']['message'] ?? $response->body();
+                Log::error("Failed to create catalog: {$errorMessage}");
+
+                // Store error for returning to frontend
+                $this->lastCatalogError = $errorMessage;
             }
 
             return null;
         } catch (\Exception $e) {
             Log::error('createMetaCatalog error: ' . $e->getMessage());
+            $this->lastCatalogError = $e->getMessage();
             return null;
         }
     }
+
+    private $lastCatalogError = null;
 
     /**
      * Get existing catalog connected to WABA
