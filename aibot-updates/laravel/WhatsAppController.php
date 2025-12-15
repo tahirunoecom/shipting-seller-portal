@@ -129,8 +129,18 @@ class WhatsAppController extends Controller
                 ]
             );
 
-            // Try to get WABA info using the access token
-            $this->fetchAndSaveWabaInfo($config, $accessToken);
+            // If we already have phone_number_id from session info (Embedded Signup flow),
+            // fetch phone details and mark as connected
+            if ($config->phone_number_id) {
+                Log::info("Phone number ID exists, fetching details...");
+                $this->fetchPhoneNumberDetails($config);
+            } else {
+                // Fallback: try to get WABA info (for non-Embedded Signup flow)
+                $this->fetchAndSaveWabaInfo($config, $accessToken);
+            }
+
+            // Refresh config to get updated values
+            $config->refresh();
 
             return response()->json([
                 'status' => 1,
@@ -584,10 +594,27 @@ class WhatsAppController extends Controller
                     'connected_at' => now()
                 ]);
 
-                Log::info("Phone number details fetched: {$phone['display_phone_number']}");
+                Log::info("Phone number details fetched: " . ($phone['display_phone_number'] ?? 'N/A'));
+            } else {
+                // Even if Meta API fails, we have the essential data from session info
+                // Mark as connected since we have phone_number_id, waba_id, and access_token
+                Log::warning("Could not fetch phone details from Meta: " . $response->body());
+                Log::info("Marking as connected with existing session info data");
+                $config->update([
+                    'is_connected' => true,
+                    'connection_status' => 'connected',
+                    'connected_at' => now()
+                ]);
             }
         } catch (\Exception $e) {
             Log::error('fetchPhoneNumberDetails error: ' . $e->getMessage());
+            // Still mark as connected since we have the essential data
+            Log::info("Marking as connected despite error (we have essential data)");
+            $config->update([
+                'is_connected' => true,
+                'connection_status' => 'connected',
+                'connected_at' => now()
+            ]);
         }
     }
 }

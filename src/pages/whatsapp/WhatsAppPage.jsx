@@ -43,7 +43,6 @@ import toast from 'react-hot-toast'
 // Meta App Configuration
 const META_APP_ID = '1559645705059315'
 const META_CONFIG_ID = '4402947513364167'
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://stageshipperapi.thedelivio.com/api'
 
 function WhatsAppPage() {
   const { user, userDetails } = useAuthStore()
@@ -265,25 +264,14 @@ function WhatsAppPage() {
   // Exchange OAuth code for token
   const exchangeCodeForToken = async (code) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/whatsapp/exchange-token`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        },
-        body: JSON.stringify({
-          code,
-          wh_account_id: user?.wh_account_id
-        })
-      })
+      console.log('Exchanging OAuth code for token...')
+      const response = await whatsappService.exchangeToken(code, user?.wh_account_id)
 
-      const data = await response.json()
-
-      if (data.status === 1) {
+      if (response.status === 1) {
         toast.success('WhatsApp connected successfully!')
         loadWhatsAppConfig()
       } else {
-        toast.error(data.message || 'Failed to complete connection')
+        toast.error(response.message || 'Failed to complete connection')
         setConnectionData(prev => ({ ...prev, status: 'error' }))
       }
     } catch (error) {
@@ -296,6 +284,7 @@ function WhatsAppPage() {
   // Save session info from Embedded Signup
   const saveSessionInfo = async (sessionData) => {
     try {
+      console.log('Saving session info:', sessionData)
       const response = await whatsappService.saveSessionInfo({
         wh_account_id: user?.wh_account_id,
         waba_id: sessionData.waba_id,
@@ -304,11 +293,14 @@ function WhatsAppPage() {
       })
 
       if (response.status === 1) {
-        toast.success('WhatsApp connected successfully!')
-        loadWhatsAppConfig()
+        console.log('Session info saved successfully')
+        // Don't show success toast here - wait for token exchange to complete
+      } else {
+        console.error('Failed to save session info:', response.message)
       }
     } catch (error) {
       console.error('Save session info error:', error)
+      toast.error('Failed to save WhatsApp configuration')
     }
   }
 
