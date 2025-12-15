@@ -375,14 +375,10 @@ class WhatsAppController extends Controller
                         'image_url' => $imageUrl
                     ];
 
-                    // First DELETE existing item, then CREATE fresh (to clear any blank entries)
+                    // Use UPDATE method (upsert - creates if not exists, updates if exists)
                     $batchRequest = [
                         [
-                            'method' => 'DELETE',
-                            'data' => ['id' => (string) $productId]
-                        ],
-                        [
-                            'method' => 'CREATE',
+                            'method' => 'UPDATE',
                             'data' => $productData
                         ]
                     ];
