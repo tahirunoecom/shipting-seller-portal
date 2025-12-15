@@ -252,6 +252,231 @@ class WhatsAppController extends Controller
     }
 
     /**
+     * Sync products to WhatsApp Catalog
+     * POST /api/seller/whatsapp/sync-catalog
+     */
+    public function syncCatalog(Request $request)
+    {
+        try {
+            $whAccountId = $request->input('wh_account_id');
+
+            if (!$whAccountId) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'wh_account_id is required'
+                ]);
+            }
+
+            $config = SellerWhatsappConfig::where('wh_account_id', $whAccountId)->first();
+
+            if (!$config || !$config->is_connected) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'WhatsApp not connected'
+                ]);
+            }
+
+            if (!$config->catalog_id) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'No catalog ID configured. Please set up a catalog first.'
+                ]);
+            }
+
+            // Get seller's products from API
+            $products = $this->getSellerProducts($whAccountId);
+
+            if (empty($products)) {
+                return response()->json([
+                    'status' => 1,
+                    'message' => 'No products found to sync',
+                    'data' => ['synced' => 0, 'total' => 0]
+                ]);
+            }
+
+            $synced = 0;
+            $errors = [];
+            $seenIds = [];
+
+            foreach ($products as $product) {
+                try {
+                    // Get product ID
+                    $productId = $product['product_id'] ?? $product['id'] ?? null;
+                    if (!$productId) {
+                        Log::warning("Skipping product - no product_id");
+                        continue;
+                    }
+
+                    $productId = trim((string) $productId);
+
+                    // Skip duplicates
+                    if (in_array($productId, $seenIds)) {
+                        continue;
+                    }
+                    $seenIds[] = $productId;
+
+                    // Clean image URL
+                    $rawImage = $product['images'] ?? $product['image'] ?? '';
+                    if (is_string($rawImage) && strpos($rawImage, ',') !== false) {
+                        $imageUrl = trim(explode(',', $rawImage)[0]);
+                    } else {
+                        $imageUrl = (string) $rawImage;
+                    }
+
+                    if ($imageUrl && !str_starts_with($imageUrl, 'http')) {
+                        $imageUrl = "https://stageshipperapi.thedelivio.com/{$imageUrl}";
+                    }
+
+                    // URL encode spaces in image URL
+                    $imageUrl = str_replace(' ', '%20', $imageUrl);
+
+                    if (empty($imageUrl) || strlen($imageUrl) < 5) {
+                        $imageUrl = "https://via.placeholder.com/500";
+                    }
+
+                    // Format price as "12.99 USD"
+                    $rawPrice = $product['product_price'] ?? $product['price'] ?? 0;
+                    $priceClean = str_replace(['$', ','], '', (string) $rawPrice);
+                    $priceVal = floatval($priceClean);
+                    if ($priceVal <= 0) {
+                        $priceVal = 1.00;
+                    }
+                    $priceStr = number_format($priceVal, 2, '.', '') . ' USD';
+
+                    // Get title
+                    $title = $product['title'] ?? $product['product_name'] ?? $product['name'] ?? '';
+                    if (empty($title)) {
+                        $title = 'Product ' . $productId;
+                    }
+
+                    // Build batch request
+                    $productData = [
+                        'id' => $productId,
+                        'title' => $title,
+                        'description' => substr($product['description'] ?? $title, 0, 5000),
+                        'availability' => 'in stock',
+                        'condition' => 'new',
+                        'price' => $priceStr,
+                        'brand' => $product['brand'] ?? 'Store',
+                        'link' => 'https://shipting.com/products/' . $productId,
+                        'image_link' => $imageUrl
+                    ];
+
+                    $batchRequest = [[
+                        'method' => 'UPDATE',
+                        'data' => $productData
+                    ]];
+
+                    // Log what we're sending
+                    Log::info("Syncing product {$productId}: " . json_encode($productData));
+
+                    // Use items_batch endpoint
+                    $response = Http::withHeaders([
+                        'Authorization' => 'Bearer ' . $config->access_token
+                    ])->post("https://graph.facebook.com/v21.0/{$config->catalog_id}/items_batch", [
+                        'item_type' => 'PRODUCT_ITEM',
+                        'requests' => $batchRequest
+                    ]);
+
+                    // Log response
+                    Log::info("Meta API response for {$productId}: " . $response->body());
+
+                    if ($response->successful()) {
+                        $resJson = $response->json();
+                        $validationStatus = $resJson['validation_status'] ?? [];
+                        if (!empty($validationStatus) && !empty($validationStatus[0]['errors'] ?? [])) {
+                            $err = $validationStatus[0]['errors'][0]['message'] ?? 'Unknown error';
+                            Log::error("Product {$productId} validation error: {$err}");
+                            $errors[] = "Product {$productId}: {$err}";
+                        } else {
+                            $synced++;
+                        }
+                    } else {
+                        $errorMsg = $response->json()['error']['message'] ?? $response->body();
+                        Log::error("Product {$productId} API error: {$errorMsg}");
+                        $errors[] = "Product {$productId}: {$errorMsg}";
+                    }
+
+                    // Rate limiting
+                    usleep(500000);
+
+                } catch (\Exception $e) {
+                    Log::error("Product sync exception: " . $e->getMessage());
+                    $errors[] = "Product: " . $e->getMessage();
+                }
+            }
+
+            $config->update([
+                'last_catalog_sync' => now(),
+                'catalog_product_count' => $synced
+            ]);
+
+            return response()->json([
+                'status' => 1,
+                'message' => "Synced {$synced} products to WhatsApp Catalog",
+                'data' => [
+                    'synced' => $synced,
+                    'total' => count($products),
+                    'errors' => count($errors) > 0 ? array_slice($errors, 0, 10) : null
+                ]
+            ]);
+        } catch (\Exception $e) {
+            Log::error('WhatsApp syncCatalog error: ' . $e->getMessage());
+            return response()->json([
+                'status' => 0,
+                'message' => 'Failed to sync catalog: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get seller's products from getMasterProducts API
+     */
+    private function getSellerProducts($whAccountId)
+    {
+        try {
+            $limit = 5; // Testing limit
+
+            $apiUrl = 'https://stageshipperapi.thedelivio.com/api/getMasterProducts';
+
+            Log::info("Calling getMasterProducts API for wh_account_id: {$whAccountId}");
+
+            $response = Http::post($apiUrl, [
+                'wh_account_id' => (string) $whAccountId,
+                'upc' => '',
+                'ai_category_id' => '',
+                'ai_product_id' => '',
+                'product_id' => '',
+                'search_string' => '',
+                'zipcode' => '',
+                'user_id' => '',
+                'page' => '1',
+                'items' => (string) $limit
+            ]);
+
+            if ($response->successful()) {
+                $responseData = $response->json();
+                Log::info("getMasterProducts response: " . json_encode($responseData));
+
+                $apiData = $responseData['data'] ?? [];
+                $products = $apiData['getMasterProducts'] ?? $apiData['products'] ?? [];
+
+                if (!empty($products)) {
+                    Log::info("Found " . count($products) . " products");
+                    return $products;
+                }
+            } else {
+                Log::warning('getMasterProducts API failed: ' . $response->body());
+            }
+
+            return [];
+        } catch (\Exception $e) {
+            Log::error('getSellerProducts error: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
      * Update bot settings
      * POST /api/seller/whatsapp/bot-settings
      */
