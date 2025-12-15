@@ -576,8 +576,8 @@ class WhatsAppController extends Controller
 
             foreach ($products as $product) {
                 try {
-                    // Get product ID
-                    $productId = $product['product_id'] ?? $product['ai_product_id'] ?? $product['id'] ?? null;
+                    // Get product ID - use product_id (ignore ai_product_id)
+                    $productId = $product['product_id'] ?? $product['id'] ?? null;
                     if (!$productId) {
                         continue;
                     }
@@ -693,26 +693,42 @@ class WhatsAppController extends Controller
             $limit = 5;
 
             // Call the getMasterProducts API endpoint
-            $response = Http::post(config('app.url') . '/api/getMasterProducts', [
-                'wh_account_id' => $whAccountId,
+            $apiUrl = 'https://stageshipperapi.thedelivio.com/api/getMasterProducts';
+
+            Log::info("Calling getMasterProducts API for wh_account_id: {$whAccountId}");
+
+            $response = Http::post($apiUrl, [
+                'wh_account_id' => (string) $whAccountId,
+                'upc' => '',
+                'ai_category_id' => '',
+                'ai_product_id' => '',
+                'product_id' => '',
+                'search_string' => '',
+                'zipcode' => '',
+                'user_id' => '',
                 'page' => '1',
                 'items' => (string) $limit
             ]);
 
             if ($response->successful()) {
-                $apiData = $response->json()['data'] ?? [];
+                $responseData = $response->json();
+                Log::info("getMasterProducts API response status: " . ($responseData['status'] ?? 'unknown'));
 
-                // Handle different response structures
+                $apiData = $responseData['data'] ?? [];
+
+                // Handle response structure: data.getMasterProducts
                 if (is_array($apiData)) {
-                    $products = $apiData['getMasterProducts'] ?? $apiData['products'] ?? $apiData;
+                    $products = $apiData['getMasterProducts'] ?? $apiData['products'] ?? [];
 
                     if (!empty($products) && is_array($products)) {
                         Log::info("getMasterProducts returned " . count($products) . " products");
                         return $products;
                     }
                 }
+
+                Log::warning("No products found in API response");
             } else {
-                Log::warning('getMasterProducts API failed: ' . $response->body());
+                Log::warning('getMasterProducts API failed: ' . $response->status() . ' - ' . $response->body());
             }
 
             return [];
