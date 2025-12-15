@@ -175,7 +175,13 @@ function WhatsAppPage() {
   const loadWhatsAppConfig = async () => {
     try {
       setLoading(true)
+      // Debug: Check user and wh_account_id
+      console.log('WhatsApp Debug - user object:', user)
+      console.log('WhatsApp Debug - userDetails:', userDetails)
+      console.log('WhatsApp Debug - wh_account_id:', user?.wh_account_id)
+
       const response = await whatsappService.getWhatsAppStatus(user?.wh_account_id)
+      console.log('WhatsApp Debug - API response:', response)
 
       if (response.status === 1 && response.data) {
         const data = response.data
