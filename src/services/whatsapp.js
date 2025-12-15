@@ -47,6 +47,14 @@ export const whatsappService = {
     return response.data
   },
 
+  // Create WhatsApp Catalog (called after connection)
+  async createCatalog(wh_account_id) {
+    const response = await api.post('/seller/whatsapp/create-catalog', {
+      wh_account_id,
+    })
+    return response.data
+  },
+
   // Sync products to WhatsApp Catalog
   async syncCatalog(wh_account_id) {
     const response = await api.post('/seller/whatsapp/sync-catalog', {

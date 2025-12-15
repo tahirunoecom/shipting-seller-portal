@@ -499,6 +499,171 @@ class WhatsAppController extends Controller
     }
 
     // ============================================
+    // CATALOG MANAGEMENT
+    // ============================================
+
+    /**
+     * Create catalog for seller (called after WhatsApp connection)
+     * POST /api/seller/whatsapp/create-catalog
+     */
+    public function createCatalog(Request $request)
+    {
+        try {
+            $whAccountId = $request->input('wh_account_id');
+
+            if (!$whAccountId) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'wh_account_id is required'
+                ]);
+            }
+
+            $config = SellerWhatsappConfig::where('wh_account_id', $whAccountId)->first();
+
+            if (!$config || !$config->is_connected) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'WhatsApp not connected'
+                ]);
+            }
+
+            if ($config->catalog_id) {
+                return response()->json([
+                    'status' => 1,
+                    'message' => 'Catalog already exists',
+                    'data' => ['catalog_id' => $config->catalog_id]
+                ]);
+            }
+
+            // Get seller/store name for catalog
+            $storeName = $config->business_name ?? $config->verified_name ?? "Store_{$whAccountId}";
+
+            // Create catalog using Meta Commerce API
+            $catalogId = $this->createMetaCatalog($config, $storeName);
+
+            if ($catalogId) {
+                $config->update(['catalog_id' => $catalogId]);
+
+                return response()->json([
+                    'status' => 1,
+                    'message' => 'Catalog created successfully',
+                    'data' => ['catalog_id' => $catalogId]
+                ]);
+            }
+
+            return response()->json([
+                'status' => 0,
+                'message' => 'Failed to create catalog'
+            ]);
+        } catch (\Exception $e) {
+            Log::error('createCatalog error: ' . $e->getMessage());
+            return response()->json([
+                'status' => 0,
+                'message' => 'Failed to create catalog: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Create Meta Commerce Catalog
+     */
+    private function createMetaCatalog($config, $storeName)
+    {
+        try {
+            // First, check if WABA already has a catalog connected
+            $existingCatalog = $this->getExistingCatalogForWaba($config);
+            if ($existingCatalog) {
+                Log::info("Using existing catalog: {$existingCatalog}");
+                return $existingCatalog;
+            }
+
+            // Create new catalog under the business
+            $businessId = $config->business_id ?? $this->metaBusinessId;
+
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $config->access_token
+            ])->post("https://graph.facebook.com/v21.0/{$businessId}/owned_product_catalogs", [
+                'name' => "{$storeName} - WhatsApp Catalog",
+                'vertical' => 'commerce'
+            ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                $catalogId = $data['id'] ?? null;
+
+                if ($catalogId) {
+                    Log::info("Created catalog: {$catalogId} for store: {$storeName}");
+
+                    // Connect catalog to WABA
+                    $this->connectCatalogToWaba($config, $catalogId);
+
+                    return $catalogId;
+                }
+            } else {
+                Log::error('Failed to create catalog: ' . $response->body());
+            }
+
+            return null;
+        } catch (\Exception $e) {
+            Log::error('createMetaCatalog error: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Get existing catalog connected to WABA
+     */
+    private function getExistingCatalogForWaba($config)
+    {
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $config->access_token
+            ])->get("https://graph.facebook.com/v21.0/{$config->waba_id}/product_catalogs");
+
+            if ($response->successful()) {
+                $data = $response->json();
+                $catalogs = $data['data'] ?? [];
+
+                if (!empty($catalogs)) {
+                    return $catalogs[0]['id'];
+                }
+            }
+
+            return null;
+        } catch (\Exception $e) {
+            Log::error('getExistingCatalogForWaba error: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Connect catalog to WhatsApp Business Account
+     */
+    private function connectCatalogToWaba($config, $catalogId)
+    {
+        try {
+            // Connect catalog to WABA
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $config->access_token
+            ])->post("https://graph.facebook.com/v21.0/{$config->waba_id}/product_catalogs", [
+                'catalog_id' => $catalogId
+            ]);
+
+            if ($response->successful()) {
+                Log::info("Catalog {$catalogId} connected to WABA {$config->waba_id}");
+                return true;
+            } else {
+                Log::warning('Failed to connect catalog to WABA: ' . $response->body());
+            }
+
+            return false;
+        } catch (\Exception $e) {
+            Log::error('connectCatalogToWaba error: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    // ============================================
     // HELPER METHODS
     // ============================================
 
