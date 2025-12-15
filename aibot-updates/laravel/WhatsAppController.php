@@ -333,6 +333,9 @@ class WhatsAppController extends Controller
                         $imageUrl = "https://stageshipperapi.thedelivio.com/{$imageUrl}";
                     }
 
+                    // Fix double slashes in URL (except after http:// or https://)
+                    $imageUrl = preg_replace('#(?<!:)//+#', '/', $imageUrl);
+
                     // URL encode spaces in image URL
                     $imageUrl = str_replace(' ', '%20', $imageUrl);
 
@@ -380,7 +383,8 @@ class WhatsAppController extends Controller
                     if (count($debugSamples) < 2) {
                         $debugSamples[] = [
                             'raw_product' => $product,
-                            'sent_to_meta' => $productData
+                            'sent_to_meta' => $productData,
+                            'meta_response' => null  // Will be filled after API call
                         ];
                     }
 
@@ -392,8 +396,16 @@ class WhatsAppController extends Controller
                         'requests' => json_encode($batchRequest)  // Must be JSON string
                     ]);
 
+                    $metaResponse = $response->json();
+
                     // Log response
-                    Log::info("Meta API response for {$productId}: " . $response->body());
+                    Log::info("Meta API response for {$productId}: " . json_encode($metaResponse));
+
+                    // Update debug sample with response
+                    $sampleIndex = count($debugSamples) - 1;
+                    if ($sampleIndex >= 0 && $sampleIndex < 2) {
+                        $debugSamples[$sampleIndex]['meta_response'] = $metaResponse;
+                    }
 
                     if ($response->successful()) {
                         $resJson = $response->json();
