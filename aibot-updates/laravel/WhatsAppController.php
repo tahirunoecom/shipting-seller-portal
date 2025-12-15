@@ -387,6 +387,239 @@ class WhatsAppController extends Controller
     }
 
     // ============================================
+    // CATALOG MANAGEMENT
+    // ============================================
+
+    private $lastCatalogError = null;
+
+    /**
+     * Create catalog for seller (called after WhatsApp connection)
+     * POST /api/seller/whatsapp/create-catalog
+     */
+    public function createCatalog(Request $request)
+    {
+        try {
+            $whAccountId = $request->input('wh_account_id');
+
+            if (!$whAccountId) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'wh_account_id is required'
+                ]);
+            }
+
+            $config = SellerWhatsappConfig::where('wh_account_id', $whAccountId)->first();
+
+            if (!$config || !$config->is_connected) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'WhatsApp not connected'
+                ]);
+            }
+
+            if ($config->catalog_id) {
+                return response()->json([
+                    'status' => 1,
+                    'message' => 'Catalog already exists',
+                    'data' => ['catalog_id' => $config->catalog_id]
+                ]);
+            }
+
+            // Get seller/store name for catalog
+            $storeName = $config->business_name ?? $config->verified_name ?? "Store_{$whAccountId}";
+
+            // Try to find or create catalog
+            $this->lastCatalogError = null;
+            $catalogId = $this->findOrCreateCatalog($config, $storeName);
+
+            if ($catalogId) {
+                $config->update(['catalog_id' => $catalogId]);
+
+                return response()->json([
+                    'status' => 1,
+                    'message' => 'Catalog configured successfully',
+                    'data' => ['catalog_id' => $catalogId]
+                ]);
+            }
+
+            return response()->json([
+                'status' => 0,
+                'message' => 'Failed to create catalog: ' . ($this->lastCatalogError ?? 'Unknown error')
+            ]);
+        } catch (\Exception $e) {
+            Log::error('createCatalog error: ' . $e->getMessage());
+            return response()->json([
+                'status' => 0,
+                'message' => 'Failed to create catalog: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Find existing catalog or create new one
+     */
+    private function findOrCreateCatalog($config, $storeName)
+    {
+        // Step 1: Check if WABA already has a catalog connected
+        $existingWabaCatalog = $this->getExistingCatalogForWaba($config);
+        if ($existingWabaCatalog) {
+            Log::info("Using existing WABA catalog: {$existingWabaCatalog}");
+            return $existingWabaCatalog;
+        }
+
+        // Step 2: Check if business has any existing catalogs we can use
+        $businessCatalog = $this->getExistingCatalogForBusiness($config);
+        if ($businessCatalog) {
+            Log::info("Found existing business catalog: {$businessCatalog}");
+            // Try to connect it to WABA
+            $this->connectCatalogToWaba($config, $businessCatalog);
+            return $businessCatalog;
+        }
+
+        // Step 3: Try to create a new catalog
+        return $this->createNewCatalog($config, $storeName);
+    }
+
+    /**
+     * Get existing catalog connected to WABA
+     */
+    private function getExistingCatalogForWaba($config)
+    {
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $config->access_token
+            ])->get("https://graph.facebook.com/v21.0/{$config->waba_id}/product_catalogs");
+
+            if ($response->successful()) {
+                $data = $response->json();
+                $catalogs = $data['data'] ?? [];
+                Log::info("Found " . count($catalogs) . " catalogs for WABA {$config->waba_id}");
+
+                if (!empty($catalogs)) {
+                    return $catalogs[0]['id'];
+                }
+            } else {
+                Log::warning("Could not fetch WABA catalogs: " . $response->body());
+            }
+
+            return null;
+        } catch (\Exception $e) {
+            Log::error('getExistingCatalogForWaba error: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Get existing catalog from business account
+     */
+    private function getExistingCatalogForBusiness($config)
+    {
+        try {
+            $businessId = $config->business_id;
+            if (!$businessId) {
+                return null;
+            }
+
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $config->access_token
+            ])->get("https://graph.facebook.com/v21.0/{$businessId}/owned_product_catalogs");
+
+            if ($response->successful()) {
+                $data = $response->json();
+                $catalogs = $data['data'] ?? [];
+                Log::info("Found " . count($catalogs) . " catalogs for business {$businessId}");
+
+                if (!empty($catalogs)) {
+                    // Return the first commerce catalog
+                    foreach ($catalogs as $catalog) {
+                        if (($catalog['vertical'] ?? '') === 'commerce' || !isset($catalog['vertical'])) {
+                            return $catalog['id'];
+                        }
+                    }
+                    return $catalogs[0]['id'];
+                }
+            } else {
+                Log::warning("Could not fetch business catalogs: " . $response->body());
+            }
+
+            return null;
+        } catch (\Exception $e) {
+            Log::error('getExistingCatalogForBusiness error: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Create a new catalog
+     */
+    private function createNewCatalog($config, $storeName)
+    {
+        try {
+            $businessId = $config->business_id;
+            if (!$businessId) {
+                $this->lastCatalogError = "No business ID available";
+                return null;
+            }
+
+            Log::info("Creating new catalog for business_id: {$businessId}, store: {$storeName}");
+
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $config->access_token
+            ])->post("https://graph.facebook.com/v21.0/{$businessId}/owned_product_catalogs", [
+                'name' => "{$storeName} - WhatsApp Catalog",
+                'vertical' => 'commerce'
+            ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                $catalogId = $data['id'] ?? null;
+
+                if ($catalogId) {
+                    Log::info("Created catalog: {$catalogId} for store: {$storeName}");
+                    $this->connectCatalogToWaba($config, $catalogId);
+                    return $catalogId;
+                }
+            } else {
+                $errorBody = $response->json();
+                $this->lastCatalogError = $errorBody['error']['message'] ?? $response->body();
+                Log::error("Failed to create catalog: {$this->lastCatalogError}");
+            }
+
+            return null;
+        } catch (\Exception $e) {
+            Log::error('createNewCatalog error: ' . $e->getMessage());
+            $this->lastCatalogError = $e->getMessage();
+            return null;
+        }
+    }
+
+    /**
+     * Connect catalog to WhatsApp Business Account
+     */
+    private function connectCatalogToWaba($config, $catalogId)
+    {
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $config->access_token
+            ])->post("https://graph.facebook.com/v21.0/{$config->waba_id}/product_catalogs", [
+                'catalog_id' => $catalogId
+            ]);
+
+            if ($response->successful()) {
+                Log::info("Catalog {$catalogId} connected to WABA {$config->waba_id}");
+                return true;
+            } else {
+                Log::warning('Failed to connect catalog to WABA: ' . $response->body());
+            }
+
+            return false;
+        } catch (\Exception $e) {
+            Log::error('connectCatalogToWaba error: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    // ============================================
     // INTERNAL API ENDPOINTS (for AIBOT webhook)
     // ============================================
 
