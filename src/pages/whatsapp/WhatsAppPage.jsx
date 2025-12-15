@@ -252,6 +252,7 @@ function WhatsAppPage() {
         config_id: META_CONFIG_ID,
         response_type: 'code',
         override_default_response_type: true,
+        scope: 'whatsapp_business_management,whatsapp_business_messaging,catalog_management,business_management',
         extras: {
           setup: {},
           featureType: '',
