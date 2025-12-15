@@ -294,9 +294,15 @@ class WhatsAppController extends Controller
                 ]);
             }
 
+            // DEBUG: Log raw product structure to understand field names
+            $firstProduct = $products[0] ?? [];
+            Log::info("DEBUG - First product raw data: " . json_encode($firstProduct));
+            Log::info("DEBUG - Available fields: " . implode(', ', array_keys($firstProduct)));
+
             $synced = 0;
             $errors = [];
             $seenIds = [];
+            $debugSamples = []; // Store first 2 products for debugging
 
             foreach ($products as $product) {
                 try {
@@ -370,6 +376,14 @@ class WhatsAppController extends Controller
                     // Log what we're sending
                     Log::info("Syncing product {$productId}: " . json_encode($productData));
 
+                    // Store first 2 samples for debug response
+                    if (count($debugSamples) < 2) {
+                        $debugSamples[] = [
+                            'raw_product' => $product,
+                            'sent_to_meta' => $productData
+                        ];
+                    }
+
                     // Use items_batch endpoint
                     $response = Http::withHeaders([
                         'Authorization' => 'Bearer ' . $config->access_token
@@ -417,7 +431,8 @@ class WhatsAppController extends Controller
                 'data' => [
                     'synced' => $synced,
                     'total' => count($products),
-                    'errors' => count($errors) > 0 ? array_slice($errors, 0, 10) : null
+                    'errors' => count($errors) > 0 ? array_slice($errors, 0, 10) : null,
+                    'debug_samples' => $debugSamples // Shows raw data vs what was sent to Meta
                 ]
             ]);
         } catch (\Exception $e) {
