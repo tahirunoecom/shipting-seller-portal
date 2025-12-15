@@ -281,10 +281,11 @@ function WhatsAppPage() {
     }
   }
 
-  // Save session info from Embedded Signup
-  const saveSessionInfo = async (sessionData) => {
+  // Save session info from Embedded Signup (with retry)
+  const saveSessionInfo = async (sessionData, retryCount = 0) => {
+    const maxRetries = 3
     try {
-      console.log('Saving session info:', sessionData)
+      console.log('Saving session info:', sessionData, `(attempt ${retryCount + 1})`)
       const response = await whatsappService.saveSessionInfo({
         wh_account_id: user?.wh_account_id,
         waba_id: sessionData.waba_id,
@@ -300,7 +301,13 @@ function WhatsAppPage() {
       }
     } catch (error) {
       console.error('Save session info error:', error)
-      toast.error('Failed to save WhatsApp configuration')
+      // Retry on network error
+      if (retryCount < maxRetries && (error.code === 'ERR_NETWORK' || error.message?.includes('Network'))) {
+        console.log(`Retrying session info save in 1 second... (${retryCount + 1}/${maxRetries})`)
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        return saveSessionInfo(sessionData, retryCount + 1)
+      }
+      toast.error('Failed to save WhatsApp configuration. Please try again.')
     }
   }
 
