@@ -283,6 +283,14 @@ class WhatsAppController extends Controller
                 ]);
             }
 
+            // Check catalog vertical and auto-fix if needed
+            $catalogCheck = $this->checkAndFixCatalogVertical($config);
+            if ($catalogCheck['fixed']) {
+                // Reload config with new catalog_id
+                $config->refresh();
+                Log::info("Catalog fixed - new catalog_id: " . $config->catalog_id);
+            }
+
             // Get seller's products from API
             $products = $this->getSellerProducts($whAccountId);
 
@@ -750,6 +758,46 @@ class WhatsAppController extends Controller
             Log::error('createNewCatalog error: ' . $e->getMessage());
             $this->lastCatalogError = $e->getMessage();
             return null;
+        }
+    }
+
+    /**
+     * Check catalog vertical and create commerce catalog if needed
+     */
+    private function checkAndFixCatalogVertical($config)
+    {
+        try {
+            // Get catalog info
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $config->access_token
+            ])->get("https://graph.facebook.com/v21.0/{$config->catalog_id}", [
+                'fields' => 'id,name,vertical'
+            ]);
+
+            if ($response->successful()) {
+                $catalogData = $response->json();
+                $vertical = $catalogData['vertical'] ?? 'unknown';
+
+                Log::info("Current catalog vertical: {$vertical}");
+
+                // If not commerce, create a new commerce catalog
+                if ($vertical !== 'commerce') {
+                    Log::warning("Catalog vertical is '{$vertical}', need 'commerce'. Creating new catalog...");
+
+                    $storeName = $config->business_name ?? $config->verified_name ?? "Store_{$config->wh_account_id}";
+                    $newCatalogId = $this->createNewCatalog($config, $storeName);
+
+                    if ($newCatalogId) {
+                        $config->update(['catalog_id' => $newCatalogId]);
+                        return ['fixed' => true, 'new_catalog_id' => $newCatalogId, 'old_vertical' => $vertical];
+                    }
+                }
+            }
+
+            return ['fixed' => false];
+        } catch (\Exception $e) {
+            Log::error('checkAndFixCatalogVertical error: ' . $e->getMessage());
+            return ['fixed' => false, 'error' => $e->getMessage()];
         }
     }
 
