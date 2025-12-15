@@ -683,7 +683,7 @@ class WhatsAppController extends Controller
     }
 
     /**
-     * Get seller's products from database or API
+     * Get seller's products from getMasterProducts API
      */
     private function getSellerProducts($whAccountId)
     {
@@ -692,28 +692,30 @@ class WhatsAppController extends Controller
             // TODO: Increase this limit for production (e.g., 50 or 100)
             $limit = 5;
 
-            // Try to get products from the getMasterProducts-style table/API
-            // Adjust table name and columns based on your actual database schema
-            $products = DB::table('master_products')
-                ->where('wh_account_id', $whAccountId)
-                ->where('status', 1)
-                ->limit($limit)
-                ->get()
-                ->toArray();
+            // Call the getMasterProducts API endpoint
+            $response = Http::post(config('app.url') . '/api/getMasterProducts', [
+                'wh_account_id' => $whAccountId,
+                'page' => '1',
+                'items' => (string) $limit
+            ]);
 
-            if (!empty($products)) {
-                return json_decode(json_encode($products), true);
+            if ($response->successful()) {
+                $apiData = $response->json()['data'] ?? [];
+
+                // Handle different response structures
+                if (is_array($apiData)) {
+                    $products = $apiData['getMasterProducts'] ?? $apiData['products'] ?? $apiData;
+
+                    if (!empty($products) && is_array($products)) {
+                        Log::info("getMasterProducts returned " . count($products) . " products");
+                        return $products;
+                    }
+                }
+            } else {
+                Log::warning('getMasterProducts API failed: ' . $response->body());
             }
 
-            // Fallback: try products table
-            $products = DB::table('products')
-                ->where('wh_account_id', $whAccountId)
-                ->where('status', 1)
-                ->limit($limit)
-                ->get()
-                ->toArray();
-
-            return json_decode(json_encode($products), true);
+            return [];
 
         } catch (\Exception $e) {
             Log::error('getSellerProducts error: ' . $e->getMessage());
