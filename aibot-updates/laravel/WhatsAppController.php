@@ -688,12 +688,16 @@ class WhatsAppController extends Controller
     private function getSellerProducts($whAccountId)
     {
         try {
+            // TESTING: Limit to 5 products for initial testing
+            // TODO: Increase this limit for production (e.g., 50 or 100)
+            $limit = 5;
+
             // Try to get products from the getMasterProducts-style table/API
             // Adjust table name and columns based on your actual database schema
             $products = DB::table('master_products')
                 ->where('wh_account_id', $whAccountId)
                 ->where('status', 1)
-                ->limit(50) // Sync in batches
+                ->limit($limit)
                 ->get()
                 ->toArray();
 
@@ -705,7 +709,7 @@ class WhatsAppController extends Controller
             $products = DB::table('products')
                 ->where('wh_account_id', $whAccountId)
                 ->where('status', 1)
-                ->limit(50)
+                ->limit($limit)
                 ->get()
                 ->toArray();
 
