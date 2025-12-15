@@ -576,8 +576,8 @@ class WhatsAppController extends Controller
 
             foreach ($products as $product) {
                 try {
-                    // Get product ID
-                    $productId = $product['product_id'] ?? $product['ai_product_id'] ?? $product['id'] ?? null;
+                    // Get product ID - use product_id (ignore ai_product_id)
+                    $productId = $product['product_id'] ?? $product['id'] ?? null;
                     if (!$productId) {
                         continue;
                     }
