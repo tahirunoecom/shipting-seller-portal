@@ -1,11 +1,20 @@
+# Handle React Router - redirect all requests to index.html
+# Make sure mod_rewrite is enabled: sudo a2enmod rewrite
+
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
 
-  # If the request is for an existing file or directory, serve it directly
-  RewriteCond %{REQUEST_FILENAME} !-f
-  RewriteCond %{REQUEST_FILENAME} !-d
+  # Don't rewrite files or directories
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
 
-  # Otherwise, redirect all requests to index.html
-  RewriteRule ^ index.html [QSA,L]
+  # Rewrite everything else to index.html
+  RewriteRule ^ index.html [L]
+</IfModule>
+
+# If mod_rewrite is not available, use FallbackResource
+<IfModule !mod_rewrite.c>
+  FallbackResource /index.html
 </IfModule>
