@@ -375,18 +375,6 @@ class WhatsAppController extends Controller
                         'image_url' => $imageUrl
                     ];
 
-                    // First DELETE existing item, then CREATE fresh (to clear any blank entries)
-                    $batchRequest = [
-                        [
-                            'method' => 'DELETE',
-                            'data' => ['id' => (string) $productId]
-                        ],
-                        [
-                            'method' => 'CREATE',
-                            'data' => $productData
-                        ]
-                    ];
-
                     // Log what we're sending
                     Log::info("Syncing product {$productId}: " . json_encode($productData));
 
@@ -399,13 +387,21 @@ class WhatsAppController extends Controller
                         ];
                     }
 
-                    // Use items_batch endpoint - requests must be JSON-encoded string
-                    $response = Http::withHeaders([
-                        'Authorization' => 'Bearer ' . $config->access_token
-                    ])->asForm()->post("https://graph.facebook.com/v21.0/{$config->catalog_id}/items_batch", [
-                        'item_type' => 'PRODUCT_ITEM',
-                        'requests' => json_encode($batchRequest)  // Must be JSON string
-                    ]);
+                    // Use DIRECT products API (synchronous, immediate feedback)
+                    // Field names: retailer_id, name, description, availability, condition, price, url, image_url, brand
+                    $response = Http::withToken($config->access_token)
+                        ->post("https://graph.facebook.com/v21.0/{$config->catalog_id}/products", [
+                            'retailer_id' => (string) $productId,
+                            'name' => $title,
+                            'description' => substr($product['description'] ?? $title, 0, 5000),
+                            'availability' => 'in stock',
+                            'condition' => 'new',
+                            'price' => (int)($priceVal * 100),  // Price in cents
+                            'currency' => 'USD',
+                            'url' => 'https://shipting.com/products/' . $productId,
+                            'image_url' => $imageUrl,
+                            'brand' => $product['brand'] ?? $product['store_name'] ?? 'Store'
+                        ]);
 
                     $metaResponse = $response->json();
 
@@ -418,18 +414,11 @@ class WhatsAppController extends Controller
                         $debugSamples[$sampleIndex]['meta_response'] = $metaResponse;
                     }
 
-                    if ($response->successful()) {
-                        $resJson = $response->json();
-                        $validationStatus = $resJson['validation_status'] ?? [];
-                        if (!empty($validationStatus) && !empty($validationStatus[0]['errors'] ?? [])) {
-                            $err = $validationStatus[0]['errors'][0]['message'] ?? 'Unknown error';
-                            Log::error("Product {$productId} validation error: {$err}");
-                            $errors[] = "Product {$productId}: {$err}";
-                        } else {
-                            $synced++;
-                        }
+                    if ($response->successful() && isset($metaResponse['id'])) {
+                        $synced++;
+                        Log::info("Product {$productId} created with FB ID: " . $metaResponse['id']);
                     } else {
-                        $errorMsg = $response->json()['error']['message'] ?? $response->body();
+                        $errorMsg = $metaResponse['error']['message'] ?? $response->body();
                         Log::error("Product {$productId} API error: {$errorMsg}");
                         $errors[] = "Product {$productId}: {$errorMsg}";
                     }
