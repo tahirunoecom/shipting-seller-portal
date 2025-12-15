@@ -358,23 +358,34 @@ class WhatsAppController extends Controller
                         $title = 'Product ' . $productId;
                     }
 
-                    // Build batch request
+                    // Build batch request with retailer_id (Meta's standard field)
                     $productData = [
-                        'id' => $productId,
+                        'id' => (string) $productId,
+                        'retailer_id' => (string) $productId,  // Required by Meta
                         'title' => $title,
+                        'name' => $title,  // Some Meta APIs use 'name' instead of 'title'
                         'description' => substr($product['description'] ?? $title, 0, 5000),
                         'availability' => 'in stock',
                         'condition' => 'new',
                         'price' => $priceStr,
-                        'brand' => $product['brand'] ?? 'Store',
+                        'brand' => $product['brand'] ?? $product['store_name'] ?? 'Store',
                         'link' => 'https://shipting.com/products/' . $productId,
-                        'image_link' => $imageUrl
+                        'image_link' => $imageUrl,
+                        'url' => 'https://shipting.com/products/' . $productId,
+                        'image_url' => $imageUrl
                     ];
 
-                    $batchRequest = [[
-                        'method' => 'UPDATE',
-                        'data' => $productData
-                    ]];
+                    // First DELETE existing item, then CREATE fresh (to clear any blank entries)
+                    $batchRequest = [
+                        [
+                            'method' => 'DELETE',
+                            'data' => ['id' => (string) $productId]
+                        ],
+                        [
+                            'method' => 'CREATE',
+                            'data' => $productData
+                        ]
+                    ];
 
                     // Log what we're sending
                     Log::info("Syncing product {$productId}: " . json_encode($productData));
