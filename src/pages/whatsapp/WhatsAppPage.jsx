@@ -495,8 +495,14 @@ function WhatsAppPage() {
     switch (status) {
       case 'CONNECTED':
         return <Badge variant="success"><CheckCircle className="h-3 w-3 mr-1" /> Live</Badge>
+      case 'PENDING_REGISTRATION':
+        return <Badge variant="warning"><Clock className="h-3 w-3 mr-1" /> Pending Registration</Badge>
       case 'PENDING_VERIFICATION':
         return <Badge variant="warning"><Clock className="h-3 w-3 mr-1" /> Pending Verification</Badge>
+      case 'DISCONNECTED':
+        return <Badge variant="danger"><XCircle className="h-3 w-3 mr-1" /> Disconnected</Badge>
+      case 'API_READY':
+        return <Badge variant="default"><AlertCircle className="h-3 w-3 mr-1" /> API Ready</Badge>
       case 'PENDING':
         return <Badge variant="warning"><Clock className="h-3 w-3 mr-1" /> Pending</Badge>
       default:
@@ -913,8 +919,26 @@ function WhatsAppPage() {
 
                             {/* Detailed Status */}
                             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                              <div className={`p-2 rounded ${
+                                phoneStatus.registration_status === 'CONNECTED'
+                                  ? 'bg-green-50 dark:bg-green-900/20'
+                                  : phoneStatus.registration_status === 'PENDING'
+                                    ? 'bg-amber-50 dark:bg-amber-900/20'
+                                    : 'bg-gray-50 dark:bg-dark-bg'
+                              }`}>
+                                <p className="text-xs text-gray-500 uppercase">Registration</p>
+                                <p className={`text-sm font-medium ${
+                                  phoneStatus.registration_status === 'CONNECTED'
+                                    ? 'text-green-700 dark:text-green-300'
+                                    : phoneStatus.registration_status === 'PENDING'
+                                      ? 'text-amber-700 dark:text-amber-300'
+                                      : 'text-gray-900 dark:text-dark-text'
+                                }`}>
+                                  {phoneStatus.registration_status || 'Unknown'}
+                                </p>
+                              </div>
                               <div className="p-2 bg-gray-50 rounded dark:bg-dark-bg">
-                                <p className="text-xs text-gray-500 uppercase">Verification</p>
+                                <p className="text-xs text-gray-500 uppercase">API Verification</p>
                                 <p className="text-sm font-medium text-gray-900 dark:text-dark-text">
                                   {phoneStatus.code_verification_status || 'Unknown'}
                                 </p>
@@ -936,6 +960,14 @@ function WhatsAppPage() {
                                   <p className="text-xs text-gray-500 uppercase">Quality</p>
                                   <p className="text-sm font-medium text-gray-900 dark:text-dark-text">
                                     {phoneStatus.quality_rating}
+                                  </p>
+                                </div>
+                              )}
+                              {phoneStatus.messaging_limit_tier && (
+                                <div className="p-2 bg-gray-50 rounded dark:bg-dark-bg">
+                                  <p className="text-xs text-gray-500 uppercase">Messaging Tier</p>
+                                  <p className="text-sm font-medium text-gray-900 dark:text-dark-text">
+                                    {phoneStatus.messaging_limit_tier}
                                   </p>
                                 </div>
                               )}
