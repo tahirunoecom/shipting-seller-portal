@@ -205,13 +205,20 @@ function DashboardPage() {
 
     const counts = dashboardData.latest_ai_orders_count
     return [
-      { name: 'Pending', value: counts.Pending || 0, color: STATUS_COLORS.Pending },
-      { name: 'Accepted', value: counts.Accepted || 0, color: STATUS_COLORS.Accepted },
-      { name: 'Packed', value: counts.Packed || 0, color: STATUS_COLORS.Packed },
-      { name: 'In Transit', value: counts.Intransit || 0, color: STATUS_COLORS.Intransit },
-      { name: 'Delivered', value: counts.Delivered || 0, color: STATUS_COLORS.Delivered },
-      { name: 'Cancelled', value: counts.Cancelled || 0, color: STATUS_COLORS.Cancelled },
+      { name: 'Pending', value: counts.Pending || 0, color: STATUS_COLORS.Pending, tab: 'pending' },
+      { name: 'Accepted', value: counts.Accepted || 0, color: STATUS_COLORS.Accepted, tab: 'accepted' },
+      { name: 'Packed', value: counts.Packed || 0, color: STATUS_COLORS.Packed, tab: 'packed' },
+      { name: 'In Transit', value: counts.Intransit || 0, color: STATUS_COLORS.Intransit, tab: 'shipped' },
+      { name: 'Delivered', value: counts.Delivered || 0, color: STATUS_COLORS.Delivered, tab: 'delivered' },
+      { name: 'Cancelled', value: counts.Cancelled || 0, color: STATUS_COLORS.Cancelled, tab: 'all' },
     ].filter(item => item.value > 0)
+  }
+
+  // Handle chart bar click
+  const handleChartClick = (data) => {
+    if (data?.activePayload?.[0]?.payload?.tab) {
+      navigateToOrders(data.activePayload[0].payload.tab)
+    }
   }
 
   // Get earnings from statement details
@@ -337,7 +344,13 @@ function DashboardPage() {
             {chartData.length > 0 ? (
               <div className="h-[280px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData} layout="vertical" margin={{ left: 20 }}>
+                  <BarChart
+                    data={chartData}
+                    layout="vertical"
+                    margin={{ left: 20 }}
+                    onClick={handleChartClick}
+                    style={{ cursor: 'pointer' }}
+                  >
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" horizontal={true} vertical={false} />
                     <XAxis type="number" stroke="#6b7280" fontSize={12} />
                     <YAxis
@@ -355,8 +368,9 @@ function DashboardPage() {
                         boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
                       }}
                       formatter={(value) => [value, 'Orders']}
+                      cursor={{ fill: 'rgba(0, 0, 0, 0.1)' }}
                     />
-                    <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                    <Bar dataKey="value" radius={[0, 4, 4, 0]} style={{ cursor: 'pointer' }}>
                       {chartData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
@@ -504,7 +518,7 @@ function DashboardPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="font-semibold text-gray-900 dark:text-dark-text">
-                            #{order.invoice_no}
+                            #{order.id}
                           </span>
                           {getOrderStatusBadge(order)}
                         </div>
@@ -565,22 +579,25 @@ function DashboardPage() {
         <CardContent>
           <div className="flex flex-wrap items-center justify-between gap-4">
             {[
-              { label: 'Pending', count: orderCounts.Pending || 0, color: STATUS_COLORS.Pending, icon: Clock },
-              { label: 'Accepted', count: orderCounts.Accepted || 0, color: STATUS_COLORS.Accepted, icon: CheckCircle },
-              { label: 'Packed', count: orderCounts.Packed || 0, color: STATUS_COLORS.Packed, icon: Package },
-              { label: 'Shipped', count: orderCounts.Shipped || 0, color: STATUS_COLORS.Shipped, icon: Truck },
-              { label: 'In Transit', count: orderCounts.Intransit || 0, color: STATUS_COLORS.Intransit, icon: Truck },
-              { label: 'Delivered', count: orderCounts.Delivered || 0, color: STATUS_COLORS.Delivered, icon: PackageCheck },
+              { label: 'Pending', count: orderCounts.Pending || 0, color: STATUS_COLORS.Pending, icon: Clock, tab: 'pending' },
+              { label: 'Accepted', count: orderCounts.Accepted || 0, color: STATUS_COLORS.Accepted, icon: CheckCircle, tab: 'accepted' },
+              { label: 'Packed', count: orderCounts.Packed || 0, color: STATUS_COLORS.Packed, icon: Package, tab: 'packed' },
+              { label: 'Shipped', count: orderCounts.Shipped || 0, color: STATUS_COLORS.Shipped, icon: Truck, tab: 'shipped' },
+              { label: 'In Transit', count: orderCounts.Intransit || 0, color: STATUS_COLORS.Intransit, icon: Truck, tab: 'shipped' },
+              { label: 'Delivered', count: orderCounts.Delivered || 0, color: STATUS_COLORS.Delivered, icon: PackageCheck, tab: 'delivered' },
             ].map((stage, index, array) => (
               <div key={stage.label} className="flex items-center">
-                <div className="text-center">
+                <div
+                  className="text-center cursor-pointer group"
+                  onClick={() => navigateToOrders(stage.tab)}
+                >
                   <div
-                    className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-2"
+                    className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-2 transition-transform group-hover:scale-110"
                     style={{ backgroundColor: `${stage.color}20` }}
                   >
                     <stage.icon className="h-6 w-6" style={{ color: stage.color }} />
                   </div>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-dark-text">{stage.count}</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-dark-text group-hover:text-primary-600 transition-colors">{stage.count}</p>
                   <p className="text-xs text-gray-500 dark:text-dark-muted">{stage.label}</p>
                 </div>
                 {index < array.length - 1 && (
