@@ -4,6 +4,9 @@ import { Layout, AuthLayout } from '@/components/layout'
 // Auth pages
 import LoginPage from '@/pages/auth/LoginPage'
 import RegisterPage from '@/pages/auth/RegisterPage'
+import OTPVerificationPage from '@/pages/auth/OTPVerificationPage'
+import ServiceTypeSelectionPage from '@/pages/auth/ServiceTypeSelectionPage'
+import VerificationPage from '@/pages/auth/VerificationPage'
 import ModeSelectionPage from '@/pages/auth/ModeSelectionPage'
 
 // Main pages (Seller)
@@ -51,8 +54,12 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/forgot-password" element={<PlaceholderPage title="Forgot Password" description="Reset your password" />} />
-        <Route path="/verify-email" element={<PlaceholderPage title="Verify Email" description="Enter the OTP sent to your email" />} />
+        <Route path="/verify-email" element={<OTPVerificationPage />} />
       </Route>
+
+      {/* Onboarding routes (no auth layout) */}
+      <Route path="/select-service-type" element={<ServiceTypeSelectionPage />} />
+      <Route path="/onboarding/verification" element={<VerificationPage />} />
 
       {/* Mode Selection (for users with multiple roles) */}
       <Route path="/select-mode" element={<ModeSelectionPage />} />
