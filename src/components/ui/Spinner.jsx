@@ -18,7 +18,7 @@ function Spinner({ className, size = 'md' }) {
 
 function PageLoader() {
   return (
-    <div className="flex items-center justify-center min-h-[400px]">
+    <div data-testid="page-loader" className="flex items-center justify-center min-h-[400px]">
       <Spinner size="lg" />
     </div>
   )
