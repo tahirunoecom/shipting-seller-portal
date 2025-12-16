@@ -991,6 +991,126 @@ class WhatsAppController extends Controller
     }
 
     // ============================================
+    // PHONE NUMBER STATUS
+    // ============================================
+
+    /**
+     * Get phone number status from Meta API
+     * POST /api/seller/whatsapp/phone-status
+     *
+     * Returns: display_phone_number, verified_name, quality_rating, status
+     * Status can be: PENDING, CONNECTED, DISCONNECTED, etc.
+     */
+    public function getPhoneStatus(Request $request)
+    {
+        try {
+            $whAccountId = $request->input('wh_account_id');
+
+            if (!$whAccountId) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'wh_account_id is required'
+                ]);
+            }
+
+            $config = SellerWhatsappConfig::where('wh_account_id', $whAccountId)->first();
+
+            if (!$config || !$config->access_token) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'WhatsApp not connected or no access token'
+                ]);
+            }
+
+            if (!$config->phone_number_id) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'No phone number ID configured'
+                ]);
+            }
+
+            // Fetch phone number details from Meta API
+            $response = Http::withToken($config->access_token)
+                ->get("https://graph.facebook.com/v21.0/{$config->phone_number_id}", [
+                    'fields' => 'display_phone_number,verified_name,quality_rating,code_verification_status,name_status,account_mode'
+                ]);
+
+            if (!$response->successful()) {
+                $error = $response->json()['error']['message'] ?? 'Unknown error';
+                Log::error("Failed to get phone status: {$error}");
+                return response()->json([
+                    'status' => 0,
+                    'message' => "Failed to get phone status: {$error}"
+                ]);
+            }
+
+            $phoneData = $response->json();
+            Log::info("Phone status data: " . json_encode($phoneData));
+
+            // Determine the actual status
+            // code_verification_status: VERIFIED, NOT_VERIFIED
+            // name_status: APPROVED, PENDING, etc.
+            // account_mode: LIVE, SANDBOX
+            $codeVerificationStatus = $phoneData['code_verification_status'] ?? 'UNKNOWN';
+            $nameStatus = $phoneData['name_status'] ?? 'UNKNOWN';
+            $accountMode = $phoneData['account_mode'] ?? 'SANDBOX';
+
+            // Derive overall status
+            $overallStatus = 'PENDING';
+            if ($codeVerificationStatus === 'VERIFIED' && $accountMode === 'LIVE') {
+                $overallStatus = 'CONNECTED';
+            } elseif ($codeVerificationStatus === 'NOT_VERIFIED') {
+                $overallStatus = 'PENDING_VERIFICATION';
+            }
+
+            return response()->json([
+                'status' => 1,
+                'data' => [
+                    'phone_number' => $phoneData['display_phone_number'] ?? $config->display_phone_number,
+                    'phone_number_id' => $config->phone_number_id,
+                    'verified_name' => $phoneData['verified_name'] ?? null,
+                    'quality_rating' => $phoneData['quality_rating'] ?? null,
+                    'code_verification_status' => $codeVerificationStatus,
+                    'name_status' => $nameStatus,
+                    'account_mode' => $accountMode,
+                    'overall_status' => $overallStatus,
+                    'status_description' => $this->getStatusDescription($overallStatus, $codeVerificationStatus, $nameStatus, $accountMode)
+                ]
+            ]);
+        } catch (\Exception $e) {
+            Log::error('WhatsApp getPhoneStatus error: ' . $e->getMessage());
+            return response()->json([
+                'status' => 0,
+                'message' => 'Failed to get phone status: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get human-readable status description
+     */
+    private function getStatusDescription($overallStatus, $codeVerification, $nameStatus, $accountMode)
+    {
+        if ($overallStatus === 'CONNECTED') {
+            return 'Your WhatsApp Business number is active and ready to receive messages.';
+        }
+
+        if ($codeVerification === 'NOT_VERIFIED') {
+            return 'Phone number verification pending. Please complete the verification process in WhatsApp Manager.';
+        }
+
+        if ($accountMode === 'SANDBOX') {
+            return 'Your account is in Sandbox mode. Complete business verification to go live.';
+        }
+
+        if ($nameStatus === 'PENDING') {
+            return 'Business name verification is pending approval from Meta.';
+        }
+
+        return 'Your WhatsApp Business number is being set up. This may take a few minutes.';
+    }
+
+    // ============================================
     // INTERNAL API ENDPOINTS (for AIBOT webhook)
     // ============================================
 
