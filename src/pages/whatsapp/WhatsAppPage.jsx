@@ -814,6 +814,17 @@ function WhatsAppPage() {
                         <p className="text-xs text-gray-500 mt-2">
                           Click "Load Catalogs" to see available catalogs. Select a <strong>Commerce</strong> catalog for products to sync correctly.
                         </p>
+
+                        {/* Create New Commerce Catalog Button */}
+                        <Button
+                          variant="outline"
+                          onClick={handleCreateCatalog}
+                          isLoading={saving}
+                          className="w-full mt-4"
+                        >
+                          <Store className="h-4 w-4" />
+                          Create New Commerce Catalog
+                        </Button>
                       </div>
 
                       {/* Actions */}

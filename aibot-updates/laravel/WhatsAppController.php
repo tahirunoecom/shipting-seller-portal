@@ -702,13 +702,16 @@ class WhatsAppController extends Controller
     }
 
     /**
-     * Create catalog for seller (called after WhatsApp connection)
+     * Create a NEW commerce catalog for seller
      * POST /api/seller/whatsapp/create-catalog
+     *
+     * Always creates a new commerce catalog (even if one already exists)
      */
     public function createCatalog(Request $request)
     {
         try {
             $whAccountId = $request->input('wh_account_id');
+            $catalogName = $request->input('name'); // Optional custom name
 
             if (!$whAccountId) {
                 return response()->json([
@@ -726,35 +729,54 @@ class WhatsAppController extends Controller
                 ]);
             }
 
-            if ($config->catalog_id) {
-                return response()->json([
-                    'status' => 1,
-                    'message' => 'Catalog already exists',
-                    'data' => ['catalog_id' => $config->catalog_id]
-                ]);
-            }
-
             // Get seller/store name for catalog
-            $storeName = $config->business_name ?? $config->verified_name ?? "Store_{$whAccountId}";
+            $storeName = $catalogName ?? $config->business_name ?? $config->verified_name ?? "Store_{$whAccountId}";
 
-            // Try to find or create catalog
-            $this->lastCatalogError = null;
-            $catalogId = $this->findOrCreateCatalog($config, $storeName);
+            // Always create a NEW commerce catalog
+            $businessId = $config->business_id ?? $this->metaBusinessId;
 
-            if ($catalogId) {
-                $config->update(['catalog_id' => $catalogId]);
+            Log::info("Creating NEW commerce catalog for business_id: {$businessId}, name: {$storeName}");
 
-                return response()->json([
-                    'status' => 1,
-                    'message' => 'Catalog configured successfully',
-                    'data' => ['catalog_id' => $catalogId]
+            $response = Http::withToken($config->access_token)
+                ->post("https://graph.facebook.com/v21.0/{$businessId}/owned_product_catalogs", [
+                    'name' => "{$storeName} - Commerce Catalog",
+                    'vertical' => 'commerce'
                 ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                $catalogId = $data['id'] ?? null;
+
+                if ($catalogId) {
+                    // Update config with new catalog
+                    $config->update(['catalog_id' => $catalogId]);
+
+                    // Try to connect to WABA
+                    $this->connectCatalogToWaba($config, $catalogId);
+
+                    Log::info("Commerce catalog created: {$catalogId}");
+
+                    return response()->json([
+                        'status' => 1,
+                        'message' => 'Commerce catalog created successfully!',
+                        'data' => [
+                            'catalog_id' => $catalogId,
+                            'catalog_name' => "{$storeName} - Commerce Catalog",
+                            'catalog_vertical' => 'commerce'
+                        ]
+                    ]);
+                }
             }
+
+            $errorBody = $response->json();
+            $errorMsg = $errorBody['error']['message'] ?? $response->body();
+            Log::error("Failed to create commerce catalog: {$errorMsg}");
 
             return response()->json([
                 'status' => 0,
-                'message' => 'Failed to create catalog: ' . ($this->lastCatalogError ?? 'Unknown error')
+                'message' => 'Failed to create catalog: ' . $errorMsg
             ]);
+
         } catch (\Exception $e) {
             Log::error('createCatalog error: ' . $e->getMessage());
             return response()->json([
@@ -765,7 +787,7 @@ class WhatsAppController extends Controller
     }
 
     /**
-     * Find existing catalog or create new one
+     * Find existing catalog or create new one (used internally during auto-setup)
      */
     private function findOrCreateCatalog($config, $storeName)
     {
