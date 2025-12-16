@@ -1030,9 +1030,10 @@ class WhatsAppController extends Controller
             }
 
             // Fetch phone number details from Meta API
+            // Including 'status' field which shows actual registration status on WhatsApp network
             $response = Http::withToken($config->access_token)
                 ->get("https://graph.facebook.com/v21.0/{$config->phone_number_id}", [
-                    'fields' => 'display_phone_number,verified_name,quality_rating,code_verification_status,name_status,account_mode'
+                    'fields' => 'display_phone_number,verified_name,quality_rating,code_verification_status,name_status,account_mode,status,is_official_business_account,messaging_limit_tier'
                 ]);
 
             if (!$response->successful()) {
@@ -1048,19 +1049,29 @@ class WhatsAppController extends Controller
             Log::info("Phone status data: " . json_encode($phoneData));
 
             // Determine the actual status
-            // code_verification_status: VERIFIED, NOT_VERIFIED
-            // name_status: APPROVED, PENDING, etc.
+            // status: PENDING, CONNECTED, DISCONNECTED, etc. (registration status on WhatsApp)
+            // code_verification_status: VERIFIED, NOT_VERIFIED (API verification)
+            // name_status: APPROVED, PENDING, AVAILABLE_WITHOUT_REVIEW, etc.
             // account_mode: LIVE, SANDBOX
+            $registrationStatus = $phoneData['status'] ?? 'UNKNOWN';
             $codeVerificationStatus = $phoneData['code_verification_status'] ?? 'UNKNOWN';
             $nameStatus = $phoneData['name_status'] ?? 'UNKNOWN';
             $accountMode = $phoneData['account_mode'] ?? 'SANDBOX';
+            $messagingTier = $phoneData['messaging_limit_tier'] ?? null;
 
-            // Derive overall status
+            // Derive overall status - prioritize registration status
             $overallStatus = 'PENDING';
-            if ($codeVerificationStatus === 'VERIFIED' && $accountMode === 'LIVE') {
+            if ($registrationStatus === 'CONNECTED') {
                 $overallStatus = 'CONNECTED';
+            } elseif ($registrationStatus === 'PENDING') {
+                $overallStatus = 'PENDING_REGISTRATION';
+            } elseif ($registrationStatus === 'DISCONNECTED') {
+                $overallStatus = 'DISCONNECTED';
             } elseif ($codeVerificationStatus === 'NOT_VERIFIED') {
                 $overallStatus = 'PENDING_VERIFICATION';
+            } elseif ($codeVerificationStatus === 'VERIFIED' && $accountMode === 'LIVE') {
+                // API is verified but we don't know registration status
+                $overallStatus = 'API_READY';
             }
 
             return response()->json([
@@ -1070,11 +1081,13 @@ class WhatsAppController extends Controller
                     'phone_number_id' => $config->phone_number_id,
                     'verified_name' => $phoneData['verified_name'] ?? null,
                     'quality_rating' => $phoneData['quality_rating'] ?? null,
+                    'registration_status' => $registrationStatus,  // Actual WhatsApp registration status
                     'code_verification_status' => $codeVerificationStatus,
                     'name_status' => $nameStatus,
                     'account_mode' => $accountMode,
+                    'messaging_limit_tier' => $messagingTier,
                     'overall_status' => $overallStatus,
-                    'status_description' => $this->getStatusDescription($overallStatus, $codeVerificationStatus, $nameStatus, $accountMode)
+                    'status_description' => $this->getStatusDescription($overallStatus, $registrationStatus, $codeVerificationStatus, $nameStatus, $accountMode)
                 ]
             ]);
         } catch (\Exception $e) {
@@ -1089,9 +1102,18 @@ class WhatsAppController extends Controller
     /**
      * Get human-readable status description
      */
-    private function getStatusDescription($overallStatus, $codeVerification, $nameStatus, $accountMode)
+    private function getStatusDescription($overallStatus, $registrationStatus, $codeVerification, $nameStatus, $accountMode)
     {
-        if ($overallStatus === 'CONNECTED') {
+        // Check registration status first (this is what WhatsApp Manager shows)
+        if ($registrationStatus === 'PENDING') {
+            return 'Your phone number is pending registration on WhatsApp. This process can take a few minutes to a few hours. Please wait for Meta to complete the registration.';
+        }
+
+        if ($registrationStatus === 'DISCONNECTED') {
+            return 'Your phone number has been disconnected from WhatsApp. Please re-register the number in WhatsApp Manager.';
+        }
+
+        if ($overallStatus === 'CONNECTED' || $registrationStatus === 'CONNECTED') {
             return 'Your WhatsApp Business number is active and ready to receive messages.';
         }
 
@@ -1105,6 +1127,10 @@ class WhatsAppController extends Controller
 
         if ($nameStatus === 'PENDING') {
             return 'Business name verification is pending approval from Meta.';
+        }
+
+        if ($overallStatus === 'API_READY') {
+            return 'API is configured but phone registration status is unknown. Check WhatsApp Manager for details.';
         }
 
         return 'Your WhatsApp Business number is being set up. This may take a few minutes.';
