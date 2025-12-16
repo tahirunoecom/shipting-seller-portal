@@ -83,11 +83,21 @@ function OrdersPage() {
   const [expandedOrders, setExpandedOrders] = useState({})
 
   // Auto-expand order from URL query param (from notification click)
+  // Also set active tab from URL query param (from dashboard click)
   useEffect(() => {
     const expandOrderId = searchParams.get('expand')
+    const tabParam = searchParams.get('tab')
+
     if (expandOrderId) {
       setExpandedOrders(prev => ({ ...prev, [expandOrderId]: true }))
-      // Clear the query param after expanding
+    }
+
+    if (tabParam && ['all', 'pending', 'accepted', 'packed', 'shipped', 'delivered'].includes(tabParam)) {
+      setActiveTab(tabParam)
+    }
+
+    // Clear the query params after processing
+    if (expandOrderId || tabParam) {
       setSearchParams({}, { replace: true })
     }
   }, [searchParams, setSearchParams])
