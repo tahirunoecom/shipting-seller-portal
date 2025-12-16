@@ -63,6 +63,23 @@ export const whatsappService = {
     return response.data
   },
 
+  // List available catalogs for the seller's business
+  async listCatalogs(wh_account_id) {
+    const response = await api.post('/seller/whatsapp/list-catalogs', {
+      wh_account_id,
+    })
+    return response.data
+  },
+
+  // Update catalog ID (switch to a different catalog)
+  async updateCatalog(wh_account_id, catalog_id) {
+    const response = await api.post('/seller/whatsapp/update-catalog', {
+      wh_account_id,
+      catalog_id,
+    })
+    return response.data
+  },
+
   // ============================================
   // BOT SETTINGS ENDPOINTS
   // ============================================
