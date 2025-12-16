@@ -285,11 +285,19 @@ class WhatsAppController extends Controller
 
             // Check catalog vertical and auto-fix if needed
             $catalogCheck = $this->checkAndFixCatalogVertical($config);
+            Log::info("Catalog check result: " . json_encode($catalogCheck));
+
             if ($catalogCheck['fixed']) {
                 // Reload config with new catalog_id
                 $config->refresh();
                 Log::info("Catalog fixed - new catalog_id: " . $config->catalog_id);
             }
+
+            // Store catalog info for debug
+            $catalogDebug = [
+                'catalog_id' => $config->catalog_id,
+                'check_result' => $catalogCheck
+            ];
 
             // Get seller's products from API
             $products = $this->getSellerProducts($whAccountId);
@@ -452,6 +460,7 @@ class WhatsAppController extends Controller
                     'synced' => $synced,
                     'total' => count($products),
                     'errors' => count($errors) > 0 ? array_slice($errors, 0, 10) : null,
+                    'catalog_debug' => $catalogDebug,  // Shows catalog check info
                     'debug_samples' => $debugSamples // Shows raw data vs what was sent to Meta
                 ]
             ]);
