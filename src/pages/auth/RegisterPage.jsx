@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useAuthStore } from '@/store'
 import { Button, Input, Card, CardContent } from '@/components/ui'
 import { User, Mail, Lock, Phone, Eye, EyeOff } from 'lucide-react'
+import { authService } from '@/services'
+import toast from 'react-hot-toast'
 
 function RegisterPage() {
   const navigate = useNavigate()
-  const { register, isLoading } = useAuthStore()
+  const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [formData, setFormData] = useState({
     firstname: '',
@@ -58,16 +59,31 @@ function RegisterPage() {
     e.preventDefault()
     if (!validate()) return
 
-    const result = await register({
-      firstname: formData.firstname,
-      lastname: formData.lastname,
-      email: formData.email,
-      telephone: formData.telephone,
-      password: formData.password,
-    })
+    setIsLoading(true)
+    try {
+      const response = await authService.register({
+        firstname: formData.firstname,
+        lastname: formData.lastname,
+        email: formData.email,
+        telephone: formData.telephone,
+        password: formData.password,
+      })
 
-    if (result.success) {
-      navigate('/verify-email', { state: { email: formData.email } })
+      if (response.status === 1) {
+        toast.success('Account created! Please verify your email.')
+        navigate('/verify-email', {
+          state: {
+            email: formData.email,
+            userData: response.data,
+          },
+        })
+      } else {
+        toast.error(response.message || 'Registration failed')
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Something went wrong')
+    } finally {
+      setIsLoading(false)
     }
   }
 

@@ -13,7 +13,41 @@ export const authService = {
     return response.data
   },
 
-  // Email verification (OTP)
+  // Validate OTP (new endpoint)
+  async validateOTP(email, otp) {
+    const response = await api.post('/validate-otp', { email, otp })
+    return response.data
+  },
+
+  // Update service type (Seller/Driver)
+  async updateServiceType(data) {
+    const response = await api.post('/updateServiceType', data)
+    return response.data
+  },
+
+  // Submit verification documents
+  async submitVerification(data) {
+    const formData = new FormData()
+    Object.keys(data).forEach((key) => {
+      if (data[key] !== undefined && data[key] !== null) {
+        if (data[key] instanceof File) {
+          formData.append(key, data[key])
+        } else if (Array.isArray(data[key])) {
+          formData.append(key, JSON.stringify(data[key]))
+        } else {
+          formData.append(key, data[key])
+        }
+      }
+    })
+    const response = await api.post('/verification', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    })
+    return response.data
+  },
+
+  // Email verification (OTP) - legacy
   async verifyEmail(email, otp) {
     const response = await api.post('/emailverification', { email, otp })
     return response.data
