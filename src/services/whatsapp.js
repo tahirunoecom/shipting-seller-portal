@@ -80,6 +80,14 @@ export const whatsappService = {
     return response.data
   },
 
+  // Get phone number status from Meta API
+  async getPhoneStatus(wh_account_id) {
+    const response = await api.post('/seller/whatsapp/phone-status', {
+      wh_account_id,
+    })
+    return response.data
+  },
+
   // ============================================
   // BOT SETTINGS ENDPOINTS
   // ============================================

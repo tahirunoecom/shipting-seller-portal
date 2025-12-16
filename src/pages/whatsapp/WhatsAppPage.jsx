@@ -73,6 +73,10 @@ function WhatsAppPage() {
   const [catalogs, setCatalogs] = useState([])
   const [loadingCatalogs, setLoadingCatalogs] = useState(false)
 
+  // Phone status state
+  const [phoneStatus, setPhoneStatus] = useState(null)
+  const [loadingPhoneStatus, setLoadingPhoneStatus] = useState(false)
+
   // QR Code state
   const [showQRModal, setShowQRModal] = useState(false)
   const qrCodeRef = useRef(null)
@@ -465,6 +469,41 @@ function WhatsAppPage() {
     }
   }
 
+  // Fetch phone number status from Meta API
+  const loadPhoneStatus = async () => {
+    try {
+      setLoadingPhoneStatus(true)
+      const response = await whatsappService.getPhoneStatus(user?.wh_account_id)
+
+      if (response.status === 1) {
+        setPhoneStatus(response.data)
+      } else {
+        console.log('Phone status error:', response.message)
+      }
+    } catch (error) {
+      console.log('Failed to load phone status:', error)
+    } finally {
+      setLoadingPhoneStatus(false)
+    }
+  }
+
+  // Get phone status badge
+  const getPhoneStatusBadge = () => {
+    if (!phoneStatus) return null
+
+    const status = phoneStatus.overall_status
+    switch (status) {
+      case 'CONNECTED':
+        return <Badge variant="success"><CheckCircle className="h-3 w-3 mr-1" /> Live</Badge>
+      case 'PENDING_VERIFICATION':
+        return <Badge variant="warning"><Clock className="h-3 w-3 mr-1" /> Pending Verification</Badge>
+      case 'PENDING':
+        return <Badge variant="warning"><Clock className="h-3 w-3 mr-1" /> Pending</Badge>
+      default:
+        return <Badge variant="default"><AlertCircle className="h-3 w-3 mr-1" /> {status}</Badge>
+    }
+  }
+
   // Generate WhatsApp link for catalog
   const getWhatsAppLink = () => {
     // Format phone number (remove + and spaces)
@@ -815,6 +854,98 @@ function WhatsAppPage() {
                             <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Connected Since</p>
                             <p className="text-sm text-gray-900 dark:text-dark-text">
                               {new Date(connectionData.connectedAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Phone Number Status Section */}
+                      <div className="p-4 border rounded-lg dark:border-dark-border">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center gap-2">
+                            <Phone className="h-5 w-5 text-gray-500" />
+                            <span className="font-medium text-gray-900 dark:text-dark-text">
+                              Phone Number Status
+                            </span>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={loadPhoneStatus}
+                            isLoading={loadingPhoneStatus}
+                          >
+                            <RefreshCw className="h-4 w-4" />
+                            Check Status
+                          </Button>
+                        </div>
+
+                        {phoneStatus ? (
+                          <div className="space-y-3">
+                            {/* Status Overview */}
+                            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg dark:bg-dark-bg">
+                              <div>
+                                <p className="text-lg font-semibold text-gray-900 dark:text-dark-text">
+                                  {phoneStatus.phone_number || connectionData.phoneNumber}
+                                </p>
+                                {phoneStatus.verified_name && (
+                                  <p className="text-sm text-gray-500">{phoneStatus.verified_name}</p>
+                                )}
+                              </div>
+                              {getPhoneStatusBadge()}
+                            </div>
+
+                            {/* Status Description */}
+                            {phoneStatus.status_description && (
+                              <div className={`p-3 rounded-lg ${
+                                phoneStatus.overall_status === 'CONNECTED'
+                                  ? 'bg-green-50 dark:bg-green-900/20'
+                                  : 'bg-amber-50 dark:bg-amber-900/20'
+                              }`}>
+                                <p className={`text-sm ${
+                                  phoneStatus.overall_status === 'CONNECTED'
+                                    ? 'text-green-700 dark:text-green-300'
+                                    : 'text-amber-700 dark:text-amber-300'
+                                }`}>
+                                  {phoneStatus.status_description}
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Detailed Status */}
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                              <div className="p-2 bg-gray-50 rounded dark:bg-dark-bg">
+                                <p className="text-xs text-gray-500 uppercase">Verification</p>
+                                <p className="text-sm font-medium text-gray-900 dark:text-dark-text">
+                                  {phoneStatus.code_verification_status || 'Unknown'}
+                                </p>
+                              </div>
+                              <div className="p-2 bg-gray-50 rounded dark:bg-dark-bg">
+                                <p className="text-xs text-gray-500 uppercase">Name Status</p>
+                                <p className="text-sm font-medium text-gray-900 dark:text-dark-text">
+                                  {phoneStatus.name_status || 'Unknown'}
+                                </p>
+                              </div>
+                              <div className="p-2 bg-gray-50 rounded dark:bg-dark-bg">
+                                <p className="text-xs text-gray-500 uppercase">Mode</p>
+                                <p className="text-sm font-medium text-gray-900 dark:text-dark-text">
+                                  {phoneStatus.account_mode || 'Unknown'}
+                                </p>
+                              </div>
+                              {phoneStatus.quality_rating && (
+                                <div className="p-2 bg-gray-50 rounded dark:bg-dark-bg">
+                                  <p className="text-xs text-gray-500 uppercase">Quality</p>
+                                  <p className="text-sm font-medium text-gray-900 dark:text-dark-text">
+                                    {phoneStatus.quality_rating}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-center py-4">
+                            <Phone className="h-10 w-10 mx-auto text-gray-300 mb-2" />
+                            <p className="text-sm text-gray-500">
+                              Click "Check Status" to view your phone number status from Meta
                             </p>
                           </div>
                         )}
