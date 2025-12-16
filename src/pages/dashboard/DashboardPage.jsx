@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store'
 import { Card, CardContent, CardHeader, CardTitle, Badge, PageLoader } from '@/components/ui'
 import { formatCurrency, formatDate } from '@/utils/helpers'
@@ -58,7 +58,7 @@ const STATUS_COLORS = {
   Cancelled: '#EF4444',
 }
 
-function StatCard({ title, value, subtitle, icon: Icon, color, trend, trendValue }) {
+function StatCard({ title, value, subtitle, icon: Icon, color, trend, trendValue, onClick }) {
   const colorClasses = {
     green: 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400',
     blue: 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
@@ -70,7 +70,10 @@ function StatCard({ title, value, subtitle, icon: Icon, color, trend, trendValue
   }
 
   return (
-    <Card className="hover:shadow-md transition-shadow">
+    <Card
+      className={`hover:shadow-md transition-shadow ${onClick ? 'cursor-pointer hover:scale-[1.02]' : ''}`}
+      onClick={onClick}
+    >
       <CardContent className="p-5">
         <div className="flex items-center justify-between">
           <div className="flex-1">
@@ -135,11 +138,22 @@ function getOrderStatusBadge(order) {
 
 function DashboardPage() {
   const { user } = useAuthStore()
+  const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [period, setPeriod] = useState('month')
   const [dashboardData, setDashboardData] = useState(null)
   const [totalProducts, setTotalProducts] = useState(0)
+
+  // Navigate to orders page with specific tab filter
+  const navigateToOrders = (tab = 'all') => {
+    navigate(`/orders?tab=${tab}`)
+  }
+
+  // Navigate to specific order
+  const navigateToOrder = (orderId) => {
+    navigate(`/orders?expand=${orderId}`)
+  }
 
   useEffect(() => {
     loadDashboardData()
@@ -267,36 +281,42 @@ function DashboardPage() {
           value={orderCounts.Total || 0}
           icon={ShoppingCart}
           color="blue"
+          onClick={() => navigateToOrders('all')}
         />
         <StatCard
           title="Pending"
           value={orderCounts.Pending || 0}
           icon={Clock}
           color="orange"
+          onClick={() => navigateToOrders('pending')}
         />
         <StatCard
           title="Accepted"
           value={orderCounts.Accepted || 0}
           icon={CheckCircle}
           color="blue"
+          onClick={() => navigateToOrders('accepted')}
         />
         <StatCard
           title="In Transit"
           value={orderCounts.Intransit || 0}
           icon={Truck}
           color="indigo"
+          onClick={() => navigateToOrders('shipped')}
         />
         <StatCard
           title="Delivered"
           value={orderCounts.Delivered || 0}
           icon={PackageCheck}
           color="green"
+          onClick={() => navigateToOrders('delivered')}
         />
         <StatCard
           title="Cancelled"
           value={orderCounts.Cancelled || 0}
           icon={XCircle}
           color="red"
+          onClick={() => navigateToOrders('all')}
         />
       </div>
 
@@ -461,7 +481,7 @@ function DashboardPage() {
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <ShoppingCart className="h-5 w-5 text-blue-500" />
-              Recent AI Orders
+              Recent Orders
             </CardTitle>
             <Link
               to="/orders"
@@ -477,7 +497,8 @@ function DashboardPage() {
                 {recentOrders.map((order) => (
                   <div
                     key={order.id}
-                    className="p-4 hover:bg-gray-50 dark:hover:bg-dark-border transition-colors"
+                    onClick={() => navigateToOrder(order.id)}
+                    className="p-4 hover:bg-gray-50 dark:hover:bg-dark-border transition-colors cursor-pointer"
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 min-w-0">
@@ -502,16 +523,19 @@ function DashboardPage() {
                           {order.city}, {order.state}
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className="font-bold text-gray-900 dark:text-dark-text">
-                          {formatCurrency(order.total_amount)}
-                        </p>
-                        <p className="text-xs text-green-600 dark:text-green-400">
-                          Payout: {formatCurrency(order.shipper_payout)}
-                        </p>
-                        <p className="text-xs text-gray-400">
-                          {order.total_product_quantity} item{order.total_product_quantity > 1 ? 's' : ''}
-                        </p>
+                      <div className="text-right flex items-center gap-3">
+                        <div>
+                          <p className="font-bold text-gray-900 dark:text-dark-text">
+                            {formatCurrency(order.total_amount)}
+                          </p>
+                          <p className="text-xs text-green-600 dark:text-green-400">
+                            Payout: {formatCurrency(order.shipper_payout)}
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            {order.total_product_quantity} item{order.total_product_quantity > 1 ? 's' : ''}
+                          </p>
+                        </div>
+                        <ArrowRight className="h-4 w-4 text-gray-400" />
                       </div>
                     </div>
                   </div>
