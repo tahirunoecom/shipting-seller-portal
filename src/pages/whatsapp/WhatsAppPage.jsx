@@ -65,6 +65,10 @@ function WhatsAppPage() {
     connectedAt: null,
   })
 
+  // Catalog management state
+  const [catalogs, setCatalogs] = useState([])
+  const [loadingCatalogs, setLoadingCatalogs] = useState(false)
+
   // Bot Settings state
   const [botSettings, setBotSettings] = useState({
     welcomeMessage: 'Hello! Welcome to our store. How can we help you today?',
@@ -395,11 +399,59 @@ function WhatsAppPage() {
 
       if (response.status === 1) {
         toast.success(`Synced ${response.data?.synced || 0} products to WhatsApp Catalog`)
+        // Show debug info if there are errors
+        if (response.data?.errors?.length > 0) {
+          console.log('Sync errors:', response.data.errors)
+        }
+        if (response.data?.catalog_debug) {
+          console.log('Catalog debug:', response.data.catalog_debug)
+        }
       } else {
         toast.error(response.message || 'Failed to sync catalog')
       }
     } catch (error) {
       toast.error('Failed to sync catalog')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Load available catalogs
+  const loadCatalogs = async () => {
+    try {
+      setLoadingCatalogs(true)
+      const response = await whatsappService.listCatalogs(user?.wh_account_id)
+
+      if (response.status === 1) {
+        setCatalogs(response.data?.catalogs || [])
+      } else {
+        toast.error(response.message || 'Failed to load catalogs')
+      }
+    } catch (error) {
+      toast.error('Failed to load catalogs')
+    } finally {
+      setLoadingCatalogs(false)
+    }
+  }
+
+  // Switch to a different catalog
+  const handleSelectCatalog = async (catalogId) => {
+    try {
+      setSaving(true)
+      const response = await whatsappService.updateCatalog(user?.wh_account_id, catalogId)
+
+      if (response.status === 1) {
+        toast.success('Catalog updated successfully!')
+        if (response.data?.warning) {
+          toast.error(response.data.warning)
+        }
+        setConnectionData(prev => ({ ...prev, catalogId }))
+        loadCatalogs() // Refresh catalog list
+      } else {
+        toast.error(response.message || 'Failed to update catalog')
+      }
+    } catch (error) {
+      toast.error('Failed to update catalog')
     } finally {
       setSaving(false)
     }
@@ -675,14 +727,6 @@ function WhatsAppPage() {
                             {connectionData.wabaId || 'N/A'}
                           </p>
                         </div>
-                        {connectionData.catalogId && (
-                          <div className="p-4 bg-gray-50 rounded-lg dark:bg-dark-bg">
-                            <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Catalog ID</p>
-                            <p className="font-mono text-sm text-gray-900 dark:text-dark-text">
-                              {connectionData.catalogId}
-                            </p>
-                          </div>
-                        )}
                         {connectionData.connectedAt && (
                           <div className="p-4 bg-gray-50 rounded-lg dark:bg-dark-bg">
                             <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Connected Since</p>
@@ -693,28 +737,84 @@ function WhatsAppPage() {
                         )}
                       </div>
 
-                      {/* Catalog Setup Notice */}
-                      {!connectionData.catalogId && (
-                        <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg dark:bg-amber-900/20 dark:border-amber-800">
-                          <div className="flex items-start gap-3">
-                            <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
-                            <div>
-                              <p className="font-medium text-amber-800 dark:text-amber-300">Product Catalog Not Set Up</p>
-                              <p className="text-sm text-amber-700 dark:text-amber-400 mt-1">
-                                To sell products via WhatsApp, you need a product catalog. Click below to set one up, or create one in{' '}
-                                <a
-                                  href="https://business.facebook.com/commerce/catalogs"
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="underline font-medium"
-                                >
-                                  Meta Commerce Manager
-                                </a>.
-                              </p>
-                            </div>
+                      {/* Catalog Management Section */}
+                      <div className="p-4 border rounded-lg dark:border-dark-border">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center gap-2">
+                            <Store className="h-5 w-5 text-gray-500" />
+                            <span className="font-medium text-gray-900 dark:text-dark-text">
+                              Product Catalog
+                            </span>
                           </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={loadCatalogs}
+                            isLoading={loadingCatalogs}
+                          >
+                            <RefreshCw className="h-4 w-4" />
+                            Load Catalogs
+                          </Button>
                         </div>
-                      )}
+
+                        {/* Current Catalog */}
+                        <div className="p-3 bg-gray-50 rounded-lg dark:bg-dark-bg mb-4">
+                          <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Current Catalog</p>
+                          <p className="font-mono text-sm text-gray-900 dark:text-dark-text">
+                            {connectionData.catalogId || 'Not configured'}
+                          </p>
+                        </div>
+
+                        {/* Available Catalogs */}
+                        {catalogs.length > 0 && (
+                          <div className="space-y-2 mb-4">
+                            <p className="text-sm font-medium text-gray-700 dark:text-dark-text">Available Catalogs:</p>
+                            {catalogs.map((catalog) => (
+                              <div
+                                key={catalog.id}
+                                className={`p-3 border rounded-lg flex items-center justify-between ${
+                                  catalog.is_current
+                                    ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
+                                    : 'border-gray-200 dark:border-dark-border'
+                                }`}
+                              >
+                                <div>
+                                  <p className="font-medium text-gray-900 dark:text-dark-text">
+                                    {catalog.name}
+                                    {catalog.is_current && (
+                                      <Badge variant="success" className="ml-2">Current</Badge>
+                                    )}
+                                  </p>
+                                  <p className="text-xs text-gray-500">
+                                    ID: {catalog.id} | Type: {catalog.vertical}
+                                    {catalog.is_commerce && (
+                                      <span className="text-green-600 ml-1">(Commerce - OK)</span>
+                                    )}
+                                    {!catalog.is_commerce && (
+                                      <span className="text-amber-600 ml-1">(Not Commerce - Products won't sync!)</span>
+                                    )}
+                                  </p>
+                                </div>
+                                {!catalog.is_current && (
+                                  <Button
+                                    size="sm"
+                                    variant={catalog.is_commerce ? 'primary' : 'outline'}
+                                    onClick={() => handleSelectCatalog(catalog.id)}
+                                    isLoading={saving}
+                                  >
+                                    Select
+                                  </Button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Help text */}
+                        <p className="text-xs text-gray-500 mt-2">
+                          Click "Load Catalogs" to see available catalogs. Select a <strong>Commerce</strong> catalog for products to sync correctly.
+                        </p>
+                      </div>
 
                       {/* Actions */}
                       <div className="flex flex-wrap gap-3">

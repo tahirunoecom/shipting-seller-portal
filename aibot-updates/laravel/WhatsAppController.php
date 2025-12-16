@@ -570,6 +570,138 @@ class WhatsAppController extends Controller
     // ============================================
 
     /**
+     * List available catalogs for the seller's business
+     * POST /api/seller/whatsapp/list-catalogs
+     */
+    public function listCatalogs(Request $request)
+    {
+        try {
+            $whAccountId = $request->input('wh_account_id');
+
+            if (!$whAccountId) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'wh_account_id is required'
+                ]);
+            }
+
+            $config = SellerWhatsappConfig::where('wh_account_id', $whAccountId)->first();
+
+            if (!$config || !$config->access_token) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'WhatsApp not connected or no access token'
+                ]);
+            }
+
+            // Get catalogs from the business
+            $businessId = $config->business_id ?? $this->metaBusinessId;
+
+            $response = Http::withToken($config->access_token)
+                ->get("https://graph.facebook.com/v21.0/{$businessId}/owned_product_catalogs", [
+                    'fields' => 'id,name,vertical,product_count'
+                ]);
+
+            if (!$response->successful()) {
+                $error = $response->json()['error']['message'] ?? 'Unknown error';
+                return response()->json([
+                    'status' => 0,
+                    'message' => "Failed to fetch catalogs: {$error}"
+                ]);
+            }
+
+            $catalogs = $response->json()['data'] ?? [];
+
+            // Mark commerce catalogs and current selection
+            foreach ($catalogs as &$catalog) {
+                $catalog['is_commerce'] = ($catalog['vertical'] ?? '') === 'commerce';
+                $catalog['is_current'] = $catalog['id'] === $config->catalog_id;
+            }
+
+            return response()->json([
+                'status' => 1,
+                'data' => [
+                    'catalogs' => $catalogs,
+                    'current_catalog_id' => $config->catalog_id
+                ]
+            ]);
+        } catch (\Exception $e) {
+            Log::error('WhatsApp listCatalogs error: ' . $e->getMessage());
+            return response()->json([
+                'status' => 0,
+                'message' => 'Failed to list catalogs: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Update catalog ID (switch to a different catalog)
+     * POST /api/seller/whatsapp/update-catalog
+     */
+    public function updateCatalog(Request $request)
+    {
+        try {
+            $whAccountId = $request->input('wh_account_id');
+            $catalogId = $request->input('catalog_id');
+
+            if (!$whAccountId || !$catalogId) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'wh_account_id and catalog_id are required'
+                ]);
+            }
+
+            $config = SellerWhatsappConfig::where('wh_account_id', $whAccountId)->first();
+
+            if (!$config) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'WhatsApp configuration not found'
+                ]);
+            }
+
+            // Verify the catalog exists and is accessible
+            $verifyResponse = Http::withToken($config->access_token)
+                ->get("https://graph.facebook.com/v21.0/{$catalogId}", [
+                    'fields' => 'id,name,vertical'
+                ]);
+
+            if (!$verifyResponse->successful()) {
+                $error = $verifyResponse->json()['error']['message'] ?? 'Unknown error';
+                return response()->json([
+                    'status' => 0,
+                    'message' => "Cannot access catalog: {$error}"
+                ]);
+            }
+
+            $catalogInfo = $verifyResponse->json();
+            $vertical = $catalogInfo['vertical'] ?? 'unknown';
+
+            // Update the catalog_id
+            $config->update([
+                'catalog_id' => $catalogId
+            ]);
+
+            return response()->json([
+                'status' => 1,
+                'message' => 'Catalog updated successfully',
+                'data' => [
+                    'catalog_id' => $catalogId,
+                    'catalog_name' => $catalogInfo['name'] ?? null,
+                    'catalog_vertical' => $vertical,
+                    'warning' => ($vertical !== 'commerce') ? "Warning: Catalog vertical is '{$vertical}', not 'commerce'. Products may not sync correctly." : null
+                ]
+            ]);
+        } catch (\Exception $e) {
+            Log::error('WhatsApp updateCatalog error: ' . $e->getMessage());
+            return response()->json([
+                'status' => 0,
+                'message' => 'Failed to update catalog: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Create catalog for seller (called after WhatsApp connection)
      * POST /api/seller/whatsapp/create-catalog
      */
