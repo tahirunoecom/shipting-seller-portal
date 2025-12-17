@@ -13,12 +13,23 @@ import {
   Truck,
 } from 'lucide-react'
 import { authService } from '@/services'
+import { useAuthStore } from '@/store'
 import toast from 'react-hot-toast'
 
 function VerificationPage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { email, userData, wh_account_id, serviceTypes } = location.state || {}
+  const { user, updateUser } = useAuthStore()
+
+  // Get data from location state or auth store (for logged-in users)
+  const locationState = location.state || {}
+  const userData = locationState.userData || user
+  const wh_account_id = userData?.wh_account_id
+  const serviceTypes = locationState.serviceTypes || {
+    seller: userData?.scanSell === '1' || userData?.scanSell === 1,
+    driver: userData?.localDelivery === '1' || userData?.localDelivery === 1,
+  }
+  const fromLogin = locationState.fromLogin
 
   const [currentStep, setCurrentStep] = useState(1)
   const [isLoading, setIsLoading] = useState(false)
@@ -92,9 +103,21 @@ function VerificationPage() {
     setPreviewImages((prev) => ({ ...prev, [fieldName]: null }))
   }
 
+  // Redirect if no account data
+  if (!wh_account_id) {
+    navigate('/login')
+    return null
+  }
+
   const handleSkip = () => {
     toast.success('You can complete verification later from Settings')
-    navigate('/login')
+    // If logged in, go to dashboard; otherwise go to login
+    if (fromLogin || user) {
+      const isDriver = serviceTypes?.driver && !serviceTypes?.seller
+      navigate(isDriver ? '/driver/orders' : '/dashboard')
+    } else {
+      navigate('/login')
+    }
   }
 
   const handleSubmit = async () => {
@@ -112,11 +135,23 @@ function VerificationPage() {
 
       if (response.status === 1) {
         toast.success('Verification submitted successfully!')
-        navigate('/login', {
-          state: {
-            message: 'Account created! Please login to continue.',
-          },
-        })
+
+        // Update local user state
+        if (updateUser) {
+          updateUser({ is_verification_submitted: '1' })
+        }
+
+        // Navigate based on user state
+        if (fromLogin || user) {
+          const isDriver = serviceTypes?.driver && !serviceTypes?.seller
+          navigate(isDriver ? '/driver/orders' : '/dashboard')
+        } else {
+          navigate('/login', {
+            state: {
+              message: 'Account created! Please login to continue.',
+            },
+          })
+        }
       } else {
         toast.error(response.message || 'Verification failed')
       }

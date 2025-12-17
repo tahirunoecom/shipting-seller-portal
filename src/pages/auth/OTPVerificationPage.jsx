@@ -10,12 +10,16 @@ function OTPVerificationPage() {
   const location = useLocation()
   const email = location.state?.email
   const userData = location.state?.userData
+  const shouldResend = location.state?.resend // Flag from login page to auto-resend
 
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
   const [isLoading, setIsLoading] = useState(false)
   const [isResending, setIsResending] = useState(false)
-  const [resendTimer, setResendTimer] = useState(60)
+  const [resendTimer, setResendTimer] = useState(shouldResend ? 0 : 60)
   const [error, setError] = useState('')
+  const [infoMessage, setInfoMessage] = useState(
+    shouldResend ? 'Click "Resend OTP" to receive a new verification code.' : ''
+  )
   const inputRefs = useRef([])
 
   // Redirect if no email
@@ -24,6 +28,28 @@ function OTPVerificationPage() {
       navigate('/register')
     }
   }, [email, navigate])
+
+  // Auto-resend OTP if coming from login page
+  useEffect(() => {
+    if (shouldResend && email) {
+      handleResendAuto()
+    }
+  }, []) // Run only once on mount
+
+  const handleResendAuto = async () => {
+    setIsResending(true)
+    try {
+      await authService.resendOTP(email)
+      toast.success('Verification code sent to your email!')
+      setResendTimer(60)
+      setInfoMessage('')
+      inputRefs.current[0]?.focus()
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to send OTP')
+    } finally {
+      setIsResending(false)
+    }
+  }
 
   // Resend timer countdown
   useEffect(() => {
@@ -141,6 +167,15 @@ function OTPVerificationPage() {
           </p>
         </div>
 
+        {/* Info message for users coming from login */}
+        {infoMessage && (
+          <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <p className="text-sm text-blue-700 dark:text-blue-300 text-center">
+              {infoMessage}
+            </p>
+          </div>
+        )}
+
         {/* OTP Input */}
         <div className="flex justify-center gap-2 mb-6" onPaste={handlePaste}>
           {otp.map((digit, index) => (
@@ -207,13 +242,27 @@ function OTPVerificationPage() {
 
         {/* Change email link */}
         <p className="mt-6 text-center text-sm text-gray-500 dark:text-dark-muted">
-          Wrong email?{' '}
-          <button
-            onClick={() => navigate('/register')}
-            className="font-medium text-primary-600 hover:text-primary-700"
-          >
-            Go back
-          </button>
+          {shouldResend ? (
+            <>
+              Remember your password?{' '}
+              <button
+                onClick={() => navigate('/login')}
+                className="font-medium text-primary-600 hover:text-primary-700"
+              >
+                Back to login
+              </button>
+            </>
+          ) : (
+            <>
+              Wrong email?{' '}
+              <button
+                onClick={() => navigate('/register')}
+                className="font-medium text-primary-600 hover:text-primary-700"
+              >
+                Go back
+              </button>
+            </>
+          )}
         </p>
       </CardContent>
     </Card>
