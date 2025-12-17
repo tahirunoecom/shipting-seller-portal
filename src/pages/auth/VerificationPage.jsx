@@ -86,7 +86,9 @@ function VerificationPage() {
     setIsLoadingZip(true)
     try {
       const response = await authService.getZipDetails(zip)
-      if (response.status === 1 && response.data?.zipDetails) {
+
+      // Check if response is valid and has zip details
+      if (response.status === 1 && response.data?.zipDetails && Object.keys(response.data.zipDetails).length > 0) {
         const details = response.data.zipDetails
         setFormData((prev) => ({
           ...prev,
@@ -100,13 +102,33 @@ function VerificationPage() {
         // Clear any zip error
         setErrors((prev) => ({ ...prev, zip: '' }))
       } else {
+        // ZIP not verified or empty response
         setZipFetched(false)
-        setErrors((prev) => ({ ...prev, zip: 'Invalid ZIP code' }))
+        setFormData((prev) => ({
+          ...prev,
+          city: '',
+          state: '',
+          state_id: null,
+          country: '',
+          country_id: null,
+        }))
+        setErrors((prev) => ({
+          ...prev,
+          zip: response.message || 'Please enter a valid ZIP code'
+        }))
       }
     } catch (err) {
       console.error('ZIP lookup error:', err)
       setZipFetched(false)
-      setErrors((prev) => ({ ...prev, zip: 'Could not fetch ZIP details' }))
+      setFormData((prev) => ({
+        ...prev,
+        city: '',
+        state: '',
+        state_id: null,
+        country: '',
+        country_id: null,
+      }))
+      setErrors((prev) => ({ ...prev, zip: 'Could not verify ZIP code. Please try again.' }))
     } finally {
       setIsLoadingZip(false)
     }
