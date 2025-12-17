@@ -14,6 +14,7 @@ import {
   ModalFooter,
   PageLoader,
 } from '@/components/ui'
+import { BulkUploadModal } from '@/components/products'
 import { formatCurrency } from '@/utils/helpers'
 import {
   Plus,
@@ -32,6 +33,7 @@ import {
   FolderPlus,
   ChevronLeft,
   ChevronRight,
+  FileSpreadsheet,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -58,6 +60,7 @@ function ProductsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('')
   const [showAddModal, setShowAddModal] = useState(false)
+  const [showBulkUploadModal, setShowBulkUploadModal] = useState(false)
   const [showSubcategoryModal, setShowSubcategoryModal] = useState(false)
   const [newSubcategoryName, setNewSubcategoryName] = useState('')
   const [editingProduct, setEditingProduct] = useState(null)
@@ -446,10 +449,16 @@ function ProductsPage() {
             Manage your product inventory
           </p>
         </div>
-        <Button onClick={openAddProductModal}>
-          <Plus className="h-4 w-4" />
-          Add Product
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setShowBulkUploadModal(true)}>
+            <FileSpreadsheet className="h-4 w-4" />
+            Bulk Upload
+          </Button>
+          <Button onClick={openAddProductModal}>
+            <Plus className="h-4 w-4" />
+            Add Product
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -1014,6 +1023,16 @@ function ProductsPage() {
           </ModalFooter>
         </div>
       </Modal>
+
+      {/* Bulk Upload Modal */}
+      <BulkUploadModal
+        isOpen={showBulkUploadModal}
+        onClose={() => setShowBulkUploadModal(false)}
+        categories={categories}
+        onUploadComplete={loadProducts}
+        wh_account_id={user.wh_account_id}
+        productService={productService}
+      />
     </div>
   )
 }

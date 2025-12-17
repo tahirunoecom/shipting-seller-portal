@@ -69,14 +69,30 @@ function ServiceTypeSelectionPage() {
         }
 
         // Check if verification is submitted
-        const isVerificationSubmitted = userData?.is_verification_submitted === 1 || userData?.is_verification_submitted === '1'
+        // Also check the API response for updated verification status
+        const apiUserData = response.data?.user || response.user
+        const checkUserData = apiUserData || userData
+
+        const isVerificationSubmitted =
+          checkUserData?.is_verification_submitted === 1 ||
+          checkUserData?.is_verification_submitted === '1'
+
+        // Debug logging
+        console.log('Service Type Selection - Navigation Decision:', {
+          userData,
+          apiUserData,
+          checkUserData,
+          is_verification_submitted: checkUserData?.is_verification_submitted,
+          isVerificationSubmitted,
+          selectedTypes,
+        })
 
         if (!isVerificationSubmitted) {
           // Go to verification/onboarding
           navigate('/onboarding', {
             state: {
               fromLogin: true,
-              userData,
+              userData: checkUserData,
               serviceTypes: selectedTypes,
             }
           })
