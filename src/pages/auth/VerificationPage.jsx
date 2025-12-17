@@ -10,6 +10,7 @@ import {
   CheckCircle,
   FileCheck,
   Loader2,
+  LogOut,
 } from 'lucide-react'
 import { authService } from '@/services'
 import { useAuthStore } from '@/store'
@@ -18,7 +19,7 @@ import toast from 'react-hot-toast'
 function VerificationPage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user, updateUser } = useAuthStore()
+  const { user, updateUser, logout } = useAuthStore()
 
   // Get data from location state or auth store (for logged-in users)
   const locationState = location.state || {}
@@ -191,6 +192,11 @@ function VerificationPage() {
     return null
   }
 
+  const handleLogout = () => {
+    logout()
+    navigate('/login')
+  }
+
   const validateStep = (step) => {
     const newErrors = {}
 
@@ -295,16 +301,8 @@ function VerificationPage() {
           updateUser({ is_verification_submitted: '1' })
         }
 
-        // Navigate based on user state
-        if (fromLogin || user) {
-          navigate(isDriver ? '/driver/orders' : '/dashboard')
-        } else {
-          navigate('/login', {
-            state: {
-              message: 'Account created! Please login to continue.',
-            },
-          })
-        }
+        // Navigate to pending approval page
+        navigate('/pending-approval')
       } else {
         // Check if it's an address verification error
         const errorMessage = response.message?.toLowerCase() || ''
@@ -593,6 +591,17 @@ function VerificationPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-dark-bg py-8 px-4">
       <div className="max-w-lg mx-auto">
+        {/* Logout Button */}
+        <div className="flex justify-end mb-4">
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 dark:text-dark-muted dark:hover:text-dark-text"
+          >
+            <LogOut className="h-4 w-4" />
+            Logout
+          </button>
+        </div>
+
         {/* Header */}
         <div className="text-center mb-6">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-dark-text">
