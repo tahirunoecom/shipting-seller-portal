@@ -77,27 +77,13 @@ function OTPVerificationPage() {
     setError('')
 
     try {
-      // Debug logging
-      console.log('OTP Verification - userData from signup:', userData)
-
       const response = await authService.validateOTP(email, otpString)
-      console.log('OTP Verification - validateOTP response:', response)
 
       if (response.status === 1 && response.data?.validateOtp === 1) {
         toast.success('Email verified successfully!')
 
-        // Try to get wh_account_id from various possible sources
-        const accountId =
-          userData?.wh_account_id ||
-          userData?.id ||
-          userData?.account_id ||
-          response.data?.wh_account_id ||
-          response.data?.id ||
-          response.data?.account_id ||
-          response.data?.user?.wh_account_id ||
-          response.data?.user?.id
-
-        console.log('OTP Verification - resolved accountId:', accountId)
+        // Get wh_account_id from signup userData
+        const accountId = userData?.wh_account_id
 
         // Navigate to service type selection
         navigate('/select-service-type', {
@@ -113,7 +99,6 @@ function OTPVerificationPage() {
         inputRefs.current[0]?.focus()
       }
     } catch (err) {
-      console.error('OTP Verification error:', err)
       setError(err.response?.data?.message || 'Verification failed. Please try again.')
       setOtp(['', '', '', '', '', ''])
       inputRefs.current[0]?.focus()
