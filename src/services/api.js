@@ -36,11 +36,18 @@ api.interceptors.response.use(
     return response
   },
   (error) => {
-    // Handle 401 Unauthorized
+    // Handle 401 Unauthorized - but NOT during onboarding flow
     if (error.response?.status === 401) {
-      localStorage.removeItem('access_token')
-      localStorage.removeItem('user')
-      window.location.href = '/login'
+      const currentPath = window.location.pathname
+      const onboardingPaths = ['/register', '/verify-email', '/select-service-type', '/onboarding']
+      const isOnboarding = onboardingPaths.some(path => currentPath.startsWith(path))
+
+      // Only redirect to login if not in onboarding flow
+      if (!isOnboarding) {
+        localStorage.removeItem('access_token')
+        localStorage.removeItem('user')
+        window.location.href = '/login'
+      }
     }
     return Promise.reject(error)
   }

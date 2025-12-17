@@ -80,17 +80,13 @@ function OTPVerificationPage() {
       const response = await authService.validateOTP(email, otpString)
 
       if (response.status === 1 && response.data?.validateOtp === 1) {
-        toast.success('Email verified successfully!')
+        toast.success('Email verified! Please login to continue.')
 
-        // Get wh_account_id from signup userData
-        const accountId = userData?.wh_account_id
-
-        // Navigate to service type selection
-        navigate('/select-service-type', {
+        // Navigate to login page after successful verification
+        navigate('/login', {
           state: {
-            email,
-            userData,
-            wh_account_id: accountId
+            message: 'Registration complete! Please login with your credentials.',
+            email: email,
           }
         })
       } else {
