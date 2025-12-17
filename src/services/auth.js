@@ -29,14 +29,15 @@ export const authService = {
   async submitVerification(data) {
     const formData = new FormData()
     Object.keys(data).forEach((key) => {
-      if (data[key] !== undefined && data[key] !== null) {
-        if (data[key] instanceof File) {
-          formData.append(key, data[key])
-        } else if (Array.isArray(data[key])) {
-          formData.append(key, JSON.stringify(data[key]))
-        } else {
-          formData.append(key, data[key])
-        }
+      const value = data[key]
+      if (value instanceof File) {
+        formData.append(key, value)
+      } else if (Array.isArray(value)) {
+        formData.append(key, JSON.stringify(value))
+      } else if (value === null) {
+        formData.append(key, '') // Send empty string for null values
+      } else if (value !== undefined) {
+        formData.append(key, value)
       }
     })
     const response = await api.post('/verification', formData, {
