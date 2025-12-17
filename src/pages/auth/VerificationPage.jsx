@@ -1,8 +1,7 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Button, Input, Card, CardContent } from '@/components/ui'
 import {
-  Building2,
   MapPin,
   Upload,
   FileText,
@@ -10,6 +9,7 @@ import {
   X,
   CheckCircle,
   FileCheck,
+  Loader2,
 } from 'lucide-react'
 import { authService } from '@/services'
 import { useAuthStore } from '@/store'
@@ -34,12 +34,18 @@ function VerificationPage() {
 
   const [currentStep, setCurrentStep] = useState(1)
   const [isLoading, setIsLoading] = useState(false)
+  const [isLoadingZip, setIsLoadingZip] = useState(false)
 
   const [formData, setFormData] = useState({
     // Required for both
     address1: '',
-    city: '',
+    address2: '',
     zip: '',
+    city: '',
+    state: '',
+    state_id: null,
+    country: '',
+    country_id: null,
     acceptbox: false,
     drivinglicence: null,
 
@@ -47,7 +53,6 @@ function VerificationPage() {
     company_name: '',
 
     // Optional
-    address2: '',
     company_icon: null,
     company_type: isSeller ? 'store' : 'delivery',
     convenience_store: 'N',
@@ -58,6 +63,7 @@ function VerificationPage() {
     company_icon: null,
     drivinglicence: null,
   })
+  const [zipFetched, setZipFetched] = useState(false)
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target
@@ -67,6 +73,72 @@ function VerificationPage() {
     }))
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: '' }))
+    }
+  }
+
+  // Debounced ZIP code lookup
+  const fetchZipDetails = useCallback(async (zip) => {
+    if (!zip || zip.length < 5) {
+      setZipFetched(false)
+      return
+    }
+
+    setIsLoadingZip(true)
+    try {
+      const response = await authService.getZipDetails(zip)
+      if (response.status === 1 && response.data?.zipDetails) {
+        const details = response.data.zipDetails
+        setFormData((prev) => ({
+          ...prev,
+          city: details.city || '',
+          state: details.state_name || details.state || '',
+          state_id: details.state_id || null,
+          country: details.country_name || '',
+          country_id: details.country_id || null,
+        }))
+        setZipFetched(true)
+        // Clear any zip error
+        setErrors((prev) => ({ ...prev, zip: '' }))
+      } else {
+        setZipFetched(false)
+        setErrors((prev) => ({ ...prev, zip: 'Invalid ZIP code' }))
+      }
+    } catch (err) {
+      console.error('ZIP lookup error:', err)
+      setZipFetched(false)
+      setErrors((prev) => ({ ...prev, zip: 'Could not fetch ZIP details' }))
+    } finally {
+      setIsLoadingZip(false)
+    }
+  }, [])
+
+  const handleZipChange = (e) => {
+    const { value } = e.target
+    // Only allow numbers
+    const numericValue = value.replace(/\D/g, '').slice(0, 10)
+    setFormData((prev) => ({ ...prev, zip: numericValue }))
+
+    if (errors.zip) {
+      setErrors((prev) => ({ ...prev, zip: '' }))
+    }
+
+    // Reset location fields when ZIP changes
+    if (zipFetched) {
+      setFormData((prev) => ({
+        ...prev,
+        zip: numericValue,
+        city: '',
+        state: '',
+        state_id: null,
+        country: '',
+        country_id: null,
+      }))
+      setZipFetched(false)
+    }
+
+    // Trigger API when ZIP is 5+ digits
+    if (numericValue.length >= 5) {
+      fetchZipDetails(numericValue)
     }
   }
 
@@ -105,11 +177,19 @@ function VerificationPage() {
       if (!formData.address1.trim()) {
         newErrors.address1 = 'Address is required'
       }
+      if (!formData.zip.trim()) {
+        newErrors.zip = 'ZIP code is required'
+      } else if (!zipFetched) {
+        newErrors.zip = 'Please enter a valid ZIP code'
+      }
       if (!formData.city.trim()) {
         newErrors.city = 'City is required'
       }
-      if (!formData.zip.trim()) {
-        newErrors.zip = 'ZIP code is required'
+      if (!formData.state.trim()) {
+        newErrors.state = 'State is required'
+      }
+      if (!formData.country.trim()) {
+        newErrors.country = 'Country is required'
       }
     }
 
@@ -149,13 +229,17 @@ function VerificationPage() {
 
         // Required fields
         address1: formData.address1,
+        address2: formData.address2 || '',
         city: formData.city,
         zip: formData.zip,
+        state: formData.state,
+        state_id: formData.state_id,
+        country: formData.country,
+        country_id: formData.country_id,
         acceptbox: formData.acceptbox ? 'Y' : 'N',
         drivinglicence: formData.drivinglicence,
 
         // Optional fields shown to user
-        address2: formData.address2 || '',
         company_name: formData.company_name || '',
         company_icon: formData.company_icon || '',
         company_type: formData.company_type || '',
@@ -163,20 +247,20 @@ function VerificationPage() {
 
         // Hidden fields - send defaults
         spaceimage: '',
-        Spacetype: null,
+        Spacetype: '',
         warehouse_size: '0',
         avail_space: '0',
-        docusign_status: null,
+        docusign_status: '',
         delivergoods: 'false',
-        delivergoods_zip: null,
-        deliver_upto: null,
-        printer: null,
-        printertype: null,
-        maxWeighthandle: null,
-        Carrier: null,
-        otherCarrier: null,
-        pallet: null,
-        freeStoreFront: null,
+        delivergoods_zip: '',
+        deliver_upto: '',
+        printer: '',
+        printertype: '',
+        maxWeighthandle: '',
+        Carrier: '',
+        otherCarrier: '',
+        pallet: '',
+        freeStoreFront: '',
       }
 
       const response = await authService.submitVerification(submitData)
@@ -251,23 +335,71 @@ function VerificationPage() {
               placeholder="Apt, suite, unit, etc."
             />
 
-            <div className="grid grid-cols-2 gap-4">
-              <Input
-                label="City *"
-                name="city"
-                value={formData.city}
-                onChange={handleChange}
-                placeholder="City"
-                error={errors.city}
-              />
+            {/* ZIP Code - triggers auto-fill */}
+            <div className="relative">
               <Input
                 label="ZIP Code *"
                 name="zip"
                 value={formData.zip}
-                onChange={handleChange}
-                placeholder="12345"
+                onChange={handleZipChange}
+                placeholder="Enter ZIP code"
                 error={errors.zip}
               />
+              {isLoadingZip && (
+                <div className="absolute right-3 top-9">
+                  <Loader2 className="h-5 w-5 text-primary-500 animate-spin" />
+                </div>
+              )}
+              {zipFetched && !isLoadingZip && (
+                <div className="absolute right-3 top-9">
+                  <CheckCircle className="h-5 w-5 text-green-500" />
+                </div>
+              )}
+            </div>
+
+            {/* City - editable */}
+            <Input
+              label="City *"
+              name="city"
+              value={formData.city}
+              onChange={handleChange}
+              placeholder={zipFetched ? '' : 'Enter ZIP code first'}
+              error={errors.city}
+              disabled={!zipFetched}
+            />
+
+            {/* State - read only */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-dark-text mb-1.5">
+                State *
+              </label>
+              <input
+                type="text"
+                value={formData.state}
+                readOnly
+                placeholder={zipFetched ? '' : 'Auto-filled from ZIP code'}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-dark-border rounded-lg bg-gray-100 dark:bg-dark-border text-gray-700 dark:text-dark-text cursor-not-allowed"
+              />
+              {errors.state && (
+                <p className="text-sm text-red-500 mt-1">{errors.state}</p>
+              )}
+            </div>
+
+            {/* Country - read only */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-dark-text mb-1.5">
+                Country *
+              </label>
+              <input
+                type="text"
+                value={formData.country}
+                readOnly
+                placeholder={zipFetched ? '' : 'Auto-filled from ZIP code'}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-dark-border rounded-lg bg-gray-100 dark:bg-dark-border text-gray-700 dark:text-dark-text cursor-not-allowed"
+              />
+              {errors.country && (
+                <p className="text-sm text-red-500 mt-1">{errors.country}</p>
+              )}
             </div>
           </div>
         )
@@ -494,7 +626,7 @@ function VerificationPage() {
               )}
 
               {currentStep < 2 ? (
-                <Button onClick={handleNext}>
+                <Button onClick={handleNext} disabled={isLoadingZip}>
                   Next
                   <ArrowRight className="h-4 w-4 ml-2" />
                 </Button>

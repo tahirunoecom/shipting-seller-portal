@@ -89,6 +89,12 @@ export const authService = {
     const response = await api.post('/getShipperDetails', { wh_account_id })
     return response.data
   },
+
+  // Get ZIP code details (city, state, country)
+  async getZipDetails(zip) {
+    const response = await api.post('/zipRequest', { zip })
+    return response.data
+  },
 }
 
 export default authService
