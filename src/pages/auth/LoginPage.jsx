@@ -111,7 +111,13 @@ function LoginPage() {
         return
       }
 
-      // Priority 3: Normal navigation based on roles
+      // Priority 3: If verification submitted but not approved, go to pending approval
+      if (isVerificationSubmitted && !isApproved) {
+        navigate('/pending-approval')
+        return
+      }
+
+      // Priority 4: Normal navigation based on roles
       if (isSeller && isDriver) {
         // User has multiple roles - let them choose
         navigate('/select-mode')

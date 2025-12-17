@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Button, Card, CardContent } from '@/components/ui'
-import { Store, Truck, Check, ArrowRight } from 'lucide-react'
+import { Store, Truck, Check, ArrowRight, LogOut } from 'lucide-react'
 import { authService } from '@/services'
 import { useAuthStore } from '@/store'
 import toast from 'react-hot-toast'
@@ -9,7 +9,7 @@ import toast from 'react-hot-toast'
 function ServiceTypeSelectionPage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user, updateUser } = useAuthStore()
+  const { user, updateUser, logout } = useAuthStore()
 
   // Can come from login (authenticated) or from registration (not authenticated)
   const fromLogin = location.state?.fromLogin
@@ -28,6 +28,11 @@ function ServiceTypeSelectionPage() {
   if (!accountId) {
     navigate('/login')
     return null
+  }
+
+  const handleLogout = () => {
+    logout()
+    navigate('/login')
   }
 
   const toggleSelection = (type) => {
@@ -123,6 +128,17 @@ function ServiceTypeSelectionPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-dark-bg py-12 px-4">
       <div className="max-w-3xl mx-auto">
+        {/* Logout Button */}
+        <div className="flex justify-end mb-4">
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 dark:text-dark-muted dark:hover:text-dark-text"
+          >
+            <LogOut className="h-4 w-4" />
+            Logout
+          </button>
+        </div>
+
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-dark-text">

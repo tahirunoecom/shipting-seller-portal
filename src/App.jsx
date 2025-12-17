@@ -7,6 +7,7 @@ import RegisterPage from '@/pages/auth/RegisterPage'
 import OTPVerificationPage from '@/pages/auth/OTPVerificationPage'
 import ServiceTypeSelectionPage from '@/pages/auth/ServiceTypeSelectionPage'
 import VerificationPage from '@/pages/auth/VerificationPage'
+import PendingApprovalPage from '@/pages/auth/PendingApprovalPage'
 import ModeSelectionPage from '@/pages/auth/ModeSelectionPage'
 
 // Main pages (Seller)
@@ -61,6 +62,7 @@ function App() {
       <Route path="/select-service-type" element={<ServiceTypeSelectionPage />} />
       <Route path="/onboarding" element={<VerificationPage />} />
       <Route path="/onboarding/verification" element={<VerificationPage />} />
+      <Route path="/pending-approval" element={<PendingApprovalPage />} />
 
       {/* Mode Selection (for users with multiple roles) */}
       <Route path="/select-mode" element={<ModeSelectionPage />} />
