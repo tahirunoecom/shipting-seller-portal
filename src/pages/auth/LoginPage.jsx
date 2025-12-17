@@ -88,8 +88,31 @@ function LoginPage() {
       const isDriver = userData?.localDelivery === '1' || userData?.localDelivery === 1
       const hasServiceType = isSeller || isDriver
 
+      // Debug logging
+      console.log('Login - User Data:', {
+        userData,
+        flags: {
+          otpVerified,
+          isVerificationSubmitted,
+          isApproved,
+          stripeConnected,
+          isSeller,
+          isDriver,
+          hasServiceType,
+        },
+        rawValues: {
+          otp_verification: userData?.otp_verification,
+          is_verification_submitted: userData?.is_verification_submitted,
+          approved: userData?.approved,
+          stripe_connect: userData?.stripe_connect,
+          scanSell: userData?.scanSell,
+          localDelivery: userData?.localDelivery,
+        }
+      })
+
       // Priority 1: If no service type selected, go to service type selection
       if (!hasServiceType) {
+        console.log('Login - Navigating to: /select-service-type (no service type)')
         navigate('/select-service-type', {
           state: {
             fromLogin: true,
@@ -101,6 +124,7 @@ function LoginPage() {
 
       // Priority 2: If verification not submitted, go to verification page
       if (!isVerificationSubmitted) {
+        console.log('Login - Navigating to: /onboarding (verification not submitted)')
         navigate('/onboarding', {
           state: {
             fromLogin: true,
@@ -113,6 +137,7 @@ function LoginPage() {
 
       // Priority 3: If verification submitted but not approved, go to pending approval
       if (isVerificationSubmitted && !isApproved) {
+        console.log('Login - Navigating to: /pending-approval')
         navigate('/pending-approval')
         return
       }
@@ -120,12 +145,15 @@ function LoginPage() {
       // Priority 4: Normal navigation based on roles
       if (isSeller && isDriver) {
         // User has multiple roles - let them choose
+        console.log('Login - Navigating to: /select-mode (both roles)')
         navigate('/select-mode')
       } else if (isDriver) {
         // Driver only
+        console.log('Login - Navigating to: /driver/orders')
         navigate('/driver/orders')
       } else {
         // Seller (default)
+        console.log('Login - Navigating to: /dashboard')
         navigate('/dashboard')
       }
     } else {
