@@ -59,6 +59,7 @@ function App() {
 
       {/* Onboarding routes (no auth layout) */}
       <Route path="/select-service-type" element={<ServiceTypeSelectionPage />} />
+      <Route path="/onboarding" element={<VerificationPage />} />
       <Route path="/onboarding/verification" element={<VerificationPage />} />
 
       {/* Mode Selection (for users with multiple roles) */}

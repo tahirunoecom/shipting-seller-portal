@@ -1,11 +1,12 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '@/store'
 import { Button, Input, Card, CardContent } from '@/components/ui'
-import { Mail, Lock, Eye, EyeOff } from 'lucide-react'
+import { Mail, Lock, Eye, EyeOff, AlertCircle, CheckCircle, Info } from 'lucide-react'
 
 function LoginPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { login, isLoading } = useAuthStore()
   const [showPassword, setShowPassword] = useState(false)
   const [formData, setFormData] = useState({
@@ -13,6 +14,23 @@ function LoginPage() {
     password: '',
   })
   const [errors, setErrors] = useState({})
+  const [alertMessage, setAlertMessage] = useState(null) // { type: 'error' | 'success' | 'info', message: string, email?: string }
+
+  // Check for messages from registration/OTP verification
+  useEffect(() => {
+    if (location.state?.message) {
+      setAlertMessage({
+        type: 'success',
+        message: location.state.message,
+      })
+      // Pre-fill email if provided
+      if (location.state.email) {
+        setFormData(prev => ({ ...prev, email: location.state.email }))
+      }
+      // Clear the state so message doesn't persist on refresh
+      window.history.replaceState({}, document.title)
+    }
+  }, [location.state])
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -20,6 +38,10 @@ function LoginPage() {
     // Clear error when typing
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: '' }))
+    }
+    // Clear alert when user starts typing
+    if (alertMessage) {
+      setAlertMessage(null)
     }
   }
 
@@ -37,17 +59,59 @@ function LoginPage() {
     return Object.keys(newErrors).length === 0
   }
 
+  // Mask email for display (e.g., "t***@example.com")
+  const maskEmail = (email) => {
+    if (!email) return ''
+    const [local, domain] = email.split('@')
+    if (local.length <= 2) return email
+    return `${local[0]}${'*'.repeat(Math.min(local.length - 1, 5))}@${domain}`
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!validate()) return
 
+    setAlertMessage(null)
     const result = await login(formData.email, formData.password)
+
     if (result.success) {
       const userData = result.data?.user
-      // Check if user has multiple roles
+
+      // Check verification status flags
+      const otpVerified = userData?.otp_verification === 1 || userData?.otp_verification === '1'
+      const isVerificationSubmitted = userData?.is_verification_submitted === 1 || userData?.is_verification_submitted === '1'
+      const isApproved = userData?.approved === 1 || userData?.approved === '1'
+      const stripeConnected = userData?.stripe_connect === 1 || userData?.stripe_connect === '1'
+
+      // Check service type flags
       const isSeller = userData?.scanSell === '1' || userData?.scanSell === 1
       const isDriver = userData?.localDelivery === '1' || userData?.localDelivery === 1
+      const hasServiceType = isSeller || isDriver
 
+      // Priority 1: If no service type selected, go to service type selection
+      if (!hasServiceType) {
+        navigate('/select-service-type', {
+          state: {
+            fromLogin: true,
+            userData
+          }
+        })
+        return
+      }
+
+      // Priority 2: If verification not submitted, go to verification page
+      if (!isVerificationSubmitted) {
+        navigate('/onboarding', {
+          state: {
+            fromLogin: true,
+            userData,
+            step: 'verification'
+          }
+        })
+        return
+      }
+
+      // Priority 3: Normal navigation based on roles
       if (isSeller && isDriver) {
         // User has multiple roles - let them choose
         navigate('/select-mode')
@@ -58,7 +122,33 @@ function LoginPage() {
         // Seller (default)
         navigate('/dashboard')
       }
+    } else {
+      // Check if it's an OTP verification error
+      const errorMessage = result.message?.toLowerCase() || ''
+      if (errorMessage.includes('verify') || errorMessage.includes('otp') || errorMessage.includes('email')) {
+        setAlertMessage({
+          type: 'error',
+          message: 'Please verify your email first!',
+          email: formData.email,
+          showResend: true,
+        })
+      } else {
+        setAlertMessage({
+          type: 'error',
+          message: result.message || 'Login failed. Please try again.',
+        })
+      }
     }
+  }
+
+  const handleResendOTP = () => {
+    // Navigate to OTP verification page with email to resend
+    navigate('/verify-email', {
+      state: {
+        email: formData.email,
+        resend: true
+      }
+    })
   }
 
   return (
@@ -72,6 +162,56 @@ function LoginPage() {
             Sign in to your seller account
           </p>
         </div>
+
+        {/* Alert Message Banner */}
+        {alertMessage && (
+          <div
+            className={`mb-6 p-4 rounded-lg border ${
+              alertMessage.type === 'error'
+                ? 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800'
+                : alertMessage.type === 'success'
+                ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800'
+                : 'bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800'
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              {alertMessage.type === 'error' ? (
+                <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+              ) : alertMessage.type === 'success' ? (
+                <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
+              ) : (
+                <Info className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
+              )}
+              <div className="flex-1">
+                <p
+                  className={`text-sm font-medium ${
+                    alertMessage.type === 'error'
+                      ? 'text-red-800 dark:text-red-200'
+                      : alertMessage.type === 'success'
+                      ? 'text-green-800 dark:text-green-200'
+                      : 'text-blue-800 dark:text-blue-200'
+                  }`}
+                >
+                  {alertMessage.message}
+                </p>
+                {alertMessage.email && alertMessage.showResend && (
+                  <p className="text-sm text-red-600 dark:text-red-300 mt-1">
+                    Check your email: <strong>{maskEmail(alertMessage.email)}</strong>
+                  </p>
+                )}
+                {alertMessage.showResend && (
+                  <button
+                    type="button"
+                    onClick={handleResendOTP}
+                    className="mt-2 text-sm font-medium text-red-700 hover:text-red-800 dark:text-red-300 dark:hover:text-red-200 underline"
+                  >
+                    Resend verification email
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Email */}

@@ -3,12 +3,17 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { Button, Card, CardContent } from '@/components/ui'
 import { Store, Truck, Check, ArrowRight } from 'lucide-react'
 import { authService } from '@/services'
+import { useAuthStore } from '@/store'
 import toast from 'react-hot-toast'
 
 function ServiceTypeSelectionPage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { email, userData, wh_account_id } = location.state || {}
+  const { user, updateUser } = useAuthStore()
+
+  // Can come from login (authenticated) or from registration (not authenticated)
+  const fromLogin = location.state?.fromLogin
+  const userData = location.state?.userData || user
 
   const [selectedTypes, setSelectedTypes] = useState({
     seller: false,
@@ -16,12 +21,12 @@ function ServiceTypeSelectionPage() {
   })
   const [isLoading, setIsLoading] = useState(false)
 
-  // Get account ID - passed from OTP verification
-  const accountId = wh_account_id || userData?.wh_account_id
+  // Get account ID from user data
+  const accountId = userData?.wh_account_id
 
-  // Redirect if no account data at all
-  if (!email && !userData) {
-    navigate('/register')
+  // Redirect if no account data
+  if (!accountId) {
+    navigate('/login')
     return null
   }
 
@@ -38,11 +43,6 @@ function ServiceTypeSelectionPage() {
       return
     }
 
-    if (!accountId) {
-      toast.error('Account ID is missing. Please try registering again.')
-      return
-    }
-
     setIsLoading(true)
     try {
       const response = await authService.updateServiceType({
@@ -54,14 +54,35 @@ function ServiceTypeSelectionPage() {
 
       if (response.status === 1) {
         toast.success('Account type updated!')
-        navigate('/onboarding/verification', {
-          state: {
-            email,
-            userData,
-            wh_account_id: accountId,
-            serviceTypes: selectedTypes,
+
+        // Update local user state
+        if (updateUser) {
+          updateUser({
+            scanSell: selectedTypes.seller ? '1' : '0',
+            localDelivery: selectedTypes.driver ? '1' : '0',
+          })
+        }
+
+        // Check if verification is submitted
+        const isVerificationSubmitted = userData?.is_verification_submitted === 1 || userData?.is_verification_submitted === '1'
+
+        if (!isVerificationSubmitted) {
+          // Go to verification/onboarding
+          navigate('/onboarding', {
+            state: {
+              fromLogin: true,
+              userData,
+              serviceTypes: selectedTypes,
+            }
+          })
+        } else {
+          // Go to dashboard
+          if (selectedTypes.driver && !selectedTypes.seller) {
+            navigate('/driver/orders')
+          } else {
+            navigate('/dashboard')
           }
-        })
+        }
       } else {
         toast.error(response.message || 'Failed to update account type')
       }
@@ -70,6 +91,11 @@ function ServiceTypeSelectionPage() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const handleSkip = () => {
+    // Skip and go to dashboard - user can set this later in settings
+    navigate('/dashboard')
   }
 
   const serviceOptions = [
@@ -108,7 +134,7 @@ function ServiceTypeSelectionPage() {
             How will you use Shipting?
           </h1>
           <p className="text-gray-500 dark:text-dark-muted mt-2">
-            Select all that apply. You can change this later.
+            Select all that apply. You can change this later in settings.
           </p>
         </div>
 
@@ -181,7 +207,14 @@ function ServiceTypeSelectionPage() {
         </div>
 
         {/* Continue Button */}
-        <div className="flex justify-center">
+        <div className="flex justify-center gap-4">
+          <Button
+            variant="outline"
+            onClick={handleSkip}
+            className="px-8"
+          >
+            Skip for now
+          </Button>
           <Button
             onClick={handleContinue}
             isLoading={isLoading}
