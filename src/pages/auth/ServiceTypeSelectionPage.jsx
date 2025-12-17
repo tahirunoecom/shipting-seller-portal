@@ -16,13 +16,17 @@ function ServiceTypeSelectionPage() {
   })
   const [isLoading, setIsLoading] = useState(false)
 
-  // Redirect if no account data
-  if (!wh_account_id && !userData) {
+  // Get account ID from various sources
+  const accountId = wh_account_id || userData?.wh_account_id || userData?.id
+
+  // Debug logging
+  console.log('ServiceTypeSelectionPage state:', { email, userData, wh_account_id, accountId })
+
+  // Redirect if no account data at all
+  if (!email && !userData) {
     navigate('/register')
     return null
   }
-
-  const accountId = wh_account_id || userData?.wh_account_id
 
   const toggleSelection = (type) => {
     setSelectedTypes((prev) => ({
@@ -37,14 +41,30 @@ function ServiceTypeSelectionPage() {
       return
     }
 
+    // Check if we have account ID
+    if (!accountId) {
+      console.error('Missing wh_account_id! userData:', userData)
+      toast.error('Account ID is missing. Please try registering again.')
+      return
+    }
+
     setIsLoading(true)
     try {
+      console.log('Calling updateServiceType with:', {
+        wh_account_id: accountId,
+        scanSell: selectedTypes.seller ? 1 : 0,
+        fulfillment: 0,
+        localDelivery: selectedTypes.driver ? 1 : 0,
+      })
+
       const response = await authService.updateServiceType({
         wh_account_id: accountId,
         scanSell: selectedTypes.seller ? 1 : 0,
         fulfillment: 0, // Always 0 as per requirement
         localDelivery: selectedTypes.driver ? 1 : 0,
       })
+
+      console.log('updateServiceType response:', response)
 
       if (response.status === 1) {
         toast.success('Account type updated!')
@@ -61,7 +81,9 @@ function ServiceTypeSelectionPage() {
         toast.error(response.message || 'Failed to update account type')
       }
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Something went wrong')
+      console.error('updateServiceType error:', err)
+      const errorMessage = err.response?.data?.message || err.message || 'Something went wrong'
+      toast.error(errorMessage, { duration: 5000 }) // Show for 5 seconds
     } finally {
       setIsLoading(false)
     }
