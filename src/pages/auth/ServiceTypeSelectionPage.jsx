@@ -93,11 +93,6 @@ function ServiceTypeSelectionPage() {
     }
   }
 
-  const handleSkip = () => {
-    // Skip and go to dashboard - user can set this later in settings
-    navigate('/dashboard')
-  }
-
   const serviceOptions = [
     {
       id: 'seller',
@@ -207,14 +202,7 @@ function ServiceTypeSelectionPage() {
         </div>
 
         {/* Continue Button */}
-        <div className="flex justify-center gap-4">
-          <Button
-            variant="outline"
-            onClick={handleSkip}
-            className="px-8"
-          >
-            Skip for now
-          </Button>
+        <div className="flex justify-center">
           <Button
             onClick={handleContinue}
             isLoading={isLoading}
