@@ -306,7 +306,21 @@ function VerificationPage() {
           })
         }
       } else {
-        toast.error(response.message || 'Verification failed')
+        // Check if it's an address verification error
+        const errorMessage = response.message?.toLowerCase() || ''
+        const verificationData = response.data?.verification?.toLowerCase() || ''
+
+        if (errorMessage.includes('address') || verificationData.includes('address')) {
+          // Address verification failed - go back to step 1
+          setCurrentStep(1)
+          setErrors((prev) => ({
+            ...prev,
+            address1: 'Please enter a valid address. Your address could not be verified.'
+          }))
+          toast.error('Address verification failed. Please check your address and try again.')
+        } else {
+          toast.error(response.message || 'Verification failed')
+        }
       }
     } catch (err) {
       console.error('Verification error:', err)
