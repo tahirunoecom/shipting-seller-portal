@@ -1809,6 +1809,26 @@ class WhatsAppController extends Controller
                 $overallStatus = 'API_READY';
             }
 
+            // AUTO-CONNECT: If WABA exists but catalog is not connected, try to connect
+            $catalogAutoConnected = false;
+            if ($config->waba_id && !$config->catalog_connected) {
+                Log::info("Catalog not connected for wh_account_id: {$whAccountId}, attempting auto-connect...");
+                $catalogAutoConnected = $this->autoConnectCatalog($config);
+                if ($catalogAutoConnected) {
+                    $config->refresh();
+                }
+            }
+
+            // AUTO-WEBHOOK: If WABA exists but webhook not configured, try to configure
+            $webhookAutoConfigured = false;
+            if ($config->waba_id && !$config->webhook_configured) {
+                Log::info("Webhook not configured for wh_account_id: {$whAccountId}, attempting auto-configure...");
+                $webhookAutoConfigured = $this->configureWebhookForWaba($config);
+                if ($webhookAutoConfigured) {
+                    $config->refresh();
+                }
+            }
+
             return response()->json([
                 'status' => 1,
                 'data' => [
