@@ -1825,7 +1825,9 @@ class WhatsAppController extends Controller
                     'overall_status' => $overallStatus,
                     'status_description' => $this->getStatusDescription($overallStatus, $registrationStatus, $codeVerificationStatus, $nameStatus, $accountMode),
                     'data_auto_fetched' => $dataFetched,
-                    'webhook_configured' => $config->webhook_configured ?? false
+                    'webhook_configured' => $config->webhook_configured ?? false,
+                    'catalog_id' => $config->catalog_id,
+                    'catalog_connected' => $config->catalog_connected ?? false
                 ]
             ]);
         } catch (\Exception $e) {
@@ -2144,6 +2146,10 @@ class WhatsAppController extends Controller
                         $webhookSuccess = $this->configureWebhookForWaba($config);
                         Log::info("Webhook configuration: " . ($webhookSuccess ? 'SUCCESS' : 'FAILED'));
 
+                        // Auto-connect catalog if not already connected
+                        $catalogSuccess = $this->autoConnectCatalog($config);
+                        Log::info("Catalog auto-connect: " . ($catalogSuccess ? 'SUCCESS' : 'SKIPPED/FAILED'));
+
                         return true;
                     } else {
                         Log::warning("Phone number {$config->phone_number_id} has no whatsapp_business_account field");
@@ -2240,6 +2246,10 @@ class WhatsAppController extends Controller
                                     $config->refresh();
                                     $webhookSuccess = $this->configureWebhookForWaba($config);
                                     Log::info("Webhook configuration: " . ($webhookSuccess ? 'SUCCESS' : 'FAILED'));
+
+                                    // Auto-connect catalog if not already connected
+                                    $catalogSuccess = $this->autoConnectCatalog($config);
+                                    Log::info("Catalog auto-connect: " . ($catalogSuccess ? 'SUCCESS' : 'SKIPPED/FAILED'));
 
                                     return true;
                                 }
@@ -2575,6 +2585,116 @@ class WhatsAppController extends Controller
 
         } catch (\Exception $e) {
             Log::error("Exception configuring webhook for WABA: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Auto-connect a catalog to the WABA
+     * Finds an available catalog from the business and connects it to the WABA
+     *
+     * @param SellerWhatsappConfig $config - The seller's WhatsApp configuration
+     * @return bool - Whether catalog was connected successfully
+     */
+    private function autoConnectCatalog($config)
+    {
+        try {
+            $wabaId = $config->waba_id;
+            $accessToken = $config->access_token;
+            $businessId = $config->business_id ?? $this->metaBusinessId;
+
+            if (!$wabaId || !$accessToken) {
+                Log::warning("Cannot auto-connect catalog - missing WABA ID or access token");
+                return false;
+            }
+
+            // Check if WABA already has a catalog connected
+            $existingCatalogResponse = Http::withToken($accessToken)
+                ->get("https://graph.facebook.com/v21.0/{$wabaId}/product_catalogs");
+
+            if ($existingCatalogResponse->successful()) {
+                $existingCatalogs = $existingCatalogResponse->json()['data'] ?? [];
+                if (!empty($existingCatalogs)) {
+                    $existingCatalogId = $existingCatalogs[0]['id'];
+                    Log::info("WABA {$wabaId} already has catalog connected: {$existingCatalogId}");
+
+                    // Update config with existing catalog ID
+                    $config->update([
+                        'catalog_id' => $existingCatalogId,
+                        'catalog_connected' => true
+                    ]);
+
+                    return true;
+                }
+            }
+
+            Log::info("No catalog connected to WABA {$wabaId}, searching for available catalogs...");
+
+            // Find available catalogs from the business
+            $catalogsResponse = Http::withToken($accessToken)
+                ->get("https://graph.facebook.com/v21.0/{$businessId}/owned_product_catalogs", [
+                    'fields' => 'id,name,vertical'
+                ]);
+
+            if (!$catalogsResponse->successful()) {
+                $error = $catalogsResponse->json()['error']['message'] ?? 'Unknown error';
+                Log::warning("Cannot get business catalogs: {$error}");
+                return false;
+            }
+
+            $catalogs = $catalogsResponse->json()['data'] ?? [];
+            Log::info("Found " . count($catalogs) . " catalogs for business {$businessId}");
+
+            if (empty($catalogs)) {
+                Log::info("No catalogs available to connect");
+                return false;
+            }
+
+            // Prefer commerce catalogs, otherwise use the first one
+            $catalogToConnect = null;
+            foreach ($catalogs as $catalog) {
+                if (($catalog['vertical'] ?? '') === 'commerce') {
+                    $catalogToConnect = $catalog;
+                    break;
+                }
+            }
+
+            if (!$catalogToConnect) {
+                $catalogToConnect = $catalogs[0];
+            }
+
+            $catalogId = $catalogToConnect['id'];
+            $catalogName = $catalogToConnect['name'] ?? 'Unknown';
+
+            Log::info("Connecting catalog {$catalogId} ({$catalogName}) to WABA {$wabaId}");
+
+            // Connect the catalog to the WABA
+            $connectResponse = Http::withToken($accessToken)
+                ->post("https://graph.facebook.com/v21.0/{$wabaId}/product_catalogs", [
+                    'catalog_id' => $catalogId
+                ]);
+
+            $responseData = $connectResponse->json();
+            Log::info("Catalog connect response: " . json_encode($responseData));
+
+            if ($connectResponse->successful() && ($responseData['success'] ?? false)) {
+                Log::info("Catalog {$catalogId} successfully connected to WABA {$wabaId}");
+
+                $config->update([
+                    'catalog_id' => $catalogId,
+                    'catalog_connected' => true,
+                    'catalog_connected_at' => now()
+                ]);
+
+                return true;
+            }
+
+            $error = $responseData['error']['message'] ?? 'Unknown error';
+            Log::error("Failed to connect catalog: {$error}");
+            return false;
+
+        } catch (\Exception $e) {
+            Log::error("autoConnectCatalog error: " . $e->getMessage());
             return false;
         }
     }
