@@ -991,6 +991,629 @@ class WhatsAppController extends Controller
     }
 
     // ============================================
+    // PHONE REGISTRATION & VERIFICATION
+    // ============================================
+
+    /**
+     * Request verification code (OTP) for phone number
+     * POST /api/seller/whatsapp/request-code
+     *
+     * @param code_method: SMS or VOICE
+     * @param language: en, es, pt_BR, etc.
+     */
+    public function requestVerificationCode(Request $request)
+    {
+        try {
+            $whAccountId = $request->input('wh_account_id');
+            $codeMethod = $request->input('code_method', 'SMS'); // SMS or VOICE
+            $language = $request->input('language', 'en');
+
+            if (!$whAccountId) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'wh_account_id is required'
+                ]);
+            }
+
+            $config = SellerWhatsappConfig::where('wh_account_id', $whAccountId)->first();
+
+            if (!$config || !$config->access_token || !$config->phone_number_id) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'WhatsApp not connected or phone number not configured'
+                ]);
+            }
+
+            Log::info("Requesting verification code for phone_number_id: {$config->phone_number_id}, method: {$codeMethod}");
+
+            // Request verification code from Meta
+            $response = Http::withToken($config->access_token)
+                ->post("https://graph.facebook.com/v21.0/{$config->phone_number_id}/request_code", [
+                    'code_method' => strtoupper($codeMethod),
+                    'language' => $language
+                ]);
+
+            $responseData = $response->json();
+            Log::info("Request code response: " . json_encode($responseData));
+
+            if ($response->successful() && ($responseData['success'] ?? false)) {
+                return response()->json([
+                    'status' => 1,
+                    'message' => "Verification code sent via {$codeMethod}. Please check your phone.",
+                    'data' => [
+                        'method' => $codeMethod,
+                        'phone_number' => $config->display_phone_number
+                    ]
+                ]);
+            }
+
+            $error = $responseData['error']['message'] ?? 'Failed to send verification code';
+            Log::error("Request code failed: {$error}");
+
+            return response()->json([
+                'status' => 0,
+                'message' => $error
+            ]);
+        } catch (\Exception $e) {
+            Log::error('requestVerificationCode error: ' . $e->getMessage());
+            return response()->json([
+                'status' => 0,
+                'message' => 'Failed to request verification code: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Verify the OTP code
+     * POST /api/seller/whatsapp/verify-code
+     */
+    public function verifyCode(Request $request)
+    {
+        try {
+            $whAccountId = $request->input('wh_account_id');
+            $code = $request->input('code');
+
+            if (!$whAccountId || !$code) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'wh_account_id and code are required'
+                ]);
+            }
+
+            $config = SellerWhatsappConfig::where('wh_account_id', $whAccountId)->first();
+
+            if (!$config || !$config->access_token || !$config->phone_number_id) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'WhatsApp not connected or phone number not configured'
+                ]);
+            }
+
+            Log::info("Verifying code for phone_number_id: {$config->phone_number_id}");
+
+            // Verify the code with Meta
+            $response = Http::withToken($config->access_token)
+                ->post("https://graph.facebook.com/v21.0/{$config->phone_number_id}/verify_code", [
+                    'code' => $code
+                ]);
+
+            $responseData = $response->json();
+            Log::info("Verify code response: " . json_encode($responseData));
+
+            if ($response->successful() && ($responseData['success'] ?? false)) {
+                // Update config to mark as verified
+                $config->update([
+                    'code_verified' => true,
+                    'code_verified_at' => now()
+                ]);
+
+                return response()->json([
+                    'status' => 1,
+                    'message' => 'Phone number verified successfully!'
+                ]);
+            }
+
+            $error = $responseData['error']['message'] ?? 'Invalid verification code';
+            Log::error("Verify code failed: {$error}");
+
+            return response()->json([
+                'status' => 0,
+                'message' => $error
+            ]);
+        } catch (\Exception $e) {
+            Log::error('verifyCode error: ' . $e->getMessage());
+            return response()->json([
+                'status' => 0,
+                'message' => 'Failed to verify code: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Register phone number with WhatsApp
+     * POST /api/seller/whatsapp/register-phone
+     *
+     * This completes the phone registration process
+     */
+    public function registerPhone(Request $request)
+    {
+        try {
+            $whAccountId = $request->input('wh_account_id');
+            $pin = $request->input('pin'); // Optional 6-digit PIN for 2FA
+
+            if (!$whAccountId) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'wh_account_id is required'
+                ]);
+            }
+
+            $config = SellerWhatsappConfig::where('wh_account_id', $whAccountId)->first();
+
+            if (!$config || !$config->access_token || !$config->phone_number_id) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'WhatsApp not connected or phone number not configured'
+                ]);
+            }
+
+            Log::info("Registering phone_number_id: {$config->phone_number_id}");
+
+            // Register the phone number
+            $payload = [
+                'messaging_product' => 'whatsapp'
+            ];
+
+            // Include 2FA PIN if provided
+            if ($pin) {
+                $payload['pin'] = $pin;
+            }
+
+            $response = Http::withToken($config->access_token)
+                ->post("https://graph.facebook.com/v21.0/{$config->phone_number_id}/register", $payload);
+
+            $responseData = $response->json();
+            Log::info("Register phone response: " . json_encode($responseData));
+
+            if ($response->successful() && ($responseData['success'] ?? false)) {
+                $config->update([
+                    'is_registered' => true,
+                    'registered_at' => now()
+                ]);
+
+                return response()->json([
+                    'status' => 1,
+                    'message' => 'Phone number registered successfully with WhatsApp!'
+                ]);
+            }
+
+            $error = $responseData['error']['message'] ?? 'Failed to register phone number';
+            Log::error("Register phone failed: {$error}");
+
+            return response()->json([
+                'status' => 0,
+                'message' => $error
+            ]);
+        } catch (\Exception $e) {
+            Log::error('registerPhone error: ' . $e->getMessage());
+            return response()->json([
+                'status' => 0,
+                'message' => 'Failed to register phone: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Update WhatsApp Business Profile
+     * POST /api/seller/whatsapp/update-profile
+     *
+     * Updates: about, address, description, email, profile_picture_url, websites, vertical
+     */
+    public function updateBusinessProfile(Request $request)
+    {
+        try {
+            $whAccountId = $request->input('wh_account_id');
+
+            if (!$whAccountId) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'wh_account_id is required'
+                ]);
+            }
+
+            $config = SellerWhatsappConfig::where('wh_account_id', $whAccountId)->first();
+
+            if (!$config || !$config->access_token || !$config->phone_number_id) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'WhatsApp not connected or phone number not configured'
+                ]);
+            }
+
+            // Build profile data from request
+            $profileData = [];
+
+            if ($request->has('about')) {
+                $profileData['about'] = substr($request->input('about'), 0, 139); // Max 139 chars
+            }
+            if ($request->has('address')) {
+                $profileData['address'] = substr($request->input('address'), 0, 256);
+            }
+            if ($request->has('description')) {
+                $profileData['description'] = substr($request->input('description'), 0, 512);
+            }
+            if ($request->has('email')) {
+                $profileData['email'] = $request->input('email');
+            }
+            if ($request->has('websites')) {
+                $websites = $request->input('websites');
+                if (is_array($websites)) {
+                    $profileData['websites'] = array_slice($websites, 0, 2); // Max 2 websites
+                } elseif (is_string($websites)) {
+                    $profileData['websites'] = [$websites];
+                }
+            }
+            if ($request->has('vertical')) {
+                // Valid verticals: UNDEFINED, OTHER, AUTO, BEAUTY, APPAREL, EDU, ENTERTAIN,
+                // EVENT_PLAN, FINANCE, GROCERY, GOVT, HOTEL, HEALTH, NONPROFIT, PROF_SERVICES,
+                // RETAIL, TRAVEL, RESTAURANT, NOT_A_BIZ
+                $profileData['vertical'] = strtoupper($request->input('vertical'));
+            }
+            if ($request->has('profile_picture_handle')) {
+                $profileData['profile_picture_handle'] = $request->input('profile_picture_handle');
+            }
+
+            if (empty($profileData)) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'No profile data provided to update'
+                ]);
+            }
+
+            Log::info("Updating business profile for phone_number_id: {$config->phone_number_id}");
+            Log::info("Profile data: " . json_encode($profileData));
+
+            // Update the business profile
+            $response = Http::withToken($config->access_token)
+                ->post("https://graph.facebook.com/v21.0/{$config->phone_number_id}/whatsapp_business_profile", $profileData);
+
+            $responseData = $response->json();
+            Log::info("Update profile response: " . json_encode($responseData));
+
+            if ($response->successful() && ($responseData['success'] ?? false)) {
+                return response()->json([
+                    'status' => 1,
+                    'message' => 'Business profile updated successfully!'
+                ]);
+            }
+
+            $error = $responseData['error']['message'] ?? 'Failed to update profile';
+            Log::error("Update profile failed: {$error}");
+
+            return response()->json([
+                'status' => 0,
+                'message' => $error
+            ]);
+        } catch (\Exception $e) {
+            Log::error('updateBusinessProfile error: ' . $e->getMessage());
+            return response()->json([
+                'status' => 0,
+                'message' => 'Failed to update profile: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get current business profile
+     * POST /api/seller/whatsapp/get-profile
+     */
+    public function getBusinessProfile(Request $request)
+    {
+        try {
+            $whAccountId = $request->input('wh_account_id');
+
+            if (!$whAccountId) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'wh_account_id is required'
+                ]);
+            }
+
+            $config = SellerWhatsappConfig::where('wh_account_id', $whAccountId)->first();
+
+            if (!$config || !$config->access_token || !$config->phone_number_id) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'WhatsApp not connected or phone number not configured'
+                ]);
+            }
+
+            // Get business profile from Meta
+            $response = Http::withToken($config->access_token)
+                ->get("https://graph.facebook.com/v21.0/{$config->phone_number_id}/whatsapp_business_profile", [
+                    'fields' => 'about,address,description,email,profile_picture_url,websites,vertical'
+                ]);
+
+            $responseData = $response->json();
+            Log::info("Get profile response: " . json_encode($responseData));
+
+            if ($response->successful()) {
+                $profileData = $responseData['data'][0] ?? [];
+
+                return response()->json([
+                    'status' => 1,
+                    'data' => [
+                        'about' => $profileData['about'] ?? '',
+                        'address' => $profileData['address'] ?? '',
+                        'description' => $profileData['description'] ?? '',
+                        'email' => $profileData['email'] ?? '',
+                        'profile_picture_url' => $profileData['profile_picture_url'] ?? '',
+                        'websites' => $profileData['websites'] ?? [],
+                        'vertical' => $profileData['vertical'] ?? 'UNDEFINED'
+                    ]
+                ]);
+            }
+
+            $error = $responseData['error']['message'] ?? 'Failed to get profile';
+            return response()->json([
+                'status' => 0,
+                'message' => $error
+            ]);
+        } catch (\Exception $e) {
+            Log::error('getBusinessProfile error: ' . $e->getMessage());
+            return response()->json([
+                'status' => 0,
+                'message' => 'Failed to get profile: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Upload profile picture
+     * POST /api/seller/whatsapp/upload-profile-picture
+     *
+     * Requires: file (image)
+     * Returns: handle to use with updateBusinessProfile
+     */
+    public function uploadProfilePicture(Request $request)
+    {
+        try {
+            $whAccountId = $request->input('wh_account_id');
+
+            if (!$whAccountId) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'wh_account_id is required'
+                ]);
+            }
+
+            if (!$request->hasFile('file')) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'Profile picture file is required'
+                ]);
+            }
+
+            $config = SellerWhatsappConfig::where('wh_account_id', $whAccountId)->first();
+
+            if (!$config || !$config->access_token) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'WhatsApp not connected'
+                ]);
+            }
+
+            $file = $request->file('file');
+
+            // Validate file type (must be JPEG or PNG, square, between 192x192 and 640x640)
+            $allowedMimes = ['image/jpeg', 'image/png'];
+            if (!in_array($file->getMimeType(), $allowedMimes)) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'Profile picture must be JPEG or PNG'
+                ]);
+            }
+
+            Log::info("Uploading profile picture for wh_account_id: {$whAccountId}");
+
+            // Upload to Meta using resumable upload session
+            // Step 1: Create upload session
+            $appId = $this->metaAppId;
+            $fileSize = $file->getSize();
+            $fileType = $file->getMimeType();
+
+            $sessionResponse = Http::withToken($config->access_token)
+                ->post("https://graph.facebook.com/v21.0/{$appId}/uploads", [
+                    'file_length' => $fileSize,
+                    'file_type' => $fileType,
+                    'file_name' => 'profile_picture.' . $file->getClientOriginalExtension()
+                ]);
+
+            if (!$sessionResponse->successful()) {
+                $error = $sessionResponse->json()['error']['message'] ?? 'Failed to create upload session';
+                return response()->json([
+                    'status' => 0,
+                    'message' => $error
+                ]);
+            }
+
+            $uploadSessionId = $sessionResponse->json()['id'] ?? null;
+
+            if (!$uploadSessionId) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'Failed to get upload session ID'
+                ]);
+            }
+
+            // Step 2: Upload the file
+            $uploadResponse = Http::withToken($config->access_token)
+                ->withHeaders([
+                    'file_offset' => 0
+                ])
+                ->attach('file', file_get_contents($file->getRealPath()), $file->getClientOriginalName())
+                ->post("https://graph.facebook.com/v21.0/{$uploadSessionId}");
+
+            if (!$uploadResponse->successful()) {
+                $error = $uploadResponse->json()['error']['message'] ?? 'Failed to upload file';
+                return response()->json([
+                    'status' => 0,
+                    'message' => $error
+                ]);
+            }
+
+            $handle = $uploadResponse->json()['h'] ?? null;
+
+            if ($handle) {
+                return response()->json([
+                    'status' => 1,
+                    'message' => 'Profile picture uploaded successfully',
+                    'data' => [
+                        'handle' => $handle
+                    ]
+                ]);
+            }
+
+            return response()->json([
+                'status' => 0,
+                'message' => 'Failed to get upload handle'
+            ]);
+        } catch (\Exception $e) {
+            Log::error('uploadProfilePicture error: ' . $e->getMessage());
+            return response()->json([
+                'status' => 0,
+                'message' => 'Failed to upload profile picture: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get available business categories/verticals
+     * POST /api/seller/whatsapp/get-categories
+     */
+    public function getBusinessCategories(Request $request)
+    {
+        // Return the list of valid WhatsApp Business verticals
+        $categories = [
+            ['id' => 'UNDEFINED', 'name' => 'Select a category'],
+            ['id' => 'AUTO', 'name' => 'Automotive'],
+            ['id' => 'BEAUTY', 'name' => 'Beauty, Spa and Salon'],
+            ['id' => 'APPAREL', 'name' => 'Clothing and Apparel'],
+            ['id' => 'EDU', 'name' => 'Education'],
+            ['id' => 'ENTERTAIN', 'name' => 'Entertainment'],
+            ['id' => 'EVENT_PLAN', 'name' => 'Event Planning and Service'],
+            ['id' => 'FINANCE', 'name' => 'Finance and Banking'],
+            ['id' => 'GROCERY', 'name' => 'Grocery and Supermarket'],
+            ['id' => 'GOVT', 'name' => 'Government and Public Service'],
+            ['id' => 'HOTEL', 'name' => 'Hotel and Lodging'],
+            ['id' => 'HEALTH', 'name' => 'Medical and Health'],
+            ['id' => 'NONPROFIT', 'name' => 'Non-profit'],
+            ['id' => 'PROF_SERVICES', 'name' => 'Professional Services'],
+            ['id' => 'RETAIL', 'name' => 'Shopping and Retail'],
+            ['id' => 'TRAVEL', 'name' => 'Travel and Transportation'],
+            ['id' => 'RESTAURANT', 'name' => 'Restaurant'],
+            ['id' => 'OTHER', 'name' => 'Other'],
+        ];
+
+        return response()->json([
+            'status' => 1,
+            'data' => [
+                'categories' => $categories
+            ]
+        ]);
+    }
+
+    /**
+     * Update display name (requires Meta approval)
+     * POST /api/seller/whatsapp/update-display-name
+     */
+    public function updateDisplayName(Request $request)
+    {
+        try {
+            $whAccountId = $request->input('wh_account_id');
+            $displayName = $request->input('display_name');
+
+            if (!$whAccountId || !$displayName) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'wh_account_id and display_name are required'
+                ]);
+            }
+
+            // Validate display name (no special chars at start/end, 3-50 chars)
+            $displayName = trim($displayName);
+            if (strlen($displayName) < 3 || strlen($displayName) > 50) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'Display name must be between 3 and 50 characters'
+                ]);
+            }
+
+            // Check for invalid characters at start/end
+            if (preg_match('/^[_\-\.\s]|[_\-\.\s]$/', $displayName)) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'Display name cannot start or end with special characters (_, -, ., space)'
+                ]);
+            }
+
+            $config = SellerWhatsappConfig::where('wh_account_id', $whAccountId)->first();
+
+            if (!$config || !$config->access_token || !$config->waba_id) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'WhatsApp not connected'
+                ]);
+            }
+
+            Log::info("Updating display name to: {$displayName} for WABA: {$config->waba_id}");
+
+            // Note: Display name updates go through WABA, not phone number
+            // The API endpoint is: /{WABA-ID}
+            // With parameter: business_verification_display_name
+            // However, this usually requires business verification
+
+            // For now, we'll update the phone number's verified_name field
+            // This triggers a review by Meta
+            $response = Http::withToken($config->access_token)
+                ->post("https://graph.facebook.com/v21.0/{$config->phone_number_id}", [
+                    'verified_name' => $displayName
+                ]);
+
+            $responseData = $response->json();
+            Log::info("Update display name response: " . json_encode($responseData));
+
+            if ($response->successful() && ($responseData['success'] ?? false)) {
+                return response()->json([
+                    'status' => 1,
+                    'message' => 'Display name update submitted. It may take up to 48 hours for Meta to review and approve.'
+                ]);
+            }
+
+            $error = $responseData['error']['message'] ?? 'Failed to update display name';
+
+            // Provide helpful error messages
+            if (strpos($error, 'verified_name') !== false || strpos($error, 'permission') !== false) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'Display name cannot be updated via API. Please update it in WhatsApp Manager: business.facebook.com/wa/manage/phone'
+                ]);
+            }
+
+            return response()->json([
+                'status' => 0,
+                'message' => $error
+            ]);
+        } catch (\Exception $e) {
+            Log::error('updateDisplayName error: ' . $e->getMessage());
+            return response()->json([
+                'status' => 0,
+                'message' => 'Failed to update display name: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    // ============================================
     // PHONE NUMBER STATUS
     // ============================================
 

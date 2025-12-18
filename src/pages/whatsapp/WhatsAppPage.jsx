@@ -41,6 +41,15 @@ import {
   QrCode,
   Download,
   Share2,
+  Smartphone,
+  KeyRound,
+  User,
+  Building2,
+  Globe,
+  Mail,
+  MapPin,
+  Image,
+  FileText,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -112,6 +121,31 @@ function WhatsAppPage() {
   const [showQuickReplyModal, setShowQuickReplyModal] = useState(false)
   const [editingQuickReply, setEditingQuickReply] = useState(null)
   const [quickReplyForm, setQuickReplyForm] = useState({ shortcut: '', message: '' })
+
+  // Phone Registration state
+  const [showOtpModal, setShowOtpModal] = useState(false)
+  const [otpCode, setOtpCode] = useState('')
+  const [otpMethod, setOtpMethod] = useState('SMS')
+  const [requestingOtp, setRequestingOtp] = useState(false)
+  const [verifyingOtp, setVerifyingOtp] = useState(false)
+  const [registeringPhone, setRegisteringPhone] = useState(false)
+
+  // Business Profile state
+  const [showProfileModal, setShowProfileModal] = useState(false)
+  const [loadingProfile, setLoadingProfile] = useState(false)
+  const [savingProfile, setSavingProfile] = useState(false)
+  const [businessCategories, setBusinessCategories] = useState([])
+  const [businessProfile, setBusinessProfile] = useState({
+    about: '',
+    address: '',
+    description: '',
+    email: '',
+    websites: [''],
+    vertical: 'UNDEFINED',
+  })
+  const [displayNameForm, setDisplayNameForm] = useState('')
+  const [showDisplayNameModal, setShowDisplayNameModal] = useState(false)
+  const [updatingDisplayName, setUpdatingDisplayName] = useState(false)
 
   const tabs = [
     { key: 'connection', label: 'Connection', icon: Link },
@@ -401,6 +435,173 @@ function WhatsAppPage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  // ============================================
+  // Phone Registration Handlers
+  // ============================================
+
+  // Request OTP code
+  const handleRequestOtp = async () => {
+    try {
+      setRequestingOtp(true)
+      const response = await whatsappService.requestVerificationCode(
+        user?.wh_account_id,
+        otpMethod
+      )
+
+      if (response.status === 1) {
+        toast.success(response.message || `Verification code sent via ${otpMethod}`)
+        setShowOtpModal(true)
+      } else {
+        toast.error(response.message || 'Failed to send verification code')
+      }
+    } catch (error) {
+      toast.error('Failed to request verification code')
+    } finally {
+      setRequestingOtp(false)
+    }
+  }
+
+  // Verify OTP code
+  const handleVerifyOtp = async () => {
+    if (!otpCode || otpCode.length < 6) {
+      toast.error('Please enter a valid 6-digit code')
+      return
+    }
+
+    try {
+      setVerifyingOtp(true)
+      const response = await whatsappService.verifyCode(user?.wh_account_id, otpCode)
+
+      if (response.status === 1) {
+        toast.success('Phone number verified successfully!')
+        setShowOtpModal(false)
+        setOtpCode('')
+        // Refresh phone status
+        loadPhoneStatus()
+      } else {
+        toast.error(response.message || 'Invalid verification code')
+      }
+    } catch (error) {
+      toast.error('Failed to verify code')
+    } finally {
+      setVerifyingOtp(false)
+    }
+  }
+
+  // Register phone with WhatsApp
+  const handleRegisterPhone = async () => {
+    try {
+      setRegisteringPhone(true)
+      const response = await whatsappService.registerPhone(user?.wh_account_id)
+
+      if (response.status === 1) {
+        toast.success('Phone number registered with WhatsApp!')
+        loadPhoneStatus()
+      } else {
+        toast.error(response.message || 'Failed to register phone')
+      }
+    } catch (error) {
+      toast.error('Failed to register phone')
+    } finally {
+      setRegisteringPhone(false)
+    }
+  }
+
+  // ============================================
+  // Business Profile Handlers
+  // ============================================
+
+  // Load business profile
+  const loadBusinessProfile = async () => {
+    try {
+      setLoadingProfile(true)
+
+      // Load categories first
+      const catResponse = await whatsappService.getBusinessCategories()
+      if (catResponse.status === 1) {
+        setBusinessCategories(catResponse.data?.categories || [])
+      }
+
+      // Load profile
+      const profileResponse = await whatsappService.getBusinessProfile(user?.wh_account_id)
+      if (profileResponse.status === 1 && profileResponse.data) {
+        setBusinessProfile({
+          about: profileResponse.data.about || '',
+          address: profileResponse.data.address || '',
+          description: profileResponse.data.description || '',
+          email: profileResponse.data.email || '',
+          websites: profileResponse.data.websites?.length > 0 ? profileResponse.data.websites : [''],
+          vertical: profileResponse.data.vertical || 'UNDEFINED',
+        })
+      }
+    } catch (error) {
+      console.error('Failed to load business profile:', error)
+    } finally {
+      setLoadingProfile(false)
+    }
+  }
+
+  // Save business profile
+  const handleSaveProfile = async () => {
+    try {
+      setSavingProfile(true)
+
+      // Filter out empty websites
+      const websites = businessProfile.websites.filter(w => w.trim() !== '')
+
+      const response = await whatsappService.updateBusinessProfile(user?.wh_account_id, {
+        about: businessProfile.about,
+        address: businessProfile.address,
+        description: businessProfile.description,
+        email: businessProfile.email,
+        websites: websites.length > 0 ? websites : undefined,
+        vertical: businessProfile.vertical !== 'UNDEFINED' ? businessProfile.vertical : undefined,
+      })
+
+      if (response.status === 1) {
+        toast.success('Business profile updated successfully!')
+        setShowProfileModal(false)
+      } else {
+        toast.error(response.message || 'Failed to update profile')
+      }
+    } catch (error) {
+      toast.error('Failed to update profile')
+    } finally {
+      setSavingProfile(false)
+    }
+  }
+
+  // Update display name
+  const handleUpdateDisplayName = async () => {
+    if (!displayNameForm || displayNameForm.length < 3) {
+      toast.error('Display name must be at least 3 characters')
+      return
+    }
+
+    try {
+      setUpdatingDisplayName(true)
+      const response = await whatsappService.updateDisplayName(user?.wh_account_id, displayNameForm)
+
+      if (response.status === 1) {
+        toast.success(response.message || 'Display name update submitted for review')
+        setShowDisplayNameModal(false)
+        setDisplayNameForm('')
+      } else {
+        toast.error(response.message || 'Failed to update display name')
+      }
+    } catch (error) {
+      toast.error('Failed to update display name')
+    } finally {
+      setUpdatingDisplayName(false)
+    }
+  }
+
+  // Open profile modal
+  const openProfileModal = () => {
+    loadBusinessProfile()
+    setShowProfileModal(true)
   }
 
   // Sync products to catalog
@@ -981,6 +1182,93 @@ function WhatsAppPage() {
                             </p>
                           </div>
                         )}
+
+                        {/* Phone Registration Actions - Show when status is pending */}
+                        {phoneStatus && phoneStatus.registration_status === 'PENDING' && (
+                          <div className="mt-4 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                            <h4 className="font-medium text-amber-800 dark:text-amber-200 mb-2 flex items-center gap-2">
+                              <AlertCircle className="h-4 w-4" />
+                              Complete Registration
+                            </h4>
+                            <p className="text-sm text-amber-700 dark:text-amber-300 mb-4">
+                              Your phone number is pending registration. You can try to verify it manually or wait for Meta to complete the process.
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              <div className="flex items-center gap-2">
+                                <select
+                                  value={otpMethod}
+                                  onChange={(e) => setOtpMethod(e.target.value)}
+                                  className="px-3 py-2 text-sm border rounded-lg bg-white dark:bg-dark-card dark:border-dark-border dark:text-dark-text"
+                                >
+                                  <option value="SMS">SMS</option>
+                                  <option value="VOICE">Voice Call</option>
+                                </select>
+                                <Button
+                                  size="sm"
+                                  onClick={handleRequestOtp}
+                                  isLoading={requestingOtp}
+                                >
+                                  <KeyRound className="h-4 w-4" />
+                                  Request Code
+                                </Button>
+                              </div>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={handleRegisterPhone}
+                                isLoading={registeringPhone}
+                              >
+                                <Smartphone className="h-4 w-4" />
+                                Try Register
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Business Profile Section */}
+                      <div className="p-4 border rounded-lg dark:border-dark-border">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center gap-2">
+                            <Building2 className="h-5 w-5 text-gray-500" />
+                            <span className="font-medium text-gray-900 dark:text-dark-text">
+                              Business Profile
+                            </span>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setDisplayNameForm(phoneStatus?.verified_name || '')
+                                setShowDisplayNameModal(true)
+                              }}
+                            >
+                              <Edit2 className="h-4 w-4" />
+                              Display Name
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={openProfileModal}
+                            >
+                              <Settings className="h-4 w-4" />
+                              Edit Profile
+                            </Button>
+                          </div>
+                        </div>
+
+                        <div className="text-sm text-gray-500 dark:text-dark-muted">
+                          <p>Update your WhatsApp Business profile including description, category, email, address, and websites.</p>
+                          {phoneStatus?.verified_name && (
+                            <p className="mt-2">
+                              <span className="font-medium text-gray-700 dark:text-dark-text">Display Name:</span>{' '}
+                              {phoneStatus.verified_name}
+                              {phoneStatus.name_status === 'PENDING' && (
+                                <Badge variant="warning" className="ml-2">Pending Review</Badge>
+                              )}
+                            </p>
+                          )}
+                        </div>
                       </div>
 
                       {/* Catalog Management Section */}
@@ -1600,6 +1888,185 @@ function WhatsAppPage() {
           <div className="flex justify-end gap-3 pt-4">
             <Button variant="outline" onClick={() => setShowQuickReplyModal(false)}>Cancel</Button>
             <Button onClick={handleSaveQuickReply} isLoading={saving}>{editingQuickReply ? 'Update' : 'Add'}</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* OTP Verification Modal */}
+      <Modal isOpen={showOtpModal} onClose={() => setShowOtpModal(false)} title="Enter Verification Code">
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600 dark:text-dark-muted">
+            Enter the 6-digit verification code sent to your phone number via {otpMethod}.
+          </p>
+          <Input
+            label="Verification Code"
+            placeholder="Enter 6-digit code"
+            value={otpCode}
+            onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            maxLength={6}
+          />
+          <div className="flex justify-between items-center pt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRequestOtp}
+              isLoading={requestingOtp}
+              disabled={requestingOtp}
+            >
+              Resend Code
+            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setShowOtpModal(false)}>Cancel</Button>
+              <Button onClick={handleVerifyOtp} isLoading={verifyingOtp} disabled={otpCode.length < 6}>
+                <CheckCircle className="h-4 w-4" />
+                Verify
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Business Profile Modal */}
+      <Modal isOpen={showProfileModal} onClose={() => setShowProfileModal(false)} title="Edit Business Profile" size="lg">
+        {loadingProfile ? (
+          <div className="flex justify-center py-8">
+            <Spinner size="lg" />
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-dark-text mb-1">
+                Business Category
+              </label>
+              <select
+                value={businessProfile.vertical}
+                onChange={(e) => setBusinessProfile(prev => ({ ...prev, vertical: e.target.value }))}
+                className="w-full px-3 py-2 border rounded-lg dark:bg-dark-bg dark:border-dark-border dark:text-dark-text"
+              >
+                {businessCategories.map(cat => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <Input
+              label="About (Short Description)"
+              placeholder="Brief description of your business (max 139 chars)"
+              value={businessProfile.about}
+              onChange={(e) => setBusinessProfile(prev => ({ ...prev, about: e.target.value.slice(0, 139) }))}
+              maxLength={139}
+            />
+            <p className="text-xs text-gray-500 -mt-2">{businessProfile.about.length}/139 characters</p>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-dark-text mb-1">
+                Description
+              </label>
+              <textarea
+                className="w-full px-3 py-2 border rounded-lg dark:bg-dark-bg dark:border-dark-border dark:text-dark-text"
+                rows={3}
+                placeholder="Detailed description of your business (max 512 chars)"
+                value={businessProfile.description}
+                onChange={(e) => setBusinessProfile(prev => ({ ...prev, description: e.target.value.slice(0, 512) }))}
+                maxLength={512}
+              />
+              <p className="text-xs text-gray-500 mt-1">{businessProfile.description.length}/512 characters</p>
+            </div>
+
+            <Input
+              label="Business Email"
+              type="email"
+              placeholder="contact@yourbusiness.com"
+              value={businessProfile.email}
+              onChange={(e) => setBusinessProfile(prev => ({ ...prev, email: e.target.value }))}
+            />
+
+            <Input
+              label="Business Address"
+              placeholder="123 Main Street, City, State, Country"
+              value={businessProfile.address}
+              onChange={(e) => setBusinessProfile(prev => ({ ...prev, address: e.target.value.slice(0, 256) }))}
+              maxLength={256}
+            />
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-dark-text mb-1">
+                Website(s)
+              </label>
+              {businessProfile.websites.map((website, idx) => (
+                <div key={idx} className="flex gap-2 mb-2">
+                  <Input
+                    placeholder="https://www.yourbusiness.com"
+                    value={website}
+                    onChange={(e) => {
+                      const newWebsites = [...businessProfile.websites]
+                      newWebsites[idx] = e.target.value
+                      setBusinessProfile(prev => ({ ...prev, websites: newWebsites }))
+                    }}
+                  />
+                  {idx === 0 && businessProfile.websites.length < 2 && (
+                    <Button
+                      variant="outline"
+                      onClick={() => setBusinessProfile(prev => ({ ...prev, websites: [...prev.websites, ''] }))}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {idx === 1 && (
+                    <Button
+                      variant="outline"
+                      onClick={() => setBusinessProfile(prev => ({ ...prev, websites: [prev.websites[0]] }))}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+              <p className="text-xs text-gray-500">Maximum 2 websites allowed</p>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4 border-t dark:border-dark-border">
+              <Button variant="outline" onClick={() => setShowProfileModal(false)}>Cancel</Button>
+              <Button onClick={handleSaveProfile} isLoading={savingProfile}>
+                <Save className="h-4 w-4" />
+                Save Profile
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Display Name Modal */}
+      <Modal isOpen={showDisplayNameModal} onClose={() => setShowDisplayNameModal(false)} title="Update Display Name">
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600 dark:text-dark-muted">
+            Update your WhatsApp Business display name. This requires approval from Meta and may take up to 48 hours.
+          </p>
+          <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+            <p className="text-sm text-amber-700 dark:text-amber-300">
+              <strong>Naming Guidelines:</strong>
+            </p>
+            <ul className="text-xs text-amber-600 dark:text-amber-400 mt-1 list-disc list-inside">
+              <li>Must be 3-50 characters</li>
+              <li>Cannot start or end with special characters (_, -, ., space)</li>
+              <li>Should represent your actual business name</li>
+              <li>No generic names like "Test Business"</li>
+            </ul>
+          </div>
+          <Input
+            label="Display Name"
+            placeholder="Your Business Name"
+            value={displayNameForm}
+            onChange={(e) => setDisplayNameForm(e.target.value)}
+            maxLength={50}
+          />
+          <p className="text-xs text-gray-500 -mt-2">{displayNameForm.length}/50 characters</p>
+          <div className="flex justify-end gap-3 pt-4">
+            <Button variant="outline" onClick={() => setShowDisplayNameModal(false)}>Cancel</Button>
+            <Button onClick={handleUpdateDisplayName} isLoading={updatingDisplayName} disabled={displayNameForm.length < 3}>
+              <Send className="h-4 w-4" />
+              Submit for Review
+            </Button>
           </div>
         </div>
       </Modal>

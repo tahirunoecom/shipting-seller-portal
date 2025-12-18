@@ -19,7 +19,23 @@ Route::middleware(['auth:sanctum'])->prefix('seller/whatsapp')->group(function (
     Route::post('/session-info', [WhatsAppController::class, 'saveSessionInfo']);
     Route::post('/disconnect', [WhatsAppController::class, 'disconnect']);
 
-    // Catalog sync
+    // Phone registration & verification (100% self-service)
+    Route::post('/request-code', [WhatsAppController::class, 'requestVerificationCode']);
+    Route::post('/verify-code', [WhatsAppController::class, 'verifyCode']);
+    Route::post('/register-phone', [WhatsAppController::class, 'registerPhone']);
+    Route::post('/phone-status', [WhatsAppController::class, 'getPhoneStatus']);
+
+    // Business profile management
+    Route::post('/get-profile', [WhatsAppController::class, 'getBusinessProfile']);
+    Route::post('/update-profile', [WhatsAppController::class, 'updateBusinessProfile']);
+    Route::post('/upload-profile-picture', [WhatsAppController::class, 'uploadProfilePicture']);
+    Route::post('/get-categories', [WhatsAppController::class, 'getBusinessCategories']);
+    Route::post('/update-display-name', [WhatsAppController::class, 'updateDisplayName']);
+
+    // Catalog management
+    Route::post('/create-catalog', [WhatsAppController::class, 'createCatalog']);
+    Route::post('/list-catalogs', [WhatsAppController::class, 'listCatalogs']);
+    Route::post('/update-catalog', [WhatsAppController::class, 'updateCatalog']);
     Route::post('/sync-catalog', [WhatsAppController::class, 'syncCatalog']);
 
     // Bot settings
