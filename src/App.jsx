@@ -1,32 +1,38 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
+import { Suspense, lazy } from 'react'
 import { Layout, AuthLayout } from '@/components/layout'
 
-// Auth pages
-import LoginPage from '@/pages/auth/LoginPage'
-import RegisterPage from '@/pages/auth/RegisterPage'
-import OTPVerificationPage from '@/pages/auth/OTPVerificationPage'
-import ServiceTypeSelectionPage from '@/pages/auth/ServiceTypeSelectionPage'
-import VerificationPage from '@/pages/auth/VerificationPage'
-import PendingApprovalPage from '@/pages/auth/PendingApprovalPage'
-import ModeSelectionPage from '@/pages/auth/ModeSelectionPage'
+// Loading fallback component
+const PageLoader = () => (
+  <div className="flex items-center justify-center min-h-[400px]">
+    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+  </div>
+)
 
-// Main pages (Seller)
-import DashboardPage from '@/pages/dashboard/DashboardPage'
-import ProductsPage from '@/pages/products/ProductsPage'
-import OrdersPage from '@/pages/orders/OrdersPage'
-import OrderFulfillmentBoardPage from '@/pages/orders/OrderFulfillmentBoardPage'
-import SettingsPage from '@/pages/settings/SettingsPage'
-import WhatsAppPage from '@/pages/whatsapp/WhatsAppPage'
+// Auth pages - Lazy loaded
+const LoginPage = lazy(() => import('@/pages/auth/LoginPage'))
+const RegisterPage = lazy(() => import('@/pages/auth/RegisterPage'))
+const OTPVerificationPage = lazy(() => import('@/pages/auth/OTPVerificationPage'))
+const ServiceTypeSelectionPage = lazy(() => import('@/pages/auth/ServiceTypeSelectionPage'))
+const VerificationPage = lazy(() => import('@/pages/auth/VerificationPage'))
+const PendingApprovalPage = lazy(() => import('@/pages/auth/PendingApprovalPage'))
+const ModeSelectionPage = lazy(() => import('@/pages/auth/ModeSelectionPage'))
 
-// Driver pages
-import {
-  DriverOrdersPage,
-  DriverOrderDetailPage,
-  DriverDeliveriesPage,
-  DriverEarningsPage,
-  DriverHistoryPage,
-  DriverSettingsPage,
-} from '@/pages/driver'
+// Main pages (Seller) - Lazy loaded
+const DashboardPage = lazy(() => import('@/pages/dashboard/DashboardPage'))
+const ProductsPage = lazy(() => import('@/pages/products/ProductsPage'))
+const OrdersPage = lazy(() => import('@/pages/orders/OrdersPage'))
+const OrderFulfillmentBoardPage = lazy(() => import('@/pages/orders/OrderFulfillmentBoardPage'))
+const SettingsPage = lazy(() => import('@/pages/settings/SettingsPage'))
+const WhatsAppPage = lazy(() => import('@/pages/whatsapp/WhatsAppPage'))
+
+// Driver pages - Lazy loaded
+const DriverOrdersPage = lazy(() => import('@/pages/driver/DriverOrdersPage'))
+const DriverOrderDetailPage = lazy(() => import('@/pages/driver/DriverOrderDetailPage'))
+const DriverDeliveriesPage = lazy(() => import('@/pages/driver/DriverDeliveriesPage'))
+const DriverEarningsPage = lazy(() => import('@/pages/driver/DriverEarningsPage'))
+const DriverHistoryPage = lazy(() => import('@/pages/driver/DriverHistoryPage'))
+const DriverSettingsPage = lazy(() => import('@/pages/driver/DriverSettingsPage'))
 
 // Placeholder pages (to be built)
 const CatalogPage = () => <PlaceholderPage title="Catalog" description="Manage your WhatsApp product catalog" />
@@ -50,50 +56,52 @@ function PlaceholderPage({ title, description }) {
 
 function App() {
   return (
-    <Routes>
-      {/* Auth routes */}
-      <Route element={<AuthLayout />}>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/forgot-password" element={<PlaceholderPage title="Forgot Password" description="Reset your password" />} />
-        <Route path="/verify-email" element={<OTPVerificationPage />} />
-      </Route>
+    <Suspense fallback={<PageLoader />}>
+      <Routes>
+        {/* Auth routes */}
+        <Route element={<AuthLayout />}>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/forgot-password" element={<PlaceholderPage title="Forgot Password" description="Reset your password" />} />
+          <Route path="/verify-email" element={<OTPVerificationPage />} />
+        </Route>
 
-      {/* Onboarding routes (no auth layout) */}
-      <Route path="/select-service-type" element={<ServiceTypeSelectionPage />} />
-      <Route path="/onboarding" element={<VerificationPage />} />
-      <Route path="/onboarding/verification" element={<VerificationPage />} />
-      <Route path="/pending-approval" element={<PendingApprovalPage />} />
+        {/* Onboarding routes (no auth layout) */}
+        <Route path="/select-service-type" element={<ServiceTypeSelectionPage />} />
+        <Route path="/onboarding" element={<VerificationPage />} />
+        <Route path="/onboarding/verification" element={<VerificationPage />} />
+        <Route path="/pending-approval" element={<PendingApprovalPage />} />
 
-      {/* Mode Selection (for users with multiple roles) */}
-      <Route path="/select-mode" element={<ModeSelectionPage />} />
+        {/* Mode Selection (for users with multiple roles) */}
+        <Route path="/select-mode" element={<ModeSelectionPage />} />
 
-      {/* Protected routes - Seller */}
-      <Route element={<Layout />}>
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/products" element={<ProductsPage />} />
-        <Route path="/orders" element={<OrdersPage />} />
-        <Route path="/orders/fulfillment" element={<OrderFulfillmentBoardPage />} />
-        <Route path="/catalog" element={<CatalogPage />} />
-        <Route path="/whatsapp" element={<WhatsAppPage />} />
-        <Route path="/drivers" element={<DriversPage />} />
-        <Route path="/payments" element={<PaymentsPage />} />
-        <Route path="/billing" element={<BillingPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
+        {/* Protected routes - Seller */}
+        <Route element={<Layout />}>
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/products" element={<ProductsPage />} />
+          <Route path="/orders" element={<OrdersPage />} />
+          <Route path="/orders/fulfillment" element={<OrderFulfillmentBoardPage />} />
+          <Route path="/catalog" element={<CatalogPage />} />
+          <Route path="/whatsapp" element={<WhatsAppPage />} />
+          <Route path="/drivers" element={<DriversPage />} />
+          <Route path="/payments" element={<PaymentsPage />} />
+          <Route path="/billing" element={<BillingPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
 
-        {/* Driver routes */}
-        <Route path="/driver/orders" element={<DriverOrdersPage />} />
-        <Route path="/driver/order/:orderId" element={<DriverOrderDetailPage />} />
-        <Route path="/driver/deliveries" element={<DriverDeliveriesPage />} />
-        <Route path="/driver/earnings" element={<DriverEarningsPage />} />
-        <Route path="/driver/history" element={<DriverHistoryPage />} />
-        <Route path="/driver/settings" element={<DriverSettingsPage />} />
-      </Route>
+          {/* Driver routes */}
+          <Route path="/driver/orders" element={<DriverOrdersPage />} />
+          <Route path="/driver/order/:orderId" element={<DriverOrderDetailPage />} />
+          <Route path="/driver/deliveries" element={<DriverDeliveriesPage />} />
+          <Route path="/driver/earnings" element={<DriverEarningsPage />} />
+          <Route path="/driver/history" element={<DriverHistoryPage />} />
+          <Route path="/driver/settings" element={<DriverSettingsPage />} />
+        </Route>
 
-      {/* Default redirect */}
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
-    </Routes>
+        {/* Default redirect */}
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+    </Suspense>
   )
 }
 
