@@ -2154,18 +2154,60 @@ class WhatsAppController extends Controller
                 }
 
                 // Method 2: Search through all accessible WABAs and match by phone_number_id
+                // For System User tokens, we need to use the business ID directly
                 Log::info("Trying to find WABA by searching all accessible WABAs for phone_number_id: {$config->phone_number_id}");
 
+                $wabasToSearch = [];
+
+                // First try /me/whatsapp_business_accounts (works for regular user tokens)
                 $sharedWabaResponse = Http::withToken($accessToken)
                     ->get('https://graph.facebook.com/v21.0/me/whatsapp_business_accounts', [
                         'fields' => 'id,name,owner_business_info'
                     ]);
 
                 if ($sharedWabaResponse->successful()) {
-                    $sharedWabas = $sharedWabaResponse->json()['data'] ?? [];
-                    Log::info("Found " . count($sharedWabas) . " accessible WABAs to search");
+                    $wabasToSearch = $sharedWabaResponse->json()['data'] ?? [];
+                    Log::info("Found " . count($wabasToSearch) . " accessible WABAs via /me endpoint");
+                } else {
+                    $error = $sharedWabaResponse->json()['error']['message'] ?? 'Unknown error';
+                    Log::warning("Cannot get WABAs via /me endpoint (likely System User token): {$error}");
+                }
 
-                    foreach ($sharedWabas as $waba) {
+                // If no WABAs found, try using the configured business ID directly (for System User tokens)
+                if (empty($wabasToSearch)) {
+                    $businessIdToUse = $config->business_id ?? $this->metaBusinessId;
+                    Log::info("Trying to get WABAs from business ID: {$businessIdToUse}");
+
+                    $businessWabaResponse = Http::withToken($accessToken)
+                        ->get("https://graph.facebook.com/v21.0/{$businessIdToUse}/owned_whatsapp_business_accounts", [
+                            'fields' => 'id,name'
+                        ]);
+
+                    if ($businessWabaResponse->successful()) {
+                        $wabasToSearch = $businessWabaResponse->json()['data'] ?? [];
+                        Log::info("Found " . count($wabasToSearch) . " WABAs from business {$businessIdToUse}");
+                    } else {
+                        $error = $businessWabaResponse->json()['error']['message'] ?? 'Unknown error';
+                        Log::warning("Cannot get owned WABAs from business: {$error}");
+
+                        // Try client_whatsapp_business_accounts (for shared WABAs)
+                        $clientWabaResponse = Http::withToken($accessToken)
+                            ->get("https://graph.facebook.com/v21.0/{$businessIdToUse}/client_whatsapp_business_accounts", [
+                                'fields' => 'id,name'
+                            ]);
+
+                        if ($clientWabaResponse->successful()) {
+                            $wabasToSearch = $clientWabaResponse->json()['data'] ?? [];
+                            Log::info("Found " . count($wabasToSearch) . " client WABAs from business {$businessIdToUse}");
+                        }
+                    }
+                }
+
+                // Search through found WABAs for matching phone_number_id
+                if (!empty($wabasToSearch)) {
+                    Log::info("Searching through " . count($wabasToSearch) . " WABAs for phone_number_id: {$config->phone_number_id}");
+
+                    foreach ($wabasToSearch as $waba) {
                         $wabaId = $waba['id'];
 
                         // Get phone numbers for this WABA
@@ -2185,7 +2227,7 @@ class WhatsAppController extends Controller
                                     $ownerBusiness = $waba['owner_business_info'] ?? [];
                                     $config->update([
                                         'waba_id' => $wabaId,
-                                        'business_id' => $ownerBusiness['id'] ?? $config->business_id,
+                                        'business_id' => $ownerBusiness['id'] ?? $config->business_id ?? $this->metaBusinessId,
                                         'business_name' => $ownerBusiness['name'] ?? $waba['name'] ?? $config->business_name,
                                         'display_phone_number' => $phone['display_phone_number'] ?? $config->display_phone_number,
                                         'verified_name' => $phone['verified_name'] ?? $config->verified_name,
@@ -2202,12 +2244,14 @@ class WhatsAppController extends Controller
                                     return true;
                                 }
                             }
+                        } else {
+                            $error = $phonesResponse->json()['error']['message'] ?? 'Unknown error';
+                            Log::warning("Cannot get phone numbers for WABA {$wabaId}: {$error}");
                         }
                     }
-                    Log::warning("Could not find phone_number_id {$config->phone_number_id} in any accessible WABA");
+                    Log::warning("Could not find phone_number_id {$config->phone_number_id} in any of the " . count($wabasToSearch) . " WABAs");
                 } else {
-                    $error = $sharedWabaResponse->json()['error']['message'] ?? 'Unknown error';
-                    Log::error("Failed to get shared WABAs: {$error}");
+                    Log::warning("No WABAs found to search for phone_number_id");
                 }
             }
 
