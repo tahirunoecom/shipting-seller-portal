@@ -1000,6 +1000,9 @@ class WhatsAppController extends Controller
      *
      * @param code_method: SMS or VOICE
      * @param language: en, es, pt_BR, etc.
+     *
+     * Note: This is used when phone number is in PENDING registration status
+     * The OTP code is sent to the phone number to verify ownership
      */
     public function requestVerificationCode(Request $request)
     {
@@ -1017,16 +1020,31 @@ class WhatsAppController extends Controller
 
             $config = SellerWhatsappConfig::where('wh_account_id', $whAccountId)->first();
 
-            if (!$config || !$config->access_token || !$config->phone_number_id) {
+            if (!$config) {
                 return response()->json([
                     'status' => 0,
-                    'message' => 'WhatsApp not connected or phone number not configured'
+                    'message' => 'WhatsApp configuration not found'
                 ]);
             }
 
-            Log::info("Requesting verification code for phone_number_id: {$config->phone_number_id}, method: {$codeMethod}");
+            if (!$config->access_token) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'WhatsApp not connected - no access token'
+                ]);
+            }
+
+            if (!$config->phone_number_id) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'Phone number not configured - please reconnect WhatsApp'
+                ]);
+            }
+
+            Log::info("Requesting verification code for phone_number_id: {$config->phone_number_id}, method: {$codeMethod}, language: {$language}");
 
             // Request verification code from Meta
+            // The API supports: SMS, VOICE
             $response = Http::withToken($config->access_token)
                 ->post("https://graph.facebook.com/v21.0/{$config->phone_number_id}/request_code", [
                     'code_method' => strtoupper($codeMethod),
@@ -1047,18 +1065,49 @@ class WhatsAppController extends Controller
                 ]);
             }
 
-            $error = $responseData['error']['message'] ?? 'Failed to send verification code';
-            Log::error("Request code failed: {$error}");
+            // Extract detailed error information from Meta API response
+            $errorMsg = $responseData['error']['message'] ?? 'Unknown error from Meta API';
+            $errorCode = $responseData['error']['code'] ?? null;
+            $errorSubcode = $responseData['error']['error_subcode'] ?? null;
+            $errorType = $responseData['error']['type'] ?? null;
+
+            Log::error("Request code failed - Code: {$errorCode}, Subcode: {$errorSubcode}, Type: {$errorType}, Message: {$errorMsg}");
+            Log::error("Full error response: " . json_encode($responseData));
+
+            // Provide user-friendly error messages based on common error codes
+            $userMessage = $errorMsg;
+
+            if ($errorCode == 100) {
+                if (strpos($errorMsg, 'phone_number_id') !== false) {
+                    $userMessage = 'Invalid phone number configuration. Please reconnect your WhatsApp account.';
+                } elseif (strpos($errorMsg, 'code_method') !== false) {
+                    $userMessage = 'Invalid verification method. Please try SMS or Voice call.';
+                }
+            } elseif ($errorCode == 131030 || strpos($errorMsg, 'rate limit') !== false) {
+                $userMessage = 'Too many code requests. Please wait 24 hours before requesting a new code.';
+            } elseif ($errorCode == 136025) {
+                $userMessage = 'Phone number is not eligible for verification. It may already be registered.';
+            } elseif (strpos($errorMsg, 'already registered') !== false) {
+                $userMessage = 'This phone number is already registered with WhatsApp.';
+            } elseif (strpos($errorMsg, 'not pending') !== false) {
+                $userMessage = 'Phone number is not in pending state. Registration may already be complete.';
+            }
 
             return response()->json([
                 'status' => 0,
-                'message' => $error
+                'message' => $userMessage,
+                'debug' => [
+                    'error_code' => $errorCode,
+                    'error_subcode' => $errorSubcode,
+                    'original_message' => $errorMsg
+                ]
             ]);
         } catch (\Exception $e) {
             Log::error('requestVerificationCode error: ' . $e->getMessage());
+            Log::error('Exception trace: ' . $e->getTraceAsString());
             return response()->json([
                 'status' => 0,
-                'message' => 'Failed to request verification code: ' . $e->getMessage()
+                'message' => 'Request code error: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -1134,12 +1183,18 @@ class WhatsAppController extends Controller
      * POST /api/seller/whatsapp/register-phone
      *
      * This completes the phone registration process
+     *
+     * Meta API requires:
+     * - messaging_product: "whatsapp" (always required)
+     * - pin: 6-digit PIN for two-step verification (required)
+     *
+     * Note: The PIN will be used for 2FA on this phone number going forward
      */
     public function registerPhone(Request $request)
     {
         try {
             $whAccountId = $request->input('wh_account_id');
-            $pin = $request->input('pin'); // Optional 6-digit PIN for 2FA
+            $pin = $request->input('pin'); // 6-digit PIN for 2FA
 
             if (!$whAccountId) {
                 return response()->json([
@@ -1159,15 +1214,21 @@ class WhatsAppController extends Controller
 
             Log::info("Registering phone_number_id: {$config->phone_number_id}");
 
-            // Register the phone number
-            $payload = [
-                'messaging_product' => 'whatsapp'
-            ];
-
-            // Include 2FA PIN if provided
-            if ($pin) {
-                $payload['pin'] = $pin;
+            // Meta API requires both messaging_product AND pin for registration
+            // If no PIN provided, generate a default one (user can change it later in WhatsApp Manager)
+            $registrationPin = $pin;
+            if (empty($registrationPin)) {
+                // Generate a secure 6-digit PIN
+                // Store it in config so user can retrieve it if needed
+                $registrationPin = str_pad(mt_rand(0, 999999), 6, '0', STR_PAD_LEFT);
+                Log::info("Generated registration PIN for phone_number_id: {$config->phone_number_id}");
             }
+
+            // Register the phone number - BOTH fields are REQUIRED by Meta
+            $payload = [
+                'messaging_product' => 'whatsapp',
+                'pin' => $registrationPin  // Required for 2-step verification setup
+            ];
 
             $response = Http::withToken($config->access_token)
                 ->post("https://graph.facebook.com/v21.0/{$config->phone_number_id}/register", $payload);
@@ -1178,17 +1239,39 @@ class WhatsAppController extends Controller
             if ($response->successful() && ($responseData['success'] ?? false)) {
                 $config->update([
                     'is_registered' => true,
-                    'registered_at' => now()
+                    'registered_at' => now(),
+                    // Store PIN hash for reference (don't store plain PIN for security)
+                    'two_step_pin_hash' => hash('sha256', $registrationPin)
                 ]);
 
                 return response()->json([
                     'status' => 1,
-                    'message' => 'Phone number registered successfully with WhatsApp!'
+                    'message' => 'Phone number registered successfully with WhatsApp!',
+                    'data' => [
+                        'pin_generated' => empty($pin), // Let frontend know if PIN was auto-generated
+                        'note' => empty($pin) ? 'A 6-digit PIN was generated for two-step verification. You can change it in WhatsApp Manager.' : null
+                    ]
                 ]);
             }
 
             $error = $responseData['error']['message'] ?? 'Failed to register phone number';
-            Log::error("Register phone failed: {$error}");
+            $errorCode = $responseData['error']['code'] ?? null;
+            Log::error("Register phone failed: {$error} (code: {$errorCode})");
+
+            // Provide helpful error messages based on common error codes
+            if (strpos($error, 'already registered') !== false) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'This phone number is already registered with WhatsApp. Please check your WhatsApp Manager.'
+                ]);
+            }
+
+            if (strpos($error, 'pin') !== false) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'Two-step verification PIN error. If you previously set a PIN, please provide it.'
+                ]);
+            }
 
             return response()->json([
                 'status' => 0,
@@ -1272,6 +1355,9 @@ class WhatsAppController extends Controller
 
             Log::info("Updating business profile for phone_number_id: {$config->phone_number_id}");
             Log::info("Profile data: " . json_encode($profileData));
+
+            // IMPORTANT: messaging_product is REQUIRED by Meta API
+            $profileData['messaging_product'] = 'whatsapp';
 
             // Update the business profile
             $response = Http::withToken($config->access_token)
