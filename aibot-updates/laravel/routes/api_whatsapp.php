@@ -38,6 +38,10 @@ Route::middleware(['auth:sanctum'])->prefix('seller/whatsapp')->group(function (
     Route::post('/update-catalog', [WhatsAppController::class, 'updateCatalog']);
     Route::post('/sync-catalog', [WhatsAppController::class, 'syncCatalog']);
 
+    // Webhook configuration (auto-configured on connection, but can be done manually)
+    Route::post('/configure-webhook', [WhatsAppController::class, 'configureWebhook']);
+    Route::post('/webhook-status', [WhatsAppController::class, 'getWebhookStatus']);
+
     // Bot settings
     Route::post('/bot-settings', [WhatsAppController::class, 'updateBotSettings']);
     Route::post('/bot-settings/get', [WhatsAppController::class, 'getBotSettings']);
