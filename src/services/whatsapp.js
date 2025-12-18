@@ -89,6 +89,88 @@ export const whatsappService = {
   },
 
   // ============================================
+  // PHONE REGISTRATION & VERIFICATION (100% Self-Service)
+  // ============================================
+
+  // Request verification code (OTP) via SMS or Voice call
+  async requestVerificationCode(wh_account_id, code_method = 'SMS', language = 'en') {
+    const response = await api.post('/seller/whatsapp/request-code', {
+      wh_account_id,
+      code_method,
+      language,
+    })
+    return response.data
+  },
+
+  // Verify OTP code
+  async verifyCode(wh_account_id, code) {
+    const response = await api.post('/seller/whatsapp/verify-code', {
+      wh_account_id,
+      code,
+    })
+    return response.data
+  },
+
+  // Register phone number with WhatsApp
+  async registerPhone(wh_account_id, pin = null) {
+    const response = await api.post('/seller/whatsapp/register-phone', {
+      wh_account_id,
+      pin,
+    })
+    return response.data
+  },
+
+  // ============================================
+  // BUSINESS PROFILE MANAGEMENT
+  // ============================================
+
+  // Get current business profile
+  async getBusinessProfile(wh_account_id) {
+    const response = await api.post('/seller/whatsapp/get-profile', {
+      wh_account_id,
+    })
+    return response.data
+  },
+
+  // Update business profile (about, address, description, email, websites, vertical)
+  async updateBusinessProfile(wh_account_id, profileData) {
+    const response = await api.post('/seller/whatsapp/update-profile', {
+      wh_account_id,
+      ...profileData,
+    })
+    return response.data
+  },
+
+  // Upload profile picture (returns handle to use with updateBusinessProfile)
+  async uploadProfilePicture(wh_account_id, file) {
+    const formData = new FormData()
+    formData.append('wh_account_id', wh_account_id)
+    formData.append('file', file)
+
+    const response = await api.post('/seller/whatsapp/upload-profile-picture', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    })
+    return response.data
+  },
+
+  // Get available business categories
+  async getBusinessCategories() {
+    const response = await api.post('/seller/whatsapp/get-categories', {})
+    return response.data
+  },
+
+  // Update display name (triggers Meta review)
+  async updateDisplayName(wh_account_id, display_name) {
+    const response = await api.post('/seller/whatsapp/update-display-name', {
+      wh_account_id,
+      display_name,
+    })
+    return response.data
+  },
+
+  // ============================================
   // BOT SETTINGS ENDPOINTS
   // ============================================
 
