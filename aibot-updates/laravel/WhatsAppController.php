@@ -1710,6 +1710,10 @@ class WhatsAppController extends Controller
      * Get phone number status from Meta API
      * POST /api/seller/whatsapp/phone-status
      *
+     * AUTOMATIC DATA FETCH:
+     * If waba_id or phone_number_id is missing but access_token exists,
+     * this will automatically fetch and populate all missing data from Meta API.
+     *
      * Returns: display_phone_number, verified_name, quality_rating, status
      * Status can be: PENDING, CONNECTED, DISCONNECTED, etc.
      */
@@ -1734,10 +1738,28 @@ class WhatsAppController extends Controller
                 ]);
             }
 
+            // AUTO-FETCH: If missing waba_id or phone_number_id, fetch from Meta API
+            $dataFetched = false;
+            if (!$config->waba_id || !$config->phone_number_id) {
+                Log::info("Auto-fetching missing WhatsApp data for wh_account_id: {$whAccountId}");
+                $dataFetched = $this->autoFetchWhatsAppData($config);
+
+                if ($dataFetched) {
+                    $config->refresh(); // Reload config with new data
+                    Log::info("Auto-fetch successful. WABA: {$config->waba_id}, Phone: {$config->phone_number_id}");
+                }
+            }
+
+            // Still no phone_number_id after auto-fetch
             if (!$config->phone_number_id) {
                 return response()->json([
                     'status' => 0,
-                    'message' => 'No phone number ID configured'
+                    'message' => 'No phone number found. Please reconnect your WhatsApp Business account.',
+                    'data' => [
+                        'waba_id' => $config->waba_id,
+                        'auto_fetch_attempted' => $dataFetched,
+                        'hint' => 'The access token may not have permission to access WhatsApp Business accounts, or no phone number is registered.'
+                    ]
                 ]);
             }
 
@@ -1760,11 +1782,13 @@ class WhatsAppController extends Controller
             $phoneData = $response->json();
             Log::info("Phone status data: " . json_encode($phoneData));
 
+            // Update local config with latest data from Meta
+            $config->update([
+                'display_phone_number' => $phoneData['display_phone_number'] ?? $config->display_phone_number,
+                'verified_name' => $phoneData['verified_name'] ?? $config->verified_name,
+            ]);
+
             // Determine the actual status
-            // status: PENDING, CONNECTED, DISCONNECTED, etc. (registration status on WhatsApp)
-            // code_verification_status: VERIFIED, NOT_VERIFIED (API verification)
-            // name_status: APPROVED, PENDING, AVAILABLE_WITHOUT_REVIEW, etc.
-            // account_mode: LIVE, SANDBOX
             $registrationStatus = $phoneData['status'] ?? 'UNKNOWN';
             $codeVerificationStatus = $phoneData['code_verification_status'] ?? 'UNKNOWN';
             $nameStatus = $phoneData['name_status'] ?? 'UNKNOWN';
@@ -1782,7 +1806,6 @@ class WhatsAppController extends Controller
             } elseif ($codeVerificationStatus === 'NOT_VERIFIED') {
                 $overallStatus = 'PENDING_VERIFICATION';
             } elseif ($codeVerificationStatus === 'VERIFIED' && $accountMode === 'LIVE') {
-                // API is verified but we don't know registration status
                 $overallStatus = 'API_READY';
             }
 
@@ -1791,15 +1814,18 @@ class WhatsAppController extends Controller
                 'data' => [
                     'phone_number' => $phoneData['display_phone_number'] ?? $config->display_phone_number,
                     'phone_number_id' => $config->phone_number_id,
+                    'waba_id' => $config->waba_id,
                     'verified_name' => $phoneData['verified_name'] ?? null,
                     'quality_rating' => $phoneData['quality_rating'] ?? null,
-                    'registration_status' => $registrationStatus,  // Actual WhatsApp registration status
+                    'registration_status' => $registrationStatus,
                     'code_verification_status' => $codeVerificationStatus,
                     'name_status' => $nameStatus,
                     'account_mode' => $accountMode,
                     'messaging_limit_tier' => $messagingTier,
                     'overall_status' => $overallStatus,
-                    'status_description' => $this->getStatusDescription($overallStatus, $registrationStatus, $codeVerificationStatus, $nameStatus, $accountMode)
+                    'status_description' => $this->getStatusDescription($overallStatus, $registrationStatus, $codeVerificationStatus, $nameStatus, $accountMode),
+                    'data_auto_fetched' => $dataFetched,
+                    'webhook_configured' => $config->webhook_configured ?? false
                 ]
             ]);
         } catch (\Exception $e) {
@@ -2041,6 +2067,158 @@ class WhatsAppController extends Controller
     // ============================================
     // HELPER METHODS
     // ============================================
+
+    /**
+     * Auto-fetch all missing WhatsApp data using access token
+     * This fetches WABA ID, phone numbers, and configures webhook automatically
+     *
+     * @param SellerWhatsappConfig $config
+     * @return bool - Whether data was successfully fetched
+     */
+    private function autoFetchWhatsAppData($config)
+    {
+        try {
+            $accessToken = $config->access_token;
+
+            if (!$accessToken) {
+                Log::warning("Cannot auto-fetch - no access token");
+                return false;
+            }
+
+            Log::info("Starting auto-fetch for wh_account_id: {$config->wh_account_id}");
+
+            // Step 1: Debug token to get app info and scopes
+            $debugResponse = Http::withToken($accessToken)
+                ->get('https://graph.facebook.com/v21.0/debug_token', [
+                    'input_token' => $accessToken
+                ]);
+
+            if ($debugResponse->successful()) {
+                $debugData = $debugResponse->json()['data'] ?? [];
+                Log::info("Token debug info: " . json_encode($debugData));
+
+                // Get the user ID from token
+                $userId = $debugData['user_id'] ?? null;
+                $scopes = $debugData['scopes'] ?? [];
+                Log::info("Token user_id: {$userId}, scopes: " . implode(', ', $scopes));
+            }
+
+            // Step 2: Try to get shared WABA from the user's businesses
+            // First, get the user's businesses
+            $businessesResponse = Http::withToken($accessToken)
+                ->get('https://graph.facebook.com/v21.0/me/businesses', [
+                    'fields' => 'id,name'
+                ]);
+
+            $wabaId = null;
+            $businessId = null;
+            $businessName = null;
+
+            if ($businessesResponse->successful()) {
+                $businesses = $businessesResponse->json()['data'] ?? [];
+                Log::info("Found " . count($businesses) . " businesses");
+
+                foreach ($businesses as $business) {
+                    $businessId = $business['id'];
+                    $businessName = $business['name'] ?? null;
+
+                    // Get WABAs owned by this business
+                    $wabaResponse = Http::withToken($accessToken)
+                        ->get("https://graph.facebook.com/v21.0/{$businessId}/owned_whatsapp_business_accounts", [
+                            'fields' => 'id,name,currency,timezone_id'
+                        ]);
+
+                    if ($wabaResponse->successful()) {
+                        $wabas = $wabaResponse->json()['data'] ?? [];
+                        Log::info("Business {$businessId} has " . count($wabas) . " WABAs");
+
+                        if (!empty($wabas)) {
+                            $wabaId = $wabas[0]['id'];
+                            $config->update([
+                                'waba_id' => $wabaId,
+                                'business_id' => $businessId,
+                                'business_name' => $businessName ?? $wabas[0]['name'] ?? null
+                            ]);
+                            Log::info("Found WABA: {$wabaId} from business: {$businessId}");
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Step 3: If still no WABA, try the shared WABAs endpoint
+            if (!$wabaId) {
+                $sharedWabaResponse = Http::withToken($accessToken)
+                    ->get('https://graph.facebook.com/v21.0/me/whatsapp_business_accounts', [
+                        'fields' => 'id,name,currency,timezone_id,owner_business_info'
+                    ]);
+
+                if ($sharedWabaResponse->successful()) {
+                    $sharedWabas = $sharedWabaResponse->json()['data'] ?? [];
+                    Log::info("Found " . count($sharedWabas) . " shared WABAs");
+
+                    if (!empty($sharedWabas)) {
+                        $wabaId = $sharedWabas[0]['id'];
+                        $ownerBusiness = $sharedWabas[0]['owner_business_info'] ?? [];
+
+                        $config->update([
+                            'waba_id' => $wabaId,
+                            'business_id' => $ownerBusiness['id'] ?? $businessId,
+                            'business_name' => $ownerBusiness['name'] ?? $sharedWabas[0]['name'] ?? null
+                        ]);
+                        Log::info("Found shared WABA: {$wabaId}");
+                    }
+                }
+            }
+
+            if (!$wabaId) {
+                Log::warning("No WABA found for wh_account_id: {$config->wh_account_id}");
+                return false;
+            }
+
+            // Step 4: Get phone numbers for this WABA
+            $phoneResponse = Http::withToken($accessToken)
+                ->get("https://graph.facebook.com/v21.0/{$wabaId}/phone_numbers", [
+                    'fields' => 'id,display_phone_number,verified_name,quality_rating,status,code_verification_status'
+                ]);
+
+            if ($phoneResponse->successful()) {
+                $phones = $phoneResponse->json()['data'] ?? [];
+                Log::info("Found " . count($phones) . " phone numbers for WABA {$wabaId}");
+
+                if (!empty($phones)) {
+                    $phone = $phones[0];
+                    $config->update([
+                        'phone_number_id' => $phone['id'],
+                        'display_phone_number' => $phone['display_phone_number'] ?? null,
+                        'verified_name' => $phone['verified_name'] ?? null,
+                        'is_connected' => true,
+                        'connection_status' => 'connected',
+                        'connected_at' => now()
+                    ]);
+
+                    Log::info("Phone number configured: {$phone['display_phone_number']} (ID: {$phone['id']})");
+
+                    // Step 5: Auto-configure webhook
+                    $config->refresh();
+                    $webhookSuccess = $this->configureWebhookForWaba($config);
+                    Log::info("Webhook configuration: " . ($webhookSuccess ? 'SUCCESS' : 'FAILED'));
+
+                    return true;
+                }
+            } else {
+                $error = $phoneResponse->json()['error']['message'] ?? 'Unknown error';
+                Log::error("Failed to get phone numbers: {$error}");
+            }
+
+            return false;
+
+        } catch (\Exception $e) {
+            Log::error("autoFetchWhatsAppData error: " . $e->getMessage());
+            Log::error("Stack trace: " . $e->getTraceAsString());
+            return false;
+        }
+    }
 
     /**
      * Fetch WABA info from Meta API
