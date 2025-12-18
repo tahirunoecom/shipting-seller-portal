@@ -2152,9 +2152,66 @@ class WhatsAppController extends Controller
                     $error = $phoneResponse->json()['error']['message'] ?? 'Unknown error';
                     Log::error("Failed to query phone_number_id {$config->phone_number_id}: {$error}");
                 }
+
+                // Method 2: Search through all accessible WABAs and match by phone_number_id
+                Log::info("Trying to find WABA by searching all accessible WABAs for phone_number_id: {$config->phone_number_id}");
+
+                $sharedWabaResponse = Http::withToken($accessToken)
+                    ->get('https://graph.facebook.com/v21.0/me/whatsapp_business_accounts', [
+                        'fields' => 'id,name,owner_business_info'
+                    ]);
+
+                if ($sharedWabaResponse->successful()) {
+                    $sharedWabas = $sharedWabaResponse->json()['data'] ?? [];
+                    Log::info("Found " . count($sharedWabas) . " accessible WABAs to search");
+
+                    foreach ($sharedWabas as $waba) {
+                        $wabaId = $waba['id'];
+
+                        // Get phone numbers for this WABA
+                        $phonesResponse = Http::withToken($accessToken)
+                            ->get("https://graph.facebook.com/v21.0/{$wabaId}/phone_numbers", [
+                                'fields' => 'id,display_phone_number,verified_name'
+                            ]);
+
+                        if ($phonesResponse->successful()) {
+                            $phones = $phonesResponse->json()['data'] ?? [];
+                            Log::info("WABA {$wabaId} has " . count($phones) . " phone numbers");
+
+                            foreach ($phones as $phone) {
+                                if ($phone['id'] === $config->phone_number_id) {
+                                    Log::info("SUCCESS! Found matching WABA {$wabaId} for phone_number_id {$config->phone_number_id}");
+
+                                    $ownerBusiness = $waba['owner_business_info'] ?? [];
+                                    $config->update([
+                                        'waba_id' => $wabaId,
+                                        'business_id' => $ownerBusiness['id'] ?? $config->business_id,
+                                        'business_name' => $ownerBusiness['name'] ?? $waba['name'] ?? $config->business_name,
+                                        'display_phone_number' => $phone['display_phone_number'] ?? $config->display_phone_number,
+                                        'verified_name' => $phone['verified_name'] ?? $config->verified_name,
+                                        'is_connected' => true,
+                                        'connection_status' => 'connected',
+                                        'connected_at' => $config->connected_at ?? now()
+                                    ]);
+
+                                    // Auto-configure webhook
+                                    $config->refresh();
+                                    $webhookSuccess = $this->configureWebhookForWaba($config);
+                                    Log::info("Webhook configuration: " . ($webhookSuccess ? 'SUCCESS' : 'FAILED'));
+
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                    Log::warning("Could not find phone_number_id {$config->phone_number_id} in any accessible WABA");
+                } else {
+                    $error = $sharedWabaResponse->json()['error']['message'] ?? 'Unknown error';
+                    Log::error("Failed to get shared WABAs: {$error}");
+                }
             }
 
-            // FALLBACK PATH: Search through businesses/shared WABAs
+            // FALLBACK PATH: Search through businesses/shared WABAs (for cases where we have neither)
             Log::info("Falling back to business/WABA search method");
 
             // Step 1: Debug token to get app info and scopes
