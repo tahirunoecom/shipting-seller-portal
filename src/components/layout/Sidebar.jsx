@@ -17,6 +17,7 @@ import {
   Clock,
   Navigation,
   ArrowLeftRight,
+  Kanban,
 } from 'lucide-react'
 
 // Seller/Store Owner menu items
@@ -35,6 +36,11 @@ const sellerMenuItems = [
     title: 'Orders',
     href: '/orders',
     icon: ShoppingCart,
+  },
+  {
+    title: 'Order Board',
+    href: '/orders/fulfillment',
+    icon: Kanban,
   },
   {
     title: 'Catalog',

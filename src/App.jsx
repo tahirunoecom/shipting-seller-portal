@@ -14,6 +14,7 @@ import ModeSelectionPage from '@/pages/auth/ModeSelectionPage'
 import DashboardPage from '@/pages/dashboard/DashboardPage'
 import ProductsPage from '@/pages/products/ProductsPage'
 import OrdersPage from '@/pages/orders/OrdersPage'
+import OrderFulfillmentBoardPage from '@/pages/orders/OrderFulfillmentBoardPage'
 import SettingsPage from '@/pages/settings/SettingsPage'
 import WhatsAppPage from '@/pages/whatsapp/WhatsAppPage'
 
@@ -72,6 +73,7 @@ function App() {
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/products" element={<ProductsPage />} />
         <Route path="/orders" element={<OrdersPage />} />
+        <Route path="/orders/fulfillment" element={<OrderFulfillmentBoardPage />} />
         <Route path="/catalog" element={<CatalogPage />} />
         <Route path="/whatsapp" element={<WhatsAppPage />} />
         <Route path="/drivers" element={<DriversPage />} />
