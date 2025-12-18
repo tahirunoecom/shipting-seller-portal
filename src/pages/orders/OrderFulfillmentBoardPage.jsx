@@ -22,8 +22,32 @@ import {
   Camera,
   Car,
   AlertCircle,
+  PenTool,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+
+// CSS for highlight animation (injected inline)
+const highlightStyles = `
+@keyframes orderMoved {
+  0% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 20px 10px rgba(34, 197, 94, 0.3);
+    transform: scale(1.02);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+    transform: scale(1);
+  }
+}
+.order-just-moved {
+  animation: orderMoved 1.5s ease-out;
+  border-color: rgb(34, 197, 94) !important;
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, transparent 100%) !important;
+}
+`
 
 // Default columns configuration
 const DEFAULT_COLUMNS = [
@@ -67,6 +91,7 @@ function OrderFulfillmentBoardPage() {
   const [draggedOrder, setDraggedOrder] = useState(null)
   const [dragOverColumn, setDragOverColumn] = useState(null)
   const [expandedCards, setExpandedCards] = useState({})
+  const [recentlyMovedOrders, setRecentlyMovedOrders] = useState(new Set())
 
   // Delivery confirmation
   const [showDeliveryModal, setShowDeliveryModal] = useState(false)
@@ -75,6 +100,7 @@ function OrderFulfillmentBoardPage() {
     package_received_by: '',
     driver_note: '',
     delivery_proof: null,
+    customer_signature: null,
   })
 
   // Auto-refresh
@@ -256,6 +282,19 @@ function OrderFulfillmentBoardPage() {
     setDragOverColumn(null)
   }
 
+  // Mark order as recently moved (with auto-clear)
+  const markOrderAsMoved = (orderId) => {
+    setRecentlyMovedOrders(prev => new Set([...prev, orderId]))
+    // Clear after animation completes
+    setTimeout(() => {
+      setRecentlyMovedOrders(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(orderId)
+        return newSet
+      })
+    }, 3000)
+  }
+
   // Update order status
   const updateOrderStatus = async (orderId, statusType, additionalData = {}) => {
     try {
@@ -285,6 +324,8 @@ function OrderFulfillmentBoardPage() {
           'OrderDelivered': 'Order delivered!',
         }
         toast.success(messages[statusType] || 'Status updated!')
+        // Mark order as recently moved for visual feedback
+        markOrderAsMoved(orderId)
         loadOrders(false)
       } else {
         toast.error(response.message || 'Failed to update status')
@@ -300,15 +341,22 @@ function OrderFulfillmentBoardPage() {
   const handleDeliveryConfirm = async () => {
     if (!pendingDelivery) return
 
+    // Signature is required by the API
+    if (!deliveryForm.customer_signature) {
+      toast.error('Customer signature is required')
+      return
+    }
+
     await updateOrderStatus(pendingDelivery.order.order_id, pendingDelivery.statusType, {
       package_received_by: deliveryForm.package_received_by,
       driver_note: deliveryForm.driver_note,
       delivery_proof: deliveryForm.delivery_proof,
+      customer_signature: deliveryForm.customer_signature,
     })
 
     setShowDeliveryModal(false)
     setPendingDelivery(null)
-    setDeliveryForm({ package_received_by: '', driver_note: '', delivery_proof: null })
+    setDeliveryForm({ package_received_by: '', driver_note: '', delivery_proof: null, customer_signature: null })
   }
 
   // Quick action to set delivery type and accept
@@ -321,6 +369,7 @@ function OrderFulfillmentBoardPage() {
         await updateOrderStatus(order.order_id, 'OrderAccept')
       } else {
         toast.success('Searching for driver...')
+        markOrderAsMoved(order.order_id)
         loadOrders(false)
       }
     } catch (error) {
@@ -388,6 +437,9 @@ function OrderFulfillmentBoardPage() {
 
   return (
     <div className="h-full flex flex-col">
+      {/* Inject highlight animation styles */}
+      <style>{highlightStyles}</style>
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
@@ -520,6 +572,7 @@ function OrderFulfillmentBoardPage() {
                   const driverStatus = getDriverStatusLabel(order)
                   const isExpanded = expandedCards[order.order_id]
                   const isPending = getOrderStatus(order) === 'pending' && !order.delivery_type
+                  const isRecentlyMoved = recentlyMovedOrders.has(order.order_id)
 
                   return (
                     <div
@@ -533,6 +586,8 @@ function OrderFulfillmentBoardPage() {
                           : 'cursor-default'
                       } ${
                         draggedOrder?.order_id === order.order_id ? 'opacity-50' : ''
+                      } ${
+                        isRecentlyMoved ? 'order-just-moved' : ''
                       }`}
                     >
                       {/* Card Header */}
@@ -778,6 +833,33 @@ function OrderFulfillmentBoardPage() {
               </label>
               {deliveryForm.delivery_proof && (
                 <span className="text-sm text-green-600">Photo selected</span>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <label className="label">
+              Customer Signature <span className="text-red-500">*</span>
+            </label>
+            <p className="text-xs text-gray-500 dark:text-dark-muted mb-2">
+              Upload an image of the customer's signature
+            </p>
+            <div className="flex items-center gap-4">
+              <label className={`flex items-center gap-2 px-4 py-2 border rounded-lg cursor-pointer hover:bg-gray-50 dark:border-dark-border dark:hover:bg-dark-border ${!deliveryForm.customer_signature ? 'border-red-300' : 'border-green-500'}`}>
+                <PenTool className="h-4 w-4" />
+                <span className="text-sm">Upload Signature</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => setDeliveryForm(prev => ({ ...prev, customer_signature: e.target.files[0] }))}
+                />
+              </label>
+              {deliveryForm.customer_signature && (
+                <span className="text-sm text-green-600 flex items-center gap-1">
+                  <CheckCircle className="h-4 w-4" />
+                  Signature uploaded
+                </span>
               )}
             </div>
           </div>
