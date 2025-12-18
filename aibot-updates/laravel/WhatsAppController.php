@@ -2072,6 +2072,10 @@ class WhatsAppController extends Controller
      * Auto-fetch all missing WhatsApp data using access token
      * This fetches WABA ID, phone numbers, and configures webhook automatically
      *
+     * Handles multiple scenarios:
+     * 1. Has phone_number_id but no waba_id → Query phone to get parent WABA
+     * 2. Has neither → Search through businesses/shared WABAs
+     *
      * @param SellerWhatsappConfig $config
      * @return bool - Whether data was successfully fetched
      */
@@ -2086,6 +2090,72 @@ class WhatsAppController extends Controller
             }
 
             Log::info("Starting auto-fetch for wh_account_id: {$config->wh_account_id}");
+            Log::info("Current state - phone_number_id: {$config->phone_number_id}, waba_id: {$config->waba_id}");
+
+            // PRIORITY PATH: If we have phone_number_id but no waba_id,
+            // query the phone number to get its parent WABA
+            if ($config->phone_number_id && !$config->waba_id) {
+                Log::info("Have phone_number_id but missing waba_id - querying phone for parent WABA");
+
+                $phoneResponse = Http::withToken($accessToken)
+                    ->get("https://graph.facebook.com/v21.0/{$config->phone_number_id}", [
+                        'fields' => 'id,display_phone_number,verified_name,quality_rating,status,whatsapp_business_account'
+                    ]);
+
+                if ($phoneResponse->successful()) {
+                    $phoneData = $phoneResponse->json();
+                    Log::info("Phone query response: " . json_encode($phoneData));
+
+                    // Get the parent WABA from the phone number response
+                    $wabaData = $phoneData['whatsapp_business_account'] ?? null;
+
+                    if ($wabaData && isset($wabaData['id'])) {
+                        $wabaId = $wabaData['id'];
+                        Log::info("Found parent WABA {$wabaId} from phone_number_id {$config->phone_number_id}");
+
+                        // Update config with WABA ID and phone details
+                        $config->update([
+                            'waba_id' => $wabaId,
+                            'display_phone_number' => $phoneData['display_phone_number'] ?? $config->display_phone_number,
+                            'verified_name' => $phoneData['verified_name'] ?? $config->verified_name,
+                            'is_connected' => true,
+                            'connection_status' => 'connected',
+                            'connected_at' => $config->connected_at ?? now()
+                        ]);
+
+                        // Now try to get business info from WABA
+                        $wabaDetailResponse = Http::withToken($accessToken)
+                            ->get("https://graph.facebook.com/v21.0/{$wabaId}", [
+                                'fields' => 'id,name,owner_business_info'
+                            ]);
+
+                        if ($wabaDetailResponse->successful()) {
+                            $wabaDetails = $wabaDetailResponse->json();
+                            $ownerBusiness = $wabaDetails['owner_business_info'] ?? [];
+
+                            $config->update([
+                                'business_id' => $ownerBusiness['id'] ?? $config->business_id,
+                                'business_name' => $ownerBusiness['name'] ?? $wabaDetails['name'] ?? $config->business_name
+                            ]);
+                        }
+
+                        // Auto-configure webhook
+                        $config->refresh();
+                        $webhookSuccess = $this->configureWebhookForWaba($config);
+                        Log::info("Webhook configuration: " . ($webhookSuccess ? 'SUCCESS' : 'FAILED'));
+
+                        return true;
+                    } else {
+                        Log::warning("Phone number {$config->phone_number_id} has no whatsapp_business_account field");
+                    }
+                } else {
+                    $error = $phoneResponse->json()['error']['message'] ?? 'Unknown error';
+                    Log::error("Failed to query phone_number_id {$config->phone_number_id}: {$error}");
+                }
+            }
+
+            // FALLBACK PATH: Search through businesses/shared WABAs
+            Log::info("Falling back to business/WABA search method");
 
             // Step 1: Debug token to get app info and scopes
             $debugResponse = Http::withToken($accessToken)
