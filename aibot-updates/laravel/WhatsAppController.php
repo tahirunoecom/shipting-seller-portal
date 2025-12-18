@@ -1087,6 +1087,9 @@ class WhatsAppController extends Controller
                 $userMessage = 'Too many code requests. Please wait 24 hours before requesting a new code.';
             } elseif ($errorCode == 136025) {
                 $userMessage = 'Phone number is not eligible for verification. It may already be registered.';
+            } elseif ($errorCode == 136024) {
+                // Error 136024: Phone is already registered/connected - no need for verification code
+                $userMessage = 'This phone number is already registered and connected. Verification code is not needed.';
             } elseif (strpos($errorMsg, 'already registered') !== false) {
                 $userMessage = 'This phone number is already registered with WhatsApp.';
             } elseif (strpos($errorMsg, 'not pending') !== false) {
