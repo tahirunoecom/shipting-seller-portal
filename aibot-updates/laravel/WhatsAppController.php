@@ -1918,16 +1918,54 @@ class WhatsAppController extends Controller
      * - Configure webhooks for existing WABAs
      * - Retry failed webhook configurations
      * - Re-subscribe after permissions change
+     *
+     * Accepts either:
+     * - wh_account_id (looks up from database)
+     * - OR direct waba_id + access_token (for testing)
      */
     public function configureWebhook(Request $request)
     {
         try {
             $whAccountId = $request->input('wh_account_id');
+            $directWabaId = $request->input('waba_id');
+            $directAccessToken = $request->input('access_token');
 
+            // Option 1: Use direct waba_id and access_token (for testing/manual setup)
+            if ($directWabaId && $directAccessToken) {
+                Log::info("Direct webhook configuration for WABA: {$directWabaId}");
+
+                $response = Http::withToken($directAccessToken)
+                    ->post("https://graph.facebook.com/v21.0/{$directWabaId}/subscribed_apps", [
+                        'subscribed_fields' => 'messages'
+                    ]);
+
+                $responseData = $response->json();
+                Log::info("Direct webhook subscription response: " . json_encode($responseData));
+
+                if ($response->successful() && ($responseData['success'] ?? false)) {
+                    return response()->json([
+                        'status' => 1,
+                        'message' => 'Webhook configured successfully! Your WhatsApp bot will now receive messages.',
+                        'data' => [
+                            'waba_id' => $directWabaId,
+                            'webhook_configured' => true
+                        ]
+                    ]);
+                }
+
+                $error = $responseData['error']['message'] ?? 'Unknown error';
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'Failed to configure webhook: ' . $error,
+                    'meta_response' => $responseData
+                ]);
+            }
+
+            // Option 2: Use wh_account_id to look up from database
             if (!$whAccountId) {
                 return response()->json([
                     'status' => 0,
-                    'message' => 'wh_account_id is required'
+                    'message' => 'Either wh_account_id OR (waba_id + access_token) is required'
                 ]);
             }
 
