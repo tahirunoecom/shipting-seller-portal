@@ -1907,6 +1907,138 @@ class WhatsAppController extends Controller
     }
 
     // ============================================
+    // WEBHOOK CONFIGURATION
+    // ============================================
+
+    /**
+     * Manually configure webhook for a WABA
+     * POST /api/seller/whatsapp/configure-webhook
+     *
+     * Use this to:
+     * - Configure webhooks for existing WABAs
+     * - Retry failed webhook configurations
+     * - Re-subscribe after permissions change
+     */
+    public function configureWebhook(Request $request)
+    {
+        try {
+            $whAccountId = $request->input('wh_account_id');
+
+            if (!$whAccountId) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'wh_account_id is required'
+                ]);
+            }
+
+            $config = SellerWhatsappConfig::where('wh_account_id', $whAccountId)->first();
+
+            if (!$config) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'WhatsApp configuration not found'
+                ]);
+            }
+
+            if (!$config->waba_id || !$config->access_token) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'WABA not connected. Please complete WhatsApp connection first.'
+                ]);
+            }
+
+            Log::info("Manual webhook configuration requested for wh_account_id: {$whAccountId}, WABA: {$config->waba_id}");
+
+            $success = $this->configureWebhookForWaba($config);
+
+            if ($success) {
+                return response()->json([
+                    'status' => 1,
+                    'message' => 'Webhook configured successfully! Your WhatsApp bot will now receive messages.',
+                    'data' => [
+                        'waba_id' => $config->waba_id,
+                        'webhook_configured' => true
+                    ]
+                ]);
+            }
+
+            return response()->json([
+                'status' => 0,
+                'message' => 'Failed to configure webhook. Check logs for details.',
+                'data' => [
+                    'waba_id' => $config->waba_id,
+                    'hint' => 'Ensure the user has granted whatsapp_business_messaging permission during Meta login'
+                ]
+            ]);
+        } catch (\Exception $e) {
+            Log::error('configureWebhook error: ' . $e->getMessage());
+            return response()->json([
+                'status' => 0,
+                'message' => 'Failed to configure webhook: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Check webhook status for a WABA
+     * POST /api/seller/whatsapp/webhook-status
+     */
+    public function getWebhookStatus(Request $request)
+    {
+        try {
+            $whAccountId = $request->input('wh_account_id');
+
+            if (!$whAccountId) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'wh_account_id is required'
+                ]);
+            }
+
+            $config = SellerWhatsappConfig::where('wh_account_id', $whAccountId)->first();
+
+            if (!$config || !$config->waba_id || !$config->access_token) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'WhatsApp not connected'
+                ]);
+            }
+
+            // Get subscribed apps for this WABA
+            $response = Http::withToken($config->access_token)
+                ->get("https://graph.facebook.com/v21.0/{$config->waba_id}/subscribed_apps");
+
+            $responseData = $response->json();
+
+            if ($response->successful()) {
+                $subscribedApps = $responseData['data'] ?? [];
+
+                return response()->json([
+                    'status' => 1,
+                    'data' => [
+                        'waba_id' => $config->waba_id,
+                        'webhook_configured' => $config->webhook_configured ?? false,
+                        'webhook_configured_at' => $config->webhook_configured_at,
+                        'subscribed_apps' => $subscribedApps,
+                        'is_subscribed' => !empty($subscribedApps)
+                    ]
+                ]);
+            }
+
+            return response()->json([
+                'status' => 0,
+                'message' => $responseData['error']['message'] ?? 'Failed to get webhook status'
+            ]);
+        } catch (\Exception $e) {
+            Log::error('getWebhookStatus error: ' . $e->getMessage());
+            return response()->json([
+                'status' => 0,
+                'message' => 'Failed to get webhook status: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    // ============================================
     // HELPER METHODS
     // ============================================
 
@@ -1975,6 +2107,10 @@ class WhatsAppController extends Controller
                     ]);
 
                     Log::info("WhatsApp connected: {$phone['display_phone_number']} (ID: {$phone['id']})");
+
+                    // Auto-configure webhook for this WABA
+                    $config->refresh();
+                    $this->configureWebhookForWaba($config);
                 }
             }
         } catch (\Exception $e) {
@@ -2023,6 +2159,74 @@ class WhatsAppController extends Controller
                 'connection_status' => 'connected',
                 'connected_at' => now()
             ]);
+        }
+
+        // Auto-configure webhook for this WABA after successful connection
+        if ($config->waba_id && $config->access_token) {
+            $this->configureWebhookForWaba($config);
+        }
+    }
+
+    /**
+     * Auto-configure webhook for WABA after Embedded Signup
+     * This subscribes the WABA to receive webhook events (messages, statuses, etc.)
+     *
+     * @param SellerWhatsappConfig $config - The seller's WhatsApp configuration
+     * @return bool - Whether webhook was configured successfully
+     */
+    private function configureWebhookForWaba($config)
+    {
+        try {
+            $wabaId = $config->waba_id;
+            $accessToken = $config->access_token;
+
+            if (!$wabaId || !$accessToken) {
+                Log::warning("Cannot configure webhook - missing WABA ID or access token");
+                return false;
+            }
+
+            Log::info("Configuring webhook subscription for WABA: {$wabaId}");
+
+            // Subscribe the app to the WABA's webhook events
+            // This connects this specific WABA to receive messages via your webhook URL
+            // The webhook URL itself is configured at App level in Meta Developer Portal
+            $response = Http::withToken($accessToken)
+                ->post("https://graph.facebook.com/v21.0/{$wabaId}/subscribed_apps", [
+                    'subscribed_fields' => 'messages'
+                ]);
+
+            $responseData = $response->json();
+            Log::info("Webhook subscription response for WABA {$wabaId}: " . json_encode($responseData));
+
+            if ($response->successful() && ($responseData['success'] ?? false)) {
+                Log::info("Webhook successfully configured for WABA: {$wabaId}");
+
+                // Update config to track webhook status
+                $config->update([
+                    'webhook_configured' => true,
+                    'webhook_configured_at' => now()
+                ]);
+
+                return true;
+            }
+
+            // Log error but don't fail the connection process
+            $error = $responseData['error']['message'] ?? 'Unknown error';
+            $errorCode = $responseData['error']['code'] ?? null;
+            Log::error("Failed to configure webhook for WABA {$wabaId}: {$error} (code: {$errorCode})");
+
+            // Common error handling
+            if ($errorCode == 100) {
+                Log::warning("WABA {$wabaId} may need additional permissions for webhook subscription");
+            } elseif ($errorCode == 200) {
+                Log::warning("Permission error for WABA {$wabaId} - user may need to grant whatsapp_business_messaging permission");
+            }
+
+            return false;
+
+        } catch (\Exception $e) {
+            Log::error("Exception configuring webhook for WABA: " . $e->getMessage());
+            return false;
         }
     }
 }
