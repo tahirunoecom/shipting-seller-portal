@@ -28,24 +28,18 @@ import toast from 'react-hot-toast'
 
 // CSS for highlight animation (injected inline)
 const highlightStyles = `
-@keyframes orderMoved {
-  0% {
-    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
-    transform: scale(1);
+@keyframes orderMovedPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.5);
   }
   50% {
-    box-shadow: 0 0 20px 10px rgba(34, 197, 94, 0.3);
-    transform: scale(1.02);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
-    transform: scale(1);
+    box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.3);
   }
 }
 .order-just-moved {
-  animation: orderMoved 1.5s ease-out;
+  animation: orderMovedPulse 2s ease-in-out infinite;
   border-color: rgb(34, 197, 94) !important;
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, transparent 100%) !important;
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.15) 0%, rgba(34, 197, 94, 0.05) 100%) !important;
 }
 `
 
@@ -282,17 +276,18 @@ function OrderFulfillmentBoardPage() {
     setDragOverColumn(null)
   }
 
-  // Mark order as recently moved (with auto-clear)
+  // Mark order as recently moved (persistent until clicked or another order moves)
   const markOrderAsMoved = (orderId) => {
-    setRecentlyMovedOrders(prev => new Set([...prev, orderId]))
-    // Clear after animation completes
-    setTimeout(() => {
-      setRecentlyMovedOrders(prev => {
-        const newSet = new Set(prev)
-        newSet.delete(orderId)
-        return newSet
-      })
-    }, 3000)
+    setRecentlyMovedOrders(new Set([orderId])) // Clear previous and set new
+  }
+
+  // Clear highlight when user clicks on the card
+  const clearMovedHighlight = (orderId) => {
+    setRecentlyMovedOrders(prev => {
+      const newSet = new Set(prev)
+      newSet.delete(orderId)
+      return newSet
+    })
   }
 
   // Update order status
@@ -590,10 +585,32 @@ function OrderFulfillmentBoardPage() {
                         isRecentlyMoved ? 'order-just-moved' : ''
                       }`}
                     >
+                      {/* Just Moved Badge */}
+                      {isRecentlyMoved && (
+                        <div className="bg-green-500 text-white text-xs font-medium px-2 py-1 flex items-center justify-between">
+                          <span className="flex items-center gap-1">
+                            <CheckCircle className="h-3 w-3" />
+                            Just moved here
+                          </span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              clearMovedHighlight(order.order_id)
+                            }}
+                            className="hover:bg-green-600 rounded px-1"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      )}
+
                       {/* Card Header */}
                       <div
                         className="p-3 cursor-pointer"
-                        onClick={() => toggleCardExpand(order.order_id)}
+                        onClick={() => {
+                          if (isRecentlyMoved) clearMovedHighlight(order.order_id)
+                          toggleCardExpand(order.order_id)
+                        }}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex items-start gap-2 min-w-0">
