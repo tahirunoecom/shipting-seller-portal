@@ -359,14 +359,27 @@ class WhatsAppController extends Controller
                         $imageUrl = "https://via.placeholder.com/500";
                     }
 
-                    // Format price as "12.99 USD"
-                    $rawPrice = $product['product_price'] ?? $product['price'] ?? 0;
+                    // Format price - Use DISCOUNTED PRICE for WhatsApp catalog
+                    // WhatsApp only shows ONE price, so we send the final price customer pays
+                    // Priority: discounted_price > product_price > price
+                    $rawPrice = $product['discounted_price'] ?? $product['product_price'] ?? $product['price'] ?? 0;
                     $priceClean = str_replace(['$', ','], '', (string) $rawPrice);
                     $priceVal = floatval($priceClean);
+                    if ($priceVal <= 0) {
+                        // If discounted_price is 0 or missing, fall back to main price
+                        $fallbackPrice = $product['product_price'] ?? $product['price'] ?? 0;
+                        $priceVal = floatval(str_replace(['$', ','], '', (string) $fallbackPrice));
+                    }
                     if ($priceVal <= 0) {
                         $priceVal = 1.00;
                     }
                     $priceStr = number_format($priceVal, 2, '.', '') . ' USD';
+
+                    // Log pricing info for debugging
+                    Log::info("Product {$productId} pricing: main=" . ($product['product_price'] ?? $product['price'] ?? 'N/A') .
+                             ", discount=" . ($product['discount'] ?? 'N/A') .
+                             ", discounted=" . ($product['discounted_price'] ?? 'N/A') .
+                             ", sending=" . $priceVal);
 
                     // Get title
                     $title = $product['title'] ?? $product['product_name'] ?? $product['name'] ?? '';
