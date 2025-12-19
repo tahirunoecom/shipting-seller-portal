@@ -72,7 +72,7 @@ function DeliveryCard({ order, onClick, statusCode, isCompleted }) {
                   {order.store_name || order.shipper_name || 'Store'}
                 </h3>
                 <p className="text-sm text-slate-500 dark:text-slate-400">
-                  Order #{order.order_id}
+                  Order #{order.id}
                 </p>
               </div>
             </div>
@@ -201,8 +201,8 @@ function DriverDeliveriesPage() {
       }
       return statusCode === 7
     })
-    // Sort by order_id descending (recent orders first)
-    .sort((a, b) => (b.order_id || 0) - (a.order_id || 0))
+    // Sort by id descending (recent orders first)
+    .sort((a, b) => (b.id || 0) - (a.id || 0))
 
   const activeCount = orders.filter(o => getStatusCode(o) > 0 && getStatusCode(o) < 7).length
   const completedCount = orders.filter(o => getStatusCode(o) === 7).length
@@ -287,11 +287,11 @@ function DriverDeliveriesPage() {
 
             return (
               <DeliveryCard
-                key={order.order_id}
+                key={order.id}
                 order={order}
                 statusCode={statusCode}
                 isCompleted={isCompleted}
-                onClick={() => navigate(`/driver/order/${order.order_id}`)}
+                onClick={() => navigate(`/driver/order/${order.id}`)}
               />
             )
           })}
