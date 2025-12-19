@@ -185,11 +185,13 @@ function DriverOrdersPage() {
       if (showLoader) setLoading(true)
       else setRefreshing(true)
 
+      console.log('Loading orders with params:', { driver_id: user.id, lat: location.lat, long: location.long })
       const response = await driverService.getDriverOrders({
         driver_id: user.id,
         lat: location.lat,
         long: location.long,
       })
+      console.log('getDriverOrders response:', response)
 
       if (response.status === 1 || response.status === 0) {
         const newOrders = response.data || []
