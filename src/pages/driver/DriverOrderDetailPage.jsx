@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store'
 import { driverService, DRIVER_STATUS } from '@/services'
 import { Modal } from '@/components/ui'
-import { formatCurrency } from '@/utils/helpers'
+import { formatCurrency, formatDateTime } from '@/utils/helpers'
 import {
   notifyDeliveryReminder,
   notifyDeliveryCompleted,
@@ -14,49 +14,45 @@ import {
   ArrowLeft,
   MapPin,
   Package,
-  Map,
+  Navigation,
   Phone,
   CheckCircle,
   Camera,
   RefreshCw,
   Truck,
   ChevronRight,
-  Route,
   X,
   Shield,
   FileText,
+  Clock,
+  DollarSign,
+  ExternalLink,
+  User,
+  Store,
+  CircleDot,
+  AlertCircle,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
-// Status configuration with violet/indigo theme
+// Status configuration
 const STATUS_CONFIG = {
-  1: { label: 'Go to Pickup', nextStatus: 2, gradient: 'from-violet-600 to-indigo-600' },
-  2: { label: 'Reached at Store', nextStatus: 4, gradient: 'from-violet-600 to-indigo-600' },
-  4: { label: 'Confirm Pickup', nextStatus: 3, gradient: 'from-amber-500 to-orange-500', showModal: true },
-  3: { label: 'On The Way', nextStatus: 5, gradient: 'from-violet-600 to-indigo-600' },
-  5: { label: 'Reached at Customer', nextStatus: 6, gradient: 'from-blue-500 to-cyan-500' },
-  6: { label: 'Complete Delivery', nextStatus: 7, gradient: 'from-emerald-500 to-teal-500', showDeliveryModal: true },
+  1: { label: 'Go to Pickup', nextStatus: 2, color: 'violet' },
+  2: { label: 'Arrived at Store', nextStatus: 4, color: 'violet' },
+  4: { label: 'Confirm Pickup', nextStatus: 3, color: 'amber', showModal: true },
+  3: { label: 'Start Delivery', nextStatus: 5, color: 'violet' },
+  5: { label: 'Arrived at Customer', nextStatus: 6, color: 'blue' },
+  6: { label: 'Complete Delivery', nextStatus: 7, color: 'emerald', showDeliveryModal: true },
 }
 
 const STATUS_LABELS = {
-  1: 'Order Accepted',
-  2: 'Going to Pickup',
+  1: 'Accepted',
+  2: 'Going to Store',
   3: 'Picked Up',
   4: 'At Store',
   5: 'On The Way',
   6: 'At Customer',
   7: 'Delivered',
 }
-
-const STATUS_STEPS = [
-  { status: 1, label: 'Accepted' },
-  { status: 2, label: 'Going' },
-  { status: 4, label: 'At Store' },
-  { status: 3, label: 'Picked Up' },
-  { status: 5, label: 'En Route' },
-  { status: 6, label: 'Arrived' },
-  { status: 7, label: 'Done' },
-]
 
 function DriverOrderDetailPage() {
   const { orderId } = useParams()
@@ -89,7 +85,6 @@ function DriverOrderDetailPage() {
       })
 
       if ((response.status === 1 || response.status === 0) && response.data?.length > 0) {
-        // Find the specific order by id in case API returns multiple orders
         const foundOrder = response.data.find(o => o.id === targetOrderId) || response.data[0]
         setOrder(foundOrder)
       } else {
@@ -109,35 +104,24 @@ function DriverOrderDetailPage() {
     loadOrder()
   }, [loadOrder])
 
-  // Set up delivery reminder (notifies driver every 5 minutes if no status change)
   useEffect(() => {
     if (!order) return
-
     const statusCode = typeof order.driver_order_status === 'object'
       ? order.driver_order_status?.driver_order_status
       : order.driver_order_status
 
-    // Start reminder if order is in progress (status 1-6, not delivered)
     if (statusCode && statusCode >= 1 && statusCode < 7) {
-      startDeliveryReminder(order, (o) => {
-        notifyDeliveryReminder(o, 5)
-      }, 5) // 5 minutes
+      startDeliveryReminder(order, (o) => notifyDeliveryReminder(o, 5), 5)
     }
-
-    // Cleanup: stop reminder on unmount or when order changes
     return () => {
-      if (order?.id) {
-        stopDeliveryReminder(order.id)
-      }
+      if (order?.id) stopDeliveryReminder(order.id)
     }
   }, [order])
 
   const getStatusCode = () => {
     if (!order) return 0
     const status = order.driver_order_status
-    if (typeof status === 'object') {
-      return status.driver_order_status || status.status || 0
-    }
+    if (typeof status === 'object') return status.driver_order_status || status.status || 0
     return status || 0
   }
 
@@ -182,8 +166,8 @@ function DriverOrderDetailPage() {
 
       if (response.status === 1 || response.code === 200 || response.status === 0) {
         toast.success('Delivery completed!')
-        stopDeliveryReminder(order.id) // Stop reminder
-        notifyDeliveryCompleted(order) // Show completion notification
+        stopDeliveryReminder(order.id)
+        notifyDeliveryCompleted(order)
         navigate('/driver/deliveries', { state: { completed: order } })
       } else {
         toast.error(response.message || 'Failed to complete delivery')
@@ -216,20 +200,27 @@ function DriverOrderDetailPage() {
     else handleStatusUpdate(config.nextStatus)
   }
 
-  // Get step index for progress
-  const getStepIndex = (status) => {
-    return STATUS_STEPS.findIndex(s => s.status === status)
+  const openNavigation = () => {
+    const statusCode = getStatusCode()
+    const address = statusCode < 3
+      ? `${order.pickup?.store_address || order.pickup?.address}, ${order.pickup?.store_city || order.pickup?.city}`
+      : `${order.drop_off?.address}, ${order.drop_off?.city}`
+    window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`, '_blank')
+  }
+
+  const callContact = () => {
+    const statusCode = getStatusCode()
+    const phone = statusCode < 3 ? order.shipper_phone : (order.customer_phone || order.phone)
+    if (phone) window.open(`tel:${phone}`, '_blank')
+    else toast.error('No phone number available')
   }
 
   if (loading) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="text-center">
-          <div className="relative">
-            <div className="w-16 h-16 rounded-full bg-gradient-to-r from-violet-500 to-indigo-500 animate-pulse mx-auto" />
-            <Package className="w-8 h-8 text-white absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-          </div>
-          <p className="mt-4 text-slate-500 dark:text-slate-400">Loading order...</p>
+          <div className="w-12 h-12 border-4 border-violet-200 border-t-violet-600 rounded-full animate-spin mx-auto" />
+          <p className="mt-4 text-sm text-slate-500">Loading order...</p>
         </div>
       </div>
     )
@@ -241,216 +232,240 @@ function DriverOrderDetailPage() {
   const buttonConfig = STATUS_CONFIG[statusCode]
   const isDelivered = statusCode === 7
   const orderAmount = order.order_amount || order.total_amount || 0
-  const currentStepIndex = getStepIndex(statusCode)
+  const isAtPickup = statusCode < 3
+  const currentLocation = isAtPickup ? 'pickup' : 'dropoff'
 
   return (
-    <div className="space-y-6 pb-28">
-      {/* Header */}
+    <div className="space-y-4 pb-24">
+      {/* Compact Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate(-1)}
-            className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+            className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
           >
-            <ArrowLeft className="h-5 w-5 text-slate-600 dark:text-slate-400" />
+            <ArrowLeft className="h-4 w-4 text-slate-600 dark:text-slate-400" />
           </button>
           <div>
-            <h1 className="text-xl font-bold text-slate-900 dark:text-white">
+            <h1 className="text-lg font-bold text-slate-900 dark:text-white">
               Order #{order.id}
             </h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400">{STATUS_LABELS[statusCode] || 'Processing'}</p>
+            <div className="flex items-center gap-2">
+              <span className={`inline-flex items-center gap-1 text-xs font-medium ${
+                isDelivered ? 'text-emerald-600' : 'text-violet-600'
+              }`}>
+                <CircleDot className="w-3 h-3" />
+                {STATUS_LABELS[statusCode]}
+              </span>
+            </div>
           </div>
         </div>
-        <div className={`px-4 py-2 rounded-xl font-medium text-sm ${
-          isDelivered
-            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-            : 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400'
-        }`}>
-          {isDelivered ? 'Completed' : 'Active'}
-        </div>
+
+        {/* Quick Actions - Small buttons */}
+        {!isDelivered && (
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={openNavigation}
+              className="p-2 rounded-lg bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 hover:bg-violet-200 dark:hover:bg-violet-900/50 transition-colors"
+              title="Navigate"
+            >
+              <Navigation className="w-4 h-4" />
+            </button>
+            <button
+              onClick={callContact}
+              className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"
+              title="Call"
+            >
+              <Phone className="w-4 h-4" />
+            </button>
+            <button
+              className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+              title="Cancel"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Progress Steps */}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl p-5 border border-slate-200 dark:border-slate-700">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-slate-900 dark:text-white">Delivery Progress</h3>
-          <span className="text-xs text-slate-500">{Math.min(currentStepIndex + 1, STATUS_STEPS.length)}/{STATUS_STEPS.length}</span>
+      {/* Order Summary Card */}
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+        <div className="p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
+              {order.store_img && !imgError ? (
+                <img src={order.store_img} alt="" className="w-full h-full object-cover rounded-xl" onError={() => setImgError(true)} />
+              ) : (
+                <Store className="w-6 h-6 text-white" />
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold text-slate-900 dark:text-white truncate">
+                {order.store_name || order.shipper_name || 'Store'}
+              </h3>
+              <div className="flex items-center gap-3 mt-0.5 text-xs text-slate-500">
+                <span className="flex items-center gap-1">
+                  <Package className="w-3.5 h-3.5" />
+                  {order.total_product || 1} items
+                </span>
+                <span className="flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5" />
+                  {order.time || order.minutes_to_be_delivered_on || '15'} min
+                </span>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
+                {formatCurrency(orderAmount)}
+              </p>
+              <p className="text-[10px] text-slate-400 uppercase tracking-wider">Total</p>
+            </div>
+          </div>
         </div>
-        <div className="relative">
-          {/* Progress bar background */}
-          <div className="absolute top-3 left-0 right-0 h-1 bg-slate-200 dark:bg-slate-700 rounded-full" />
-          {/* Progress bar fill */}
-          <div
-            className="absolute top-3 left-0 h-1 bg-gradient-to-r from-violet-500 to-indigo-500 rounded-full transition-all duration-500"
-            style={{ width: `${(currentStepIndex / (STATUS_STEPS.length - 1)) * 100}%` }}
-          />
 
-          {/* Steps */}
-          <div className="relative flex justify-between">
-            {STATUS_STEPS.map((step, index) => {
-              const isComplete = index <= currentStepIndex
-              const isCurrent = index === currentStepIndex
+        {/* Mini Progress Bar */}
+        <div className="px-4 pb-3">
+          <div className="flex items-center gap-1">
+            {[1, 2, 4, 3, 5, 6, 7].map((step, idx) => {
+              const stepOrder = [1, 2, 4, 3, 5, 6, 7]
+              const currentIdx = stepOrder.indexOf(statusCode)
+              const isComplete = idx <= currentIdx
               return (
-                <div key={step.status} className="flex flex-col items-center">
-                  <div className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${
+                <div
+                  key={step}
+                  className={`h-1 flex-1 rounded-full transition-all ${
                     isComplete
-                      ? 'bg-gradient-to-r from-violet-500 to-indigo-500 text-white'
-                      : 'bg-slate-200 dark:bg-slate-700 text-slate-400'
-                  } ${isCurrent ? 'ring-4 ring-violet-200 dark:ring-violet-900/50' : ''}`}>
-                    {isComplete && index < currentStepIndex ? (
-                      <CheckCircle className="w-4 h-4" />
-                    ) : (
-                      <span className="text-xs font-bold">{index + 1}</span>
-                    )}
-                  </div>
-                  <span className={`text-[10px] mt-2 font-medium ${
-                    isComplete ? 'text-violet-600 dark:text-violet-400' : 'text-slate-400'
-                  }`}>
-                    {step.label}
-                  </span>
-                </div>
+                      ? 'bg-gradient-to-r from-violet-500 to-indigo-500'
+                      : 'bg-slate-200 dark:bg-slate-700'
+                  }`}
+                />
               )
             })}
           </div>
         </div>
       </div>
 
-      {/* Store & Route Card */}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700">
-        {/* Store Header */}
-        <div className="p-5 border-b border-slate-100 dark:border-slate-700">
-          <div className="flex items-center gap-4">
-            <div className="relative">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-100 to-indigo-100 dark:from-violet-900/30 dark:to-indigo-900/30 flex items-center justify-center overflow-hidden">
-                {order.store_img && !imgError ? (
-                  <img
-                    src={order.store_img}
-                    alt=""
-                    className="w-full h-full object-cover"
-                    onError={() => setImgError(true)}
-                  />
-                ) : (
-                  <Truck className="w-7 h-7 text-violet-500" />
-                )}
-              </div>
-            </div>
-            <div className="flex-1">
-              <h3 className="font-semibold text-lg text-slate-900 dark:text-white">
-                {order.store_name || order.shipper_name || 'Pickup Point'}
-              </h3>
-              <div className="flex items-center gap-4 mt-1">
-                <span className="flex items-center gap-1 text-sm text-slate-500">
-                  <Package className="w-4 h-4" />
-                  {order.total_product || 1} items
-                </span>
-                <span className="flex items-center gap-1 text-sm text-slate-500">
-                  <Route className="w-4 h-4" />
-                  {order.distance || '2.5 mi'}
-                </span>
-              </div>
-            </div>
-          </div>
+      {/* Active Location Card */}
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+        <div className={`px-4 py-2 text-xs font-semibold uppercase tracking-wider ${
+          isAtPickup
+            ? 'bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400'
+            : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400'
+        }`}>
+          {isAtPickup ? 'Pickup Location' : 'Delivery Location'}
         </div>
 
-        {/* Route Visualization */}
-        <div className="p-5">
-          <div className="flex gap-4">
-            {/* Timeline */}
-            <div className="flex flex-col items-center">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-violet-600 flex items-center justify-center shadow-lg shadow-violet-500/25">
-                <div className="w-3 h-3 rounded-full bg-white" />
-              </div>
-              <div className="w-0.5 flex-1 my-2 bg-gradient-to-b from-violet-500 via-purple-500 to-indigo-500" />
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/25">
-                <MapPin className="w-5 h-5 text-white" />
-              </div>
+        <div className="p-4">
+          <div className="flex items-start gap-3">
+            <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
+              isAtPickup
+                ? 'bg-violet-100 dark:bg-violet-900/30 text-violet-600'
+                : 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600'
+            }`}>
+              {isAtPickup ? <Store className="w-5 h-5" /> : <MapPin className="w-5 h-5" />}
             </div>
-
-            {/* Addresses */}
-            <div className="flex-1 space-y-4">
-              <div className="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-4">
-                <p className="text-xs font-semibold text-violet-600 dark:text-violet-400 uppercase tracking-wider mb-1">Pickup Location</p>
-                <p className="text-sm text-slate-700 dark:text-slate-300">
-                  {order.pickup?.store_address || order.pickup?.address || 'N/A'}
-                </p>
-                <p className="text-xs text-slate-500 mt-1">
-                  {order.pickup?.store_city || order.pickup?.city || ''}, {order.pickup?.store_state || order.pickup?.state || ''} {order.pickup?.store_zip_code || order.pickup?.zip_code || ''}
-                </p>
-              </div>
-
-              <div className="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-4">
-                <p className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider mb-1">Dropoff Location</p>
-                <p className="text-sm text-slate-700 dark:text-slate-300">
-                  {order.drop_off?.address || 'N/A'}
-                </p>
-                <p className="text-xs text-slate-500 mt-1">
-                  {order.drop_off?.city || ''}, {order.drop_off?.state || ''} {order.drop_off?.zip_code || ''}
-                </p>
-              </div>
+            <div className="flex-1 min-w-0">
+              {isAtPickup ? (
+                <>
+                  <p className="font-medium text-slate-900 dark:text-white">
+                    {order.store_name || order.shipper_name}
+                  </p>
+                  <p className="text-sm text-slate-600 dark:text-slate-400 mt-0.5">
+                    {order.pickup?.store_address || order.pickup?.address}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {order.pickup?.store_city || order.pickup?.city}, {order.pickup?.store_state || order.pickup?.state} {order.pickup?.store_zip_code || order.pickup?.zip_code}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="font-medium text-slate-900 dark:text-white">
+                    {order.customer_name || order.firstname || 'Customer'}
+                  </p>
+                  <p className="text-sm text-slate-600 dark:text-slate-400 mt-0.5">
+                    {order.drop_off?.address}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {order.drop_off?.city}, {order.drop_off?.state} {order.drop_off?.zip_code}
+                  </p>
+                </>
+              )}
             </div>
+            <button
+              onClick={openNavigation}
+              className={`p-2.5 rounded-lg transition-colors ${
+                isAtPickup
+                  ? 'bg-violet-600 hover:bg-violet-700 text-white'
+                  : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+              }`}
+            >
+              <ExternalLink className="w-4 h-4" />
+            </button>
           </div>
         </div>
-
-        {/* Customer Notes */}
-        {order.customer_message && (
-          <div className="px-5 pb-5">
-            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
-              <div className="flex items-start gap-3">
-                <FileText className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wider mb-1">Customer Notes</p>
-                  <p className="text-sm text-amber-800 dark:text-amber-200">{order.customer_message}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* Quick Actions */}
-      {!isDelivered && (
-        <div className="grid grid-cols-3 gap-3">
-          <button
-            onClick={() => {
-              const address = statusCode < 3
-                ? `${order.pickup?.store_address || order.pickup?.address}, ${order.pickup?.store_city || order.pickup?.city}`
-                : `${order.drop_off?.address}, ${order.drop_off?.city}`
-              window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`, '_blank')
-            }}
-            className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 text-white shadow-lg shadow-violet-500/25 hover:shadow-xl hover:shadow-violet-500/30 transition-all"
-          >
-            <Map className="w-6 h-6" />
-            <span className="text-xs font-semibold">Navigate</span>
-          </button>
-          <button
-            onClick={() => {
-              const phone = statusCode < 3 ? order.shipper_phone : (order.customer_phone || order.phone)
-              if (phone) window.open(`tel:${phone}`, '_blank')
-              else toast.error('No phone number available')
-            }}
-            className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-600 text-white shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30 transition-all"
-          >
-            <Phone className="w-6 h-6" />
-            <span className="text-xs font-semibold">Call</span>
-          </button>
-          <button
-            className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
-          >
-            <X className="w-6 h-6" />
-            <span className="text-xs font-semibold">Cancel</span>
-          </button>
+      {/* Route Overview (Collapsed) */}
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <div className="w-2.5 h-2.5 rounded-full bg-violet-500 flex-shrink-0" />
+            <p className="text-xs text-slate-600 dark:text-slate-400 truncate">
+              {order.pickup?.store_city || order.pickup?.city}
+            </p>
+          </div>
+          <div className="flex-shrink-0 flex items-center gap-1 text-slate-300 dark:text-slate-600">
+            <div className="w-8 h-px bg-current" />
+            <span className="text-[10px] font-medium">{order.distance || '0 mi'}</span>
+            <div className="w-8 h-px bg-current" />
+          </div>
+          <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
+            <p className="text-xs text-slate-600 dark:text-slate-400 truncate">
+              {order.drop_off?.city}
+            </p>
+            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 flex-shrink-0" />
+          </div>
+        </div>
+      </div>
+
+      {/* Customer Notes */}
+      {order.customer_message && (
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-3">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase">Note</p>
+              <p className="text-sm text-amber-800 dark:text-amber-200 mt-0.5">{order.customer_message}</p>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Main Action Button */}
+      {/* Delivered Success */}
+      {isDelivered && (
+        <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-4 text-center">
+          <div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mx-auto mb-2">
+            <CheckCircle className="w-6 h-6 text-emerald-600" />
+          </div>
+          <p className="font-semibold text-emerald-700 dark:text-emerald-400">Delivered Successfully</p>
+          <p className="text-xs text-emerald-600 dark:text-emerald-500 mt-1">Order completed</p>
+        </div>
+      )}
+
+      {/* Fixed Bottom Action Button */}
       {buttonConfig && !isDelivered && (
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-lg border-t border-slate-200 dark:border-slate-700 lg:left-64">
+        <div className="fixed bottom-0 left-0 right-0 p-3 bg-white/90 dark:bg-slate-900/90 backdrop-blur-lg border-t border-slate-200 dark:border-slate-700 lg:left-64">
           <button
             onClick={handleActionClick}
             disabled={processing}
-            className={`w-full relative overflow-hidden bg-gradient-to-r ${buttonConfig.gradient} text-white font-bold py-4 px-6 rounded-2xl transition-all disabled:opacity-50 shadow-lg hover:shadow-xl`}
+            className={`w-full py-3.5 px-6 rounded-xl font-semibold text-white transition-all disabled:opacity-50 shadow-lg ${
+              buttonConfig.color === 'violet' ? 'bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 shadow-violet-500/25' :
+              buttonConfig.color === 'amber' ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 shadow-amber-500/25' :
+              buttonConfig.color === 'blue' ? 'bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 shadow-blue-500/25' :
+              'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-emerald-500/25'
+            }`}
           >
-            <span className="relative z-10 flex items-center justify-center gap-2 text-lg">
+            <span className="flex items-center justify-center gap-2">
               {processing ? (
                 <RefreshCw className="w-5 h-5 animate-spin" />
               ) : (
@@ -460,34 +475,17 @@ function DriverOrderDetailPage() {
                 </>
               )}
             </span>
-            {/* Shine effect */}
-            <div className="absolute inset-0 -translate-x-full hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
           </button>
         </div>
       )}
 
-      {/* Delivered State */}
-      {isDelivered && (
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-lg border-t border-slate-200 dark:border-slate-700 lg:left-64">
-          <div className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-2xl py-4 text-center font-bold text-lg flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25">
-            <CheckCircle className="w-6 h-6" />
-            Delivered Successfully
-          </div>
-        </div>
-      )}
-
       {/* Pickup Confirmation Modal */}
-      <Modal
-        isOpen={showPickupModal}
-        onClose={() => setShowPickupModal(false)}
-        title="Confirm Pickup"
-        size="md"
-      >
-        <div className="space-y-5">
-          <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl p-5">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-100 to-indigo-100 dark:from-violet-900/30 dark:to-indigo-900/30 flex items-center justify-center">
-                <Truck className="w-7 h-7 text-violet-500" />
+      <Modal isOpen={showPickupModal} onClose={() => setShowPickupModal(false)} title="Confirm Pickup" size="md">
+        <div className="space-y-4">
+          <div className="bg-slate-50 dark:bg-slate-900 rounded-xl p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
+                <Truck className="w-6 h-6 text-violet-500" />
               </div>
               <div>
                 <h4 className="font-semibold text-slate-900 dark:text-white">{order.store_name || order.shipper_name}</h4>
@@ -496,130 +494,87 @@ function DriverOrderDetailPage() {
             </div>
           </div>
 
-          <div className="text-center">
-            <div className="w-16 h-16 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center mx-auto mb-3">
-              <Package className="w-8 h-8 text-amber-600" />
-            </div>
-            <p className="text-slate-600 dark:text-slate-400">
-              Have you collected all items from the store?
-            </p>
+          <div className="text-center py-2">
+            <Package className="w-10 h-10 text-amber-500 mx-auto mb-2" />
+            <p className="text-sm text-slate-600 dark:text-slate-400">Have you collected all items?</p>
           </div>
 
           <button
             onClick={() => handleStatusUpdate(3)}
             disabled={processing}
-            className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold py-4 rounded-2xl transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-amber-500/25"
+            className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold py-3.5 rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            {processing ? <RefreshCw className="w-5 h-5 animate-spin" /> : 'Yes, Confirm Pickup'}
+            {processing ? <RefreshCw className="w-5 h-5 animate-spin" /> : 'Confirm Pickup'}
           </button>
         </div>
       </Modal>
 
       {/* Delivery Completion Modal */}
-      <Modal
-        isOpen={showDeliveryModal}
-        onClose={() => setShowDeliveryModal(false)}
-        title="Complete Delivery"
-        size="lg"
-      >
-        <div className="space-y-5 max-h-[65vh] overflow-y-auto">
-          {/* Delivery Type */}
+      <Modal isOpen={showDeliveryModal} onClose={() => setShowDeliveryModal(false)} title="Complete Delivery" size="lg">
+        <div className="space-y-4 max-h-[65vh] overflow-y-auto">
           <div>
-            <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Package was</p>
-            <div className="grid grid-cols-2 gap-3">
-              <label className={`flex items-center justify-center gap-2 p-4 border-2 rounded-2xl cursor-pointer transition-all ${
+            <p className="text-xs font-semibold text-slate-500 uppercase mb-2">Package was</p>
+            <div className="grid grid-cols-2 gap-2">
+              <label className={`flex items-center justify-center gap-2 p-3 border-2 rounded-xl cursor-pointer transition-all text-sm ${
                 deliveryForm.package_received_by === 'Received by Person'
-                  ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20'
+                  ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700'
                   : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
               }`}>
-                <input
-                  type="radio"
-                  name="received_by"
-                  className="sr-only"
-                  checked={deliveryForm.package_received_by === 'Received by Person'}
-                  onChange={() => setDeliveryForm(prev => ({ ...prev, package_received_by: 'Received by Person' }))}
-                />
-                <Shield className="w-5 h-5 text-emerald-600" />
-                <span className="text-sm font-medium">Received by Person</span>
+                <input type="radio" name="received_by" className="sr-only" checked={deliveryForm.package_received_by === 'Received by Person'}
+                  onChange={() => setDeliveryForm(prev => ({ ...prev, package_received_by: 'Received by Person' }))} />
+                <User className="w-4 h-4" />
+                <span className="font-medium">In Person</span>
               </label>
-              <label className={`flex items-center justify-center gap-2 p-4 border-2 rounded-2xl cursor-pointer transition-all ${
+              <label className={`flex items-center justify-center gap-2 p-3 border-2 rounded-xl cursor-pointer transition-all text-sm ${
                 deliveryForm.package_received_by === 'Safe Dropped'
-                  ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20'
+                  ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700'
                   : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
               }`}>
-                <input
-                  type="radio"
-                  name="received_by"
-                  className="sr-only"
-                  checked={deliveryForm.package_received_by === 'Safe Dropped'}
-                  onChange={() => setDeliveryForm(prev => ({ ...prev, package_received_by: 'Safe Dropped' }))}
-                />
-                <Package className="w-5 h-5 text-emerald-600" />
-                <span className="text-sm font-medium">Safe Dropped</span>
+                <input type="radio" name="received_by" className="sr-only" checked={deliveryForm.package_received_by === 'Safe Dropped'}
+                  onChange={() => setDeliveryForm(prev => ({ ...prev, package_received_by: 'Safe Dropped' }))} />
+                <Package className="w-4 h-4" />
+                <span className="font-medium">Safe Drop</span>
               </label>
             </div>
           </div>
 
-          {/* Proof of Delivery */}
           <div>
-            <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Proof of Delivery</p>
-            <div className="border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl p-5">
+            <p className="text-xs font-semibold text-slate-500 uppercase mb-2">Photo Proof</p>
+            <div className="border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-4">
               {deliveryForm.delivery_proof_preview ? (
-                <div className="flex items-center gap-4">
-                  <img src={deliveryForm.delivery_proof_preview} alt="Proof" className="w-20 h-20 rounded-xl object-cover" />
-                  <button
-                    onClick={() => setDeliveryForm(prev => ({ ...prev, delivery_proof: null, delivery_proof_preview: null }))}
-                    className="text-sm font-medium text-red-600 hover:underline"
-                  >
-                    Remove photo
-                  </button>
+                <div className="flex items-center gap-3">
+                  <img src={deliveryForm.delivery_proof_preview} alt="Proof" className="w-16 h-16 rounded-lg object-cover" />
+                  <button onClick={() => setDeliveryForm(prev => ({ ...prev, delivery_proof: null, delivery_proof_preview: null }))}
+                    className="text-xs font-medium text-red-600 hover:underline">Remove</button>
                 </div>
               ) : (
-                <label className="flex flex-col items-center justify-center py-6 cursor-pointer">
-                  <div className="w-14 h-14 rounded-2xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center mb-3">
-                    <Camera className="w-7 h-7 text-violet-500" />
-                  </div>
-                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Tap to upload photo</span>
-                  <span className="text-xs text-slate-500 mt-1">Optional but recommended</span>
+                <label className="flex flex-col items-center justify-center py-4 cursor-pointer">
+                  <Camera className="w-8 h-8 text-slate-400 mb-2" />
+                  <span className="text-xs font-medium text-slate-600 dark:text-slate-400">Add Photo</span>
                   <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
                 </label>
               )}
             </div>
           </div>
 
-          {/* Additional Options */}
-          <label className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl cursor-pointer">
-            <input
-              type="checkbox"
-              checked={deliveryForm.visible_drunk}
+          <label className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-900 rounded-xl cursor-pointer">
+            <input type="checkbox" checked={deliveryForm.visible_drunk}
               onChange={(e) => setDeliveryForm(prev => ({ ...prev, visible_drunk: e.target.checked }))}
-              className="w-5 h-5 rounded text-violet-500 focus:ring-violet-500"
-            />
-            <span className="text-sm text-slate-700 dark:text-slate-300">Receiver appeared intoxicated</span>
+              className="w-4 h-4 rounded text-violet-500 focus:ring-violet-500" />
+            <span className="text-sm text-slate-600 dark:text-slate-400">Receiver appeared intoxicated</span>
           </label>
 
-          {/* Notes */}
           <div>
-            <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Notes (Optional)</p>
-            <textarea
-              placeholder="Add any delivery notes..."
-              value={deliveryForm.driver_note}
+            <p className="text-xs font-semibold text-slate-500 uppercase mb-2">Notes</p>
+            <textarea placeholder="Optional notes..." value={deliveryForm.driver_note}
               onChange={(e) => setDeliveryForm(prev => ({ ...prev, driver_note: e.target.value }))}
-              className="w-full p-4 border border-slate-200 dark:border-slate-700 rounded-2xl resize-none h-24 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 dark:bg-slate-900"
-            />
+              className="w-full p-3 border border-slate-200 dark:border-slate-700 rounded-xl resize-none h-20 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 dark:bg-slate-900" />
           </div>
 
-          {/* Complete Button */}
-          <button
-            onClick={handleCompleteDelivery}
-            disabled={processing}
-            className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-bold py-4 rounded-2xl transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25"
-          >
+          <button onClick={handleCompleteDelivery} disabled={processing}
+            className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-semibold py-3.5 rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2">
             {processing ? <RefreshCw className="w-5 h-5 animate-spin" /> : (
-              <>
-                <CheckCircle className="w-5 h-5" />
-                Complete Delivery
-              </>
+              <><CheckCircle className="w-5 h-5" /> Complete Delivery</>
             )}
           </button>
         </div>
