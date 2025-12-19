@@ -67,7 +67,7 @@ function OrderCard({ order, onAccept, processing }) {
                   {order.store_name || order.shipper_name || 'Pickup Point'}
                 </h3>
                 <p className="text-sm text-slate-500 dark:text-slate-400">
-                  Order #{order.id}
+                  Order #{order.order_id}
                 </p>
               </div>
             </div>
@@ -127,11 +127,11 @@ function OrderCard({ order, onAccept, processing }) {
           {/* Action Button */}
           <button
             onClick={() => onAccept(order)}
-            disabled={processing === order.id}
+            disabled={processing === order.order_id}
             className="w-full relative overflow-hidden group/btn bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-semibold py-3.5 px-6 rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <span className="relative z-10 flex items-center justify-center gap-2">
-              {processing === order.id ? (
+              {processing === order.order_id ? (
                 <RefreshCw className="w-5 h-5 animate-spin" />
               ) : (
                 <>
@@ -232,9 +232,9 @@ function DriverOrdersPage() {
 
   const handleAcceptOrder = async (order) => {
     try {
-      setProcessing(order.id)
+      setProcessing(order.order_id)
       const response = await driverService.changeDriverOrderStatus({
-        order_id: order.id,
+        order_id: order.order_id,
         driver_id: user.id,
         user_id: user.id,
         status: 1,
@@ -242,7 +242,7 @@ function DriverOrdersPage() {
 
       if (response.status === 1 || response.code === 200 || response.status === 0) {
         toast.success('Order accepted!')
-        navigate(`/driver/order/${order.id}`)
+        navigate(`/driver/order/${order.order_id}`)
       } else {
         toast.error(response.message || 'Failed to accept order')
         loadOrders(false)
@@ -408,7 +408,7 @@ function DriverOrdersPage() {
             <div className="grid gap-4">
               {orders.map((order) => (
                 <OrderCard
-                  key={order.id}
+                  key={order.order_id}
                   order={order}
                   onAccept={handleAcceptOrder}
                   processing={processing}
