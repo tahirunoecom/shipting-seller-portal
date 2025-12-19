@@ -82,13 +82,16 @@ function DriverOrderDetailPage() {
   const loadOrder = useCallback(async () => {
     try {
       setLoading(true)
+      const targetOrderId = parseInt(orderId)
       const response = await driverService.getDriverActiveOrders({
         driver_id: user.id,
-        order_id: parseInt(orderId),
+        order_id: targetOrderId,
       })
 
       if ((response.status === 1 || response.status === 0) && response.data?.length > 0) {
-        setOrder(response.data[0])
+        // Find the specific order by id in case API returns multiple orders
+        const foundOrder = response.data.find(o => o.id === targetOrderId) || response.data[0]
+        setOrder(foundOrder)
       } else {
         toast.error('Order not found')
         navigate('/driver/orders')
