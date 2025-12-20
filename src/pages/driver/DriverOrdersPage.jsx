@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store'
 import { driverService } from '@/services'
-import { formatCurrency } from '@/utils/helpers'
 import {
   notifyNewDeliveryRequest,
   trackOrdersForNotifications,
@@ -70,13 +69,6 @@ function OrderCard({ order, onAccept, processing }) {
                   Order #{order.id}
                 </p>
               </div>
-            </div>
-
-            {/* Price Badge */}
-            <div className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/30 dark:to-teal-900/30 px-4 py-2 rounded-xl">
-              <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
-                {formatCurrency(order.order_amount || order.total_amount)}
-              </p>
             </div>
           </div>
 
