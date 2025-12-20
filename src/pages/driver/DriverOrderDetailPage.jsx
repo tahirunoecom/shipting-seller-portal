@@ -54,6 +54,16 @@ const STATUS_LABELS = {
   7: 'Delivered',
 }
 
+const STATUS_STEPS = [
+  { status: 1, label: 'Accepted' },
+  { status: 2, label: 'Going' },
+  { status: 4, label: 'At Store' },
+  { status: 3, label: 'Picked Up' },
+  { status: 5, label: 'En Route' },
+  { status: 6, label: 'Arrived' },
+  { status: 7, label: 'Done' },
+]
+
 function DriverOrderDetailPage() {
   const { orderId } = useParams()
   const navigate = useNavigate()
@@ -200,6 +210,10 @@ function DriverOrderDetailPage() {
     else handleStatusUpdate(config.nextStatus)
   }
 
+  const getStepIndex = (status) => {
+    return STATUS_STEPS.findIndex(s => s.status === status)
+  }
+
   const openNavigation = () => {
     const statusCode = getStatusCode()
     const address = statusCode < 3
@@ -233,7 +247,7 @@ function DriverOrderDetailPage() {
   const isDelivered = statusCode === 7
   const orderAmount = order.order_amount || order.total_amount || 0
   const isAtPickup = statusCode < 3
-  const currentLocation = isAtPickup ? 'pickup' : 'dropoff'
+  const currentStepIndex = getStepIndex(statusCode)
 
   return (
     <div className="space-y-4 pb-24">
@@ -323,22 +337,47 @@ function DriverOrderDetailPage() {
           </div>
         </div>
 
-        {/* Mini Progress Bar */}
-        <div className="px-4 pb-3">
-          <div className="flex items-center gap-1">
-            {[1, 2, 4, 3, 5, 6, 7].map((step, idx) => {
-              const stepOrder = [1, 2, 4, 3, 5, 6, 7]
-              const currentIdx = stepOrder.indexOf(statusCode)
-              const isComplete = idx <= currentIdx
+      </div>
+
+      {/* Progress Steps */}
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Delivery Progress</h3>
+          <span className="text-xs text-slate-500">{Math.min(currentStepIndex + 1, STATUS_STEPS.length)}/{STATUS_STEPS.length}</span>
+        </div>
+        <div className="relative">
+          {/* Progress bar background */}
+          <div className="absolute top-3 left-0 right-0 h-0.5 bg-slate-200 dark:bg-slate-700 rounded-full" />
+          {/* Progress bar fill */}
+          <div
+            className="absolute top-3 left-0 h-0.5 bg-gradient-to-r from-violet-500 to-indigo-500 rounded-full transition-all duration-500"
+            style={{ width: `${(currentStepIndex / (STATUS_STEPS.length - 1)) * 100}%` }}
+          />
+
+          {/* Steps */}
+          <div className="relative flex justify-between">
+            {STATUS_STEPS.map((step, index) => {
+              const isComplete = index <= currentStepIndex
+              const isCurrent = index === currentStepIndex
               return (
-                <div
-                  key={step}
-                  className={`h-1 flex-1 rounded-full transition-all ${
+                <div key={step.status} className="flex flex-col items-center">
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
                     isComplete
-                      ? 'bg-gradient-to-r from-violet-500 to-indigo-500'
-                      : 'bg-slate-200 dark:bg-slate-700'
-                  }`}
-                />
+                      ? 'bg-gradient-to-r from-violet-500 to-indigo-500 text-white'
+                      : 'bg-slate-200 dark:bg-slate-700 text-slate-400'
+                  } ${isCurrent ? 'ring-2 ring-violet-200 dark:ring-violet-900/50 ring-offset-1' : ''}`}>
+                    {isComplete && index < currentStepIndex ? (
+                      <CheckCircle className="w-3.5 h-3.5" />
+                    ) : (
+                      <span>{index + 1}</span>
+                    )}
+                  </div>
+                  <span className={`text-[9px] mt-1.5 font-medium text-center ${
+                    isComplete ? 'text-violet-600 dark:text-violet-400' : 'text-slate-400'
+                  }`}>
+                    {step.label}
+                  </span>
+                </div>
               )
             })}
           </div>
