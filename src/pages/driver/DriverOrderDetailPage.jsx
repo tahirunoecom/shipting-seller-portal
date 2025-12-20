@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store'
 import { driverService, DRIVER_STATUS } from '@/services'
 import { Modal } from '@/components/ui'
-import { formatCurrency, formatDateTime } from '@/utils/helpers'
+import { formatDateTime } from '@/utils/helpers'
 import {
   notifyDeliveryReminder,
   notifyDeliveryCompleted,
@@ -245,12 +245,11 @@ function DriverOrderDetailPage() {
   const statusCode = getStatusCode()
   const buttonConfig = STATUS_CONFIG[statusCode]
   const isDelivered = statusCode === 7
-  const orderAmount = order.order_amount || order.total_amount || 0
   const isAtPickup = statusCode < 3
   const currentStepIndex = getStepIndex(statusCode)
 
   return (
-    <div className="space-y-4 pb-24">
+    <div className="space-y-4 pb-6">
       {/* Compact Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -328,12 +327,28 @@ function DriverOrderDetailPage() {
                 </span>
               </div>
             </div>
-            <div className="text-right">
-              <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
-                {formatCurrency(orderAmount)}
-              </p>
-              <p className="text-[10px] text-slate-400 uppercase tracking-wider">Total</p>
-            </div>
+            {/* Action Button - Compact */}
+            {buttonConfig && !isDelivered && (
+              <button
+                onClick={handleActionClick}
+                disabled={processing}
+                className={`px-4 py-2 rounded-lg font-medium text-sm text-white transition-all disabled:opacity-50 flex items-center gap-1.5 ${
+                  buttonConfig.color === 'violet' ? 'bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700' :
+                  buttonConfig.color === 'amber' ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600' :
+                  buttonConfig.color === 'blue' ? 'bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600' :
+                  'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600'
+                }`}
+              >
+                {processing ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    {buttonConfig.label}
+                    <ChevronRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            )}
           </div>
         </div>
 
@@ -491,32 +506,6 @@ function DriverOrderDetailPage() {
         </div>
       )}
 
-      {/* Fixed Bottom Action Button */}
-      {buttonConfig && !isDelivered && (
-        <div className="fixed bottom-0 left-0 right-0 p-3 bg-white/90 dark:bg-slate-900/90 backdrop-blur-lg border-t border-slate-200 dark:border-slate-700 lg:left-64">
-          <button
-            onClick={handleActionClick}
-            disabled={processing}
-            className={`w-full py-3.5 px-6 rounded-xl font-semibold text-white transition-all disabled:opacity-50 shadow-lg ${
-              buttonConfig.color === 'violet' ? 'bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 shadow-violet-500/25' :
-              buttonConfig.color === 'amber' ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 shadow-amber-500/25' :
-              buttonConfig.color === 'blue' ? 'bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 shadow-blue-500/25' :
-              'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-emerald-500/25'
-            }`}
-          >
-            <span className="flex items-center justify-center gap-2">
-              {processing ? (
-                <RefreshCw className="w-5 h-5 animate-spin" />
-              ) : (
-                <>
-                  {buttonConfig.label}
-                  <ChevronRight className="w-5 h-5" />
-                </>
-              )}
-            </span>
-          </button>
-        </div>
-      )}
 
       {/* Pickup Confirmation Modal */}
       <Modal isOpen={showPickupModal} onClose={() => setShowPickupModal(false)} title="Confirm Pickup" size="md">
@@ -528,7 +517,7 @@ function DriverOrderDetailPage() {
               </div>
               <div>
                 <h4 className="font-semibold text-slate-900 dark:text-white">{order.store_name || order.shipper_name}</h4>
-                <p className="text-sm text-slate-500">{order.total_product} items • {formatCurrency(orderAmount)}</p>
+                <p className="text-sm text-slate-500">{order.total_product || 1} items</p>
               </div>
             </div>
           </div>
