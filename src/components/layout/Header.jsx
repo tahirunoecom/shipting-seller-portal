@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuthStore, useNotificationStore } from '@/store'
 import { Avatar } from '@/components/ui'
 import { formatDistanceToNow } from '@/utils/helpers'
+import toast from 'react-hot-toast'
 import {
   Menu,
   Bell,
@@ -43,7 +44,7 @@ function Header({ onMenuClick }) {
   const [showDropdown, setShowDropdown] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
   const navigate = useNavigate()
-  const { user, userDetails, logout } = useAuthStore()
+  const { user, userDetails, logout, activeMode } = useAuthStore()
   const {
     notifications,
     unreadCount,
@@ -61,12 +62,37 @@ function Header({ onMenuClick }) {
   const handleNotificationClick = (notification) => {
     markAsRead(notification.id)
     if (notification.navigateTo) {
+      const isDriverRoute = notification.navigateTo.startsWith('/driver')
+      const isSellerRoute = !isDriverRoute
+
+      // Check if navigation matches current mode
+      if (isDriverRoute && activeMode !== 'driver') {
+        toast.error('Switch to Driver Mode to view this order')
+        setShowNotifications(false)
+        return
+      }
+      if (isSellerRoute && activeMode === 'driver') {
+        toast.error('Switch to Seller Mode to view this order')
+        setShowNotifications(false)
+        return
+      }
+
       navigate(notification.navigateTo)
     }
     setShowNotifications(false)
   }
 
   const fullName = user ? `${user.firstname} ${user.lastname}` : 'User'
+
+  // Filter notifications based on current mode
+  const filteredNotifications = notifications.filter(notification => {
+    if (!notification.navigateTo) return true
+    const isDriverNotification = notification.navigateTo.startsWith('/driver')
+    if (activeMode === 'driver') return isDriverNotification
+    return !isDriverNotification // Seller mode shows non-driver notifications
+  })
+
+  const filteredUnreadCount = filteredNotifications.filter(n => !n.read).length
 
   return (
     <header className="sticky top-0 z-30 h-16 bg-white border-b border-gray-200 dark:bg-dark-card dark:border-dark-border">
@@ -102,9 +128,9 @@ function Header({ onMenuClick }) {
               className="relative p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:text-dark-muted dark:hover:bg-dark-border"
             >
               <Bell className="h-5 w-5" />
-              {unreadCount > 0 && (
+              {filteredUnreadCount > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center bg-red-500 text-white text-xs font-bold rounded-full">
-                  {unreadCount > 99 ? '99+' : unreadCount}
+                  {filteredUnreadCount > 99 ? '99+' : filteredUnreadCount}
                 </span>
               )}
             </button>
@@ -123,7 +149,7 @@ function Header({ onMenuClick }) {
                       Notifications
                     </h3>
                     <div className="flex items-center gap-2">
-                      {unreadCount > 0 && (
+                      {filteredUnreadCount > 0 && (
                         <button
                           onClick={markAllAsRead}
                           className="text-xs text-primary-600 hover:text-primary-700 font-medium"
@@ -131,7 +157,7 @@ function Header({ onMenuClick }) {
                           Mark all read
                         </button>
                       )}
-                      {notifications.length > 0 && (
+                      {filteredNotifications.length > 0 && (
                         <button
                           onClick={clearAll}
                           className="p-1 text-gray-400 hover:text-red-500 transition-colors"
@@ -145,8 +171,8 @@ function Header({ onMenuClick }) {
 
                   {/* Notification List */}
                   <div className="max-h-96 overflow-y-auto">
-                    {notifications.length > 0 ? (
-                      notifications.map((notification) => {
+                    {filteredNotifications.length > 0 ? (
+                      filteredNotifications.map((notification) => {
                         const Icon = NOTIFICATION_ICONS[notification.type] || NOTIFICATION_ICONS.default
                         const bgColor = NOTIFICATION_COLORS[notification.type] || NOTIFICATION_COLORS.default
 

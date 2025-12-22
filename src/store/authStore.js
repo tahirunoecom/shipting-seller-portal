@@ -2,6 +2,8 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { authService } from '@/services/auth'
 import toast from 'react-hot-toast'
+import { useNotificationStore } from './notificationStore'
+import { resetNotificationTracking, stopAllReminders } from '@/utils/notifications'
 
 const useAuthStore = create(
   persist(
@@ -62,6 +64,11 @@ const useAuthStore = create(
             }
             // If multiple roles, activeMode stays null and user chooses
 
+            // Clear any notifications from previous sessions
+            useNotificationStore.getState().clearAll()
+            resetNotificationTracking()
+            stopAllReminders()
+
             set({
               user,
               userDetails: user_details,
@@ -72,7 +79,7 @@ const useAuthStore = create(
               userTypes,
               activeMode,
             })
-            
+
             toast.success('Login successful!')
             return { success: true, data: response.data }
           } else {
@@ -164,7 +171,17 @@ const useAuthStore = create(
 
       // Logout
       logout: () => {
+        // Clear auth data
         localStorage.removeItem('access_token')
+
+        // Clear notifications
+        useNotificationStore.getState().clearAll()
+        localStorage.removeItem('notification-storage')
+
+        // Reset notification tracking
+        resetNotificationTracking()
+        stopAllReminders()
+
         set({
           user: null,
           userDetails: null,
