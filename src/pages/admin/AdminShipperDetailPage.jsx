@@ -38,6 +38,39 @@ import toast from 'react-hot-toast'
 function OverviewTab({ shipper, shipperDetails }) {
   const data = shipperDetails || shipper
 
+  // Helper to get name from different field names
+  const getName = () => {
+    if (data?.firstname || data?.lastname) {
+      return `${data?.firstname || ''} ${data?.lastname || ''}`.trim()
+    }
+    return data?.name || 'N/A'
+  }
+
+  // Helper to get store name
+  const getStoreName = () => {
+    return data?.company || data?.store_name || 'N/A'
+  }
+
+  // Helper to get phone
+  const getPhone = () => {
+    return data?.telephone || data?.phone || 'N/A'
+  }
+
+  // Helper to get address
+  const getAddress = () => {
+    const parts = [data?.address_1, data?.address_2].filter(Boolean)
+    return parts.join(', ') || data?.address || data?.store_address || 'N/A'
+  }
+
+  // Helper to get date
+  const getCreatedDate = () => {
+    const dateStr = data?.date_added || data?.created_at
+    if (dateStr) {
+      return new Date(dateStr).toLocaleDateString()
+    }
+    return 'N/A'
+  }
+
   const getStatusBadge = (value, labels = { true: 'Yes', false: 'No' }) => {
     const isTrue = value === 1 || value === '1' || value === true
     return isTrue ? (
@@ -60,7 +93,7 @@ function OverviewTab({ shipper, shipperDetails }) {
         <span className="text-sm text-slate-600 dark:text-slate-400">{label}</span>
       </div>
       {isBadge ? value : (
-        <span className="text-sm font-medium text-slate-900 dark:text-white">{value || 'N/A'}</span>
+        <span className="text-sm font-medium text-slate-900 dark:text-white text-right max-w-[200px] truncate">{value || 'N/A'}</span>
       )}
     </div>
   )
@@ -75,10 +108,10 @@ function OverviewTab({ shipper, shipperDetails }) {
             Login Details
           </h3>
           <div className="space-y-0">
-            <InfoRow icon={User} label="Name" value={data?.name} />
+            <InfoRow icon={User} label="Name" value={getName()} />
             <InfoRow icon={Mail} label="Email" value={data?.email} />
-            <InfoRow icon={Phone} label="Phone" value={data?.phone} />
-            <InfoRow icon={Calendar} label="Created" value={data?.created_at ? new Date(data.created_at).toLocaleDateString() : 'N/A'} />
+            <InfoRow icon={Phone} label="Phone" value={getPhone()} />
+            <InfoRow icon={Calendar} label="Created" value={getCreatedDate()} />
             <InfoRow icon={Shield} label="OTP Verified" value={getStatusBadge(data?.otp_verification)} isBadge />
           </div>
         </CardContent>
@@ -92,11 +125,11 @@ function OverviewTab({ shipper, shipperDetails }) {
             Store Details
           </h3>
           <div className="space-y-0">
-            <InfoRow icon={Building} label="Store Name" value={data?.store_name} />
-            <InfoRow icon={MapPin} label="Address" value={data?.address || data?.store_address} />
+            <InfoRow icon={Building} label="Store/Company" value={getStoreName()} />
+            <InfoRow icon={MapPin} label="Address" value={getAddress()} />
             <InfoRow icon={MapPin} label="City" value={data?.city || data?.store_city} />
             <InfoRow icon={MapPin} label="State" value={data?.state || data?.store_state} />
-            <InfoRow icon={MapPin} label="ZIP Code" value={data?.zip_code || data?.store_zip_code} />
+            <InfoRow icon={MapPin} label="ZIP Code" value={data?.postcode || data?.zip_code || data?.store_zip_code} />
             <InfoRow icon={Globe} label="Country" value={data?.country || data?.store_country} />
           </div>
         </CardContent>
@@ -148,7 +181,7 @@ function OverviewTab({ shipper, shipperDetails }) {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50">
               <p className="text-xs text-slate-500 dark:text-slate-400">User ID</p>
-              <p className="font-mono text-sm font-medium text-slate-900 dark:text-white mt-1">{data?.id || 'N/A'}</p>
+              <p className="font-mono text-sm font-medium text-slate-900 dark:text-white mt-1">{data?.warehouse_user_id || data?.id || 'N/A'}</p>
             </div>
             <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50">
               <p className="text-xs text-slate-500 dark:text-slate-400">WH Account ID</p>
@@ -156,7 +189,7 @@ function OverviewTab({ shipper, shipperDetails }) {
             </div>
             <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50">
               <p className="text-xs text-slate-500 dark:text-slate-400">Stripe Account</p>
-              <p className="font-mono text-sm font-medium text-slate-900 dark:text-white mt-1 truncate">{data?.stripe_account_id || 'N/A'}</p>
+              <p className="font-mono text-sm font-medium text-slate-900 dark:text-white mt-1 truncate">{data?.stripe_account_id || data?.stripe_connect_id || 'N/A'}</p>
             </div>
             <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50">
               <p className="text-xs text-slate-500 dark:text-slate-400">WABA ID</p>
@@ -309,6 +342,7 @@ function DashboardTab({ shipperId }) {
 function ProductsTab({ shipperId }) {
   const [products, setProducts] = useState([])
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
     fetchProducts()
@@ -316,16 +350,43 @@ function ProductsTab({ shipperId }) {
 
   const fetchProducts = async () => {
     setIsLoading(true)
+    setError(null)
     try {
       const response = await adminService.getShipperProducts(shipperId)
       if (response.status === 1) {
-        setProducts(response.data || [])
+        // Handle different response structures
+        const productsList = response.data?.products || response.data || []
+        setProducts(Array.isArray(productsList) ? productsList : [])
+      } else {
+        setError(response.message || 'Failed to fetch products')
       }
     } catch (error) {
       console.error('Error fetching products:', error)
+      setError('Failed to fetch products')
+      setProducts([])
     } finally {
       setIsLoading(false)
     }
+  }
+
+  // Get product name
+  const getProductName = (product) => {
+    return product.name || product.product_name || product.title || 'Unnamed Product'
+  }
+
+  // Get product image
+  const getProductImage = (product) => {
+    return product.image || product.product_image || product.thumbnail || null
+  }
+
+  // Get product price
+  const getProductPrice = (product) => {
+    return product.price || product.selling_price || product.regular_price || 0
+  }
+
+  // Check if product is active
+  const isProductActive = (product) => {
+    return product.status === 'active' || product.status === '1' || product.status === 1 || product.is_active === 1
   }
 
   if (isLoading) {
@@ -336,10 +397,34 @@ function ProductsTab({ shipperId }) {
     )
   }
 
+  if (error) {
+    return (
+      <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
+        <CardContent className="p-12 text-center">
+          <AlertCircle className="w-12 h-12 text-red-400 mx-auto" />
+          <p className="mt-4 text-slate-500 dark:text-slate-400">{error}</p>
+          <button
+            onClick={fetchProducts}
+            className="mt-4 px-4 py-2 bg-violet-500 text-white rounded-lg hover:bg-violet-600"
+          >
+            Retry
+          </button>
+        </CardContent>
+      </Card>
+    )
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-slate-500 dark:text-slate-400">{products.length} products</p>
+        <button
+          onClick={fetchProducts}
+          className="text-sm text-violet-600 hover:text-violet-700 flex items-center gap-1"
+        >
+          <RefreshCw className="w-4 h-4" />
+          Refresh
+        </button>
       </div>
 
       {products.length === 0 ? (
@@ -351,28 +436,31 @@ function ProductsTab({ shipperId }) {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {products.map((product) => (
-            <Card key={product.id} className="bg-white dark:bg-slate-800 border-0 shadow-sm">
+          {products.map((product, index) => (
+            <Card key={product.id || product.product_id || index} className="bg-white dark:bg-slate-800 border-0 shadow-sm">
               <CardContent className="p-4">
                 <div className="flex gap-4">
-                  {product.image ? (
-                    <img src={product.image} alt={product.name} className="w-16 h-16 rounded-lg object-cover" />
+                  {getProductImage(product) ? (
+                    <img src={getProductImage(product)} alt={getProductName(product)} className="w-16 h-16 rounded-lg object-cover" />
                   ) : (
                     <div className="w-16 h-16 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
                       <Package className="w-6 h-6 text-slate-400" />
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-medium text-slate-900 dark:text-white truncate">{product.name || product.product_name}</h4>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">{product.category}</p>
+                    <h4 className="font-medium text-slate-900 dark:text-white truncate">{getProductName(product)}</h4>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">{product.category || product.category_name || 'No category'}</p>
                     <div className="flex items-center gap-2 mt-2">
-                      <span className="font-semibold text-slate-900 dark:text-white">${product.price || product.selling_price || 0}</span>
-                      {product.status === 'active' || product.status === '1' ? (
+                      <span className="font-semibold text-slate-900 dark:text-white">${getProductPrice(product)}</span>
+                      {isProductActive(product) ? (
                         <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">Active</span>
                       ) : (
                         <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400">Inactive</span>
                       )}
                     </div>
+                    {product.quantity !== undefined && (
+                      <p className="text-xs text-slate-400 mt-1">Stock: {product.quantity}</p>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -388,6 +476,7 @@ function OrdersTab({ shipperId }) {
   const [orders, setOrders] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [filter, setFilter] = useState('All')
+  const [selectedOrder, setSelectedOrder] = useState(null)
 
   useEffect(() => {
     fetchOrders()
@@ -401,39 +490,162 @@ function OrdersTab({ shipperId }) {
         type: filter,
       })
       if (response.status === 1) {
-        setOrders(response.data?.orders || response.data || [])
+        const ordersList = response.data?.orders || response.data || []
+        setOrders(Array.isArray(ordersList) ? ordersList : [])
       }
     } catch (error) {
       console.error('Error fetching orders:', error)
+      setOrders([])
     } finally {
       setIsLoading(false)
     }
   }
 
+  // Get order ID - try different field names
+  const getOrderId = (order) => {
+    return order.order_id || order.id || order.order_number || 'N/A'
+  }
+
+  // Get order status with proper detection
+  const getOrderStatus = (order) => {
+    // Check for cancelled first
+    if (order.is_cancelled === 1 || order.is_cancelled === '1' || order.order_cancelled === 'Y') {
+      return 'cancelled'
+    }
+    // Check for delivered
+    if (order.order_delivered === 'Y' || order.is_delivered === 1 || order.is_delivered === '1') {
+      return 'delivered'
+    }
+    // Check for shipped
+    if (order.order_shipped === 'Y' || order.is_shipped === 1 || order.is_shipped === '1') {
+      return 'shipped'
+    }
+    // Check for packed
+    if (order.order_packed === 'Y' || order.is_packed === 1 || order.is_packed === '1') {
+      return 'packed'
+    }
+    // Check for accepted
+    if (order.order_accept === 'Y' || order.is_accepted === 1 || order.is_accepted === '1') {
+      return 'accepted'
+    }
+    return 'new'
+  }
+
   const getOrderStatusBadge = (order) => {
-    const status = order.order_status || order.status
-    if (order.is_cancelled === 1 || order.is_cancelled === '1') {
-      return <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">Cancelled</span>
+    const status = getOrderStatus(order)
+    const badges = {
+      cancelled: <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">Cancelled</span>,
+      delivered: <span className="px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">Delivered</span>,
+      shipped: <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">Shipped</span>,
+      packed: <span className="px-2 py-1 rounded-full text-xs font-medium bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">Packed</span>,
+      accepted: <span className="px-2 py-1 rounded-full text-xs font-medium bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400">Accepted</span>,
+      new: <span className="px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">New</span>,
     }
-    if (status === 'delivered' || order.order_delivered === 'Y') {
-      return <span className="px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">Delivered</span>
+    return badges[status] || badges.new
+  }
+
+  // Get customer name
+  const getCustomerName = (order) => {
+    if (order.customer_name) return order.customer_name
+    if (order.shipping_firstname || order.shipping_lastname) {
+      return `${order.shipping_firstname || ''} ${order.shipping_lastname || ''}`.trim()
     }
-    if (status === 'shipped' || order.order_shipped === 'Y') {
-      return <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">Shipped</span>
-    }
-    if (status === 'packed' || order.order_packed === 'Y') {
-      return <span className="px-2 py-1 rounded-full text-xs font-medium bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">Packed</span>
-    }
-    if (status === 'accepted' || order.order_accept === 'Y') {
-      return <span className="px-2 py-1 rounded-full text-xs font-medium bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400">Accepted</span>
-    }
-    return <span className="px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">New</span>
+    if (order.drop_off?.customer_name) return order.drop_off.customer_name
+    return null
   }
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <RefreshCw className="w-8 h-8 text-violet-500 animate-spin" />
+      </div>
+    )
+  }
+
+  // Order Detail Modal
+  if (selectedOrder) {
+    return (
+      <div className="space-y-4">
+        <button
+          onClick={() => setSelectedOrder(null)}
+          className="flex items-center gap-2 text-sm text-violet-600 hover:text-violet-700"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Orders
+        </button>
+
+        <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                Order #{getOrderId(selectedOrder)}
+              </h3>
+              {getOrderStatusBadge(selectedOrder)}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Order Info */}
+              <div className="space-y-4">
+                <h4 className="font-semibold text-slate-900 dark:text-white">Order Information</h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Order ID</span>
+                    <span className="text-slate-900 dark:text-white">{getOrderId(selectedOrder)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Amount</span>
+                    <span className="text-slate-900 dark:text-white">${selectedOrder.order_amount || selectedOrder.total_amount || 0}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Items</span>
+                    <span className="text-slate-900 dark:text-white">{selectedOrder.total_product || 1}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Date</span>
+                    <span className="text-slate-900 dark:text-white">{selectedOrder.date_added || selectedOrder.created_at || selectedOrder.order_date || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Payment</span>
+                    <span className="text-slate-900 dark:text-white">{selectedOrder.payment_method || 'N/A'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Customer Info */}
+              <div className="space-y-4">
+                <h4 className="font-semibold text-slate-900 dark:text-white">Customer Information</h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Name</span>
+                    <span className="text-slate-900 dark:text-white">{getCustomerName(selectedOrder) || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Phone</span>
+                    <span className="text-slate-900 dark:text-white">{selectedOrder.shipping_telephone || selectedOrder.customer_phone || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Email</span>
+                    <span className="text-slate-900 dark:text-white">{selectedOrder.email || 'N/A'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Shipping Address */}
+              <div className="space-y-4 md:col-span-2">
+                <h4 className="font-semibold text-slate-900 dark:text-white">Shipping Address</h4>
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  {[
+                    selectedOrder.shipping_address_1 || selectedOrder.drop_off?.address,
+                    selectedOrder.shipping_city || selectedOrder.drop_off?.city,
+                    selectedOrder.shipping_zone || selectedOrder.drop_off?.state,
+                    selectedOrder.shipping_postcode || selectedOrder.drop_off?.zip_code,
+                    selectedOrder.shipping_country || selectedOrder.drop_off?.country,
+                  ].filter(Boolean).join(', ') || 'N/A'}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     )
   }
@@ -468,23 +680,27 @@ function OrdersTab({ shipperId }) {
         </Card>
       ) : (
         <div className="space-y-3">
-          {orders.map((order) => (
-            <Card key={order.id} className="bg-white dark:bg-slate-800 border-0 shadow-sm">
+          {orders.map((order, index) => (
+            <Card
+              key={order.id || order.order_id || index}
+              className="bg-white dark:bg-slate-800 border-0 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+              onClick={() => setSelectedOrder(order)}
+            >
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3">
-                      <h4 className="font-semibold text-slate-900 dark:text-white">Order #{order.id}</h4>
+                      <h4 className="font-semibold text-slate-900 dark:text-white">Order #{getOrderId(order)}</h4>
                       {getOrderStatusBadge(order)}
                     </div>
                     <div className="flex items-center gap-4 mt-2 text-sm text-slate-500 dark:text-slate-400">
                       <span>{order.total_product || 1} item(s)</span>
                       <span>${order.order_amount || order.total_amount || 0}</span>
-                      <span>{order.created_at || order.order_date}</span>
+                      <span>{order.date_added || order.created_at || order.order_date || 'N/A'}</span>
                     </div>
-                    {order.customer_name && (
+                    {getCustomerName(order) && (
                       <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                        Customer: {order.customer_name}
+                        Customer: {getCustomerName(order)}
                       </p>
                     )}
                   </div>
@@ -502,6 +718,10 @@ function OrdersTab({ shipperId }) {
 function WhatsAppTab({ shipperId }) {
   const [whatsappStatus, setWhatsappStatus] = useState(null)
   const [botSettings, setBotSettings] = useState(null)
+  const [phoneStatus, setPhoneStatus] = useState(null)
+  const [catalogs, setCatalogs] = useState([])
+  const [autoReplies, setAutoReplies] = useState([])
+  const [businessProfile, setBusinessProfile] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -511,6 +731,7 @@ function WhatsAppTab({ shipperId }) {
   const fetchWhatsAppData = async () => {
     setIsLoading(true)
     try {
+      // Fetch all WhatsApp related data
       const [statusRes, settingsRes] = await Promise.all([
         adminService.getWhatsAppStatus(shipperId).catch(() => ({ status: 0 })),
         adminService.getWhatsAppBotSettings(shipperId).catch(() => ({ status: 0 })),
@@ -518,9 +739,14 @@ function WhatsAppTab({ shipperId }) {
 
       if (statusRes.status === 1) {
         setWhatsappStatus(statusRes.data)
+        // Extract nested data if available
+        if (statusRes.data?.phone_status) setPhoneStatus(statusRes.data.phone_status)
+        if (statusRes.data?.catalogs) setCatalogs(statusRes.data.catalogs || [])
+        if (statusRes.data?.business_profile) setBusinessProfile(statusRes.data.business_profile)
       }
       if (settingsRes.status === 1) {
         setBotSettings(settingsRes.data)
+        if (settingsRes.data?.auto_replies) setAutoReplies(settingsRes.data.auto_replies || [])
       }
     } catch (error) {
       console.error('Error fetching WhatsApp data:', error)
@@ -537,49 +763,169 @@ function WhatsAppTab({ shipperId }) {
     )
   }
 
-  const isConnected = whatsappStatus?.is_connected || whatsappStatus?.connected
+  const isConnected = whatsappStatus?.is_connected || whatsappStatus?.connected || whatsappStatus?.waba_id
 
   return (
     <div className="space-y-6">
       {/* Connection Status */}
       <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
         <CardContent className="p-6">
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-            <MessageSquare className="w-5 h-5 text-emerald-500" />
-            WhatsApp Connection
-          </h3>
-
-          <div className="flex items-center gap-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50">
-            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${isConnected ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-slate-200 dark:bg-slate-600'}`}>
-              <MessageSquare className={`w-6 h-6 ${isConnected ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`} />
-            </div>
-            <div>
-              <p className="font-medium text-slate-900 dark:text-white">
-                {isConnected ? 'Connected' : 'Not Connected'}
-              </p>
-              {whatsappStatus?.phone_number && (
-                <p className="text-sm text-slate-500 dark:text-slate-400">{whatsappStatus.phone_number}</p>
-              )}
-            </div>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 text-emerald-500" />
+              WhatsApp Connection
+            </h3>
+            <button
+              onClick={fetchWhatsAppData}
+              className="text-sm text-violet-600 hover:text-violet-700 flex items-center gap-1"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Refresh
+            </button>
           </div>
 
-          {whatsappStatus && (
-            <div className="mt-4 grid grid-cols-2 gap-4">
-              <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-700/50">
-                <p className="text-xs text-slate-500 dark:text-slate-400">WABA ID</p>
-                <p className="font-mono text-sm text-slate-900 dark:text-white mt-1">{whatsappStatus.waba_id || 'N/A'}</p>
+          <div className="flex items-center gap-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50">
+            <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${isConnected ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-slate-200 dark:bg-slate-600'}`}>
+              <MessageSquare className={`w-7 h-7 ${isConnected ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`} />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <p className="font-semibold text-slate-900 dark:text-white">
+                  {isConnected ? 'Connected' : 'Not Connected'}
+                </p>
+                {isConnected && (
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                )}
               </div>
-              <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-700/50">
-                <p className="text-xs text-slate-500 dark:text-slate-400">Phone Number ID</p>
-                <p className="font-mono text-sm text-slate-900 dark:text-white mt-1">{whatsappStatus.phone_number_id || 'N/A'}</p>
+              {whatsappStatus?.phone_number && (
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">{whatsappStatus.phone_number}</p>
+              )}
+              {whatsappStatus?.display_name && (
+                <p className="text-xs text-slate-400 mt-0.5">Display: {whatsappStatus.display_name}</p>
+              )}
+            </div>
+            {isConnected && (
+              <span className="px-3 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                Active
+              </span>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Phone Number Status */}
+      {isConnected && (
+        <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
+          <CardContent className="p-6">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+              <Phone className="w-5 h-5 text-blue-500" />
+              Phone Number Status
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50">
+                <p className="text-xs text-slate-500 dark:text-slate-400">Quality Rating</p>
+                <p className="text-lg font-semibold text-slate-900 dark:text-white mt-1">
+                  {phoneStatus?.quality_rating || whatsappStatus?.quality_rating || 'N/A'}
+                </p>
               </div>
-              <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-700/50">
-                <p className="text-xs text-slate-500 dark:text-slate-400">Business ID</p>
-                <p className="font-mono text-sm text-slate-900 dark:text-white mt-1">{whatsappStatus.business_id || 'N/A'}</p>
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50">
+                <p className="text-xs text-slate-500 dark:text-slate-400">Messaging Limit</p>
+                <p className="text-lg font-semibold text-slate-900 dark:text-white mt-1">
+                  {phoneStatus?.messaging_limit || whatsappStatus?.messaging_limit || 'N/A'}
+                </p>
               </div>
-              <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-700/50">
-                <p className="text-xs text-slate-500 dark:text-slate-400">Catalog ID</p>
-                <p className="font-mono text-sm text-slate-900 dark:text-white mt-1">{whatsappStatus.catalog_id || 'N/A'}</p>
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50">
+                <p className="text-xs text-slate-500 dark:text-slate-400">Name Status</p>
+                <p className="text-lg font-semibold text-slate-900 dark:text-white mt-1">
+                  {phoneStatus?.name_status || whatsappStatus?.name_status || 'N/A'}
+                </p>
+              </div>
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50">
+                <p className="text-xs text-slate-500 dark:text-slate-400">Verified</p>
+                <p className="text-lg font-semibold text-slate-900 dark:text-white mt-1">
+                  {phoneStatus?.is_verified || whatsappStatus?.verified_name ? 'Yes' : 'No'}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Account IDs */}
+      <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
+        <CardContent className="p-6">
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+            <Key className="w-5 h-5 text-violet-500" />
+            WhatsApp Account IDs
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50">
+              <p className="text-xs text-slate-500 dark:text-slate-400">WABA ID</p>
+              <p className="font-mono text-sm text-slate-900 dark:text-white mt-1 break-all">{whatsappStatus?.waba_id || 'N/A'}</p>
+            </div>
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50">
+              <p className="text-xs text-slate-500 dark:text-slate-400">Phone Number ID</p>
+              <p className="font-mono text-sm text-slate-900 dark:text-white mt-1 break-all">{whatsappStatus?.phone_number_id || 'N/A'}</p>
+            </div>
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50">
+              <p className="text-xs text-slate-500 dark:text-slate-400">Business ID</p>
+              <p className="font-mono text-sm text-slate-900 dark:text-white mt-1 break-all">{whatsappStatus?.business_id || 'N/A'}</p>
+            </div>
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50">
+              <p className="text-xs text-slate-500 dark:text-slate-400">Access Token</p>
+              <p className="font-mono text-sm text-slate-900 dark:text-white mt-1 truncate">
+                {whatsappStatus?.access_token ? `${whatsappStatus.access_token.substring(0, 20)}...` : 'N/A'}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Catalog Information */}
+      <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
+        <CardContent className="p-6">
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+            <Package className="w-5 h-5 text-amber-500" />
+            Catalog
+          </h3>
+
+          <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-slate-900 dark:text-white">Catalog ID</p>
+                <p className="font-mono text-sm text-slate-500 dark:text-slate-400 mt-1">
+                  {whatsappStatus?.catalog_id || 'Not configured'}
+                </p>
+              </div>
+              {whatsappStatus?.catalog_id && (
+                <span className="px-3 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                  Active
+                </span>
+              )}
+            </div>
+            {whatsappStatus?.catalog_name && (
+              <p className="text-xs text-slate-400 mt-2">Name: {whatsappStatus.catalog_name}</p>
+            )}
+            {whatsappStatus?.product_count !== undefined && (
+              <p className="text-xs text-slate-400 mt-1">Products: {whatsappStatus.product_count}</p>
+            )}
+          </div>
+
+          {catalogs.length > 0 && (
+            <div className="mt-4">
+              <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Available Catalogs</p>
+              <div className="space-y-2">
+                {catalogs.map((catalog, index) => (
+                  <div key={catalog.id || index} className="p-3 rounded-lg bg-slate-100 dark:bg-slate-600/50 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-slate-900 dark:text-white">{catalog.name || `Catalog ${index + 1}`}</p>
+                      <p className="text-xs text-slate-500">{catalog.id}</p>
+                    </div>
+                    {catalog.is_active && (
+                      <span className="text-xs text-emerald-600">Active</span>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -587,24 +933,129 @@ function WhatsAppTab({ shipperId }) {
       </Card>
 
       {/* Bot Settings */}
-      {botSettings && (
+      <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
+        <CardContent className="p-6">
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+            <MessageSquare className="w-5 h-5 text-cyan-500" />
+            Bot Settings
+          </h3>
+
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50">
+              <div>
+                <p className="font-medium text-slate-900 dark:text-white">Bot Status</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Auto-reply functionality</p>
+              </div>
+              <span className={`px-3 py-1 rounded-full text-xs font-medium ${botSettings?.enabled ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-slate-200 text-slate-600 dark:bg-slate-600 dark:text-slate-400'}`}>
+                {botSettings?.enabled ? 'Enabled' : 'Disabled'}
+              </span>
+            </div>
+
+            {botSettings?.welcome_message && (
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50">
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">Welcome Message</p>
+                <p className="text-sm text-slate-900 dark:text-white whitespace-pre-wrap">{botSettings.welcome_message}</p>
+              </div>
+            )}
+
+            {botSettings?.away_message && (
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50">
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">Away Message</p>
+                <p className="text-sm text-slate-900 dark:text-white whitespace-pre-wrap">{botSettings.away_message}</p>
+              </div>
+            )}
+
+            {botSettings?.business_hours && (
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50">
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">Business Hours</p>
+                <p className="text-sm text-slate-900 dark:text-white">{botSettings.business_hours}</p>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Auto Replies */}
+      {autoReplies.length > 0 && (
         <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
           <CardContent className="p-6">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Bot Settings</h3>
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Auto Replies ({autoReplies.length})</h3>
             <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50 dark:bg-slate-700/50">
-                <span className="text-sm text-slate-600 dark:text-slate-400">Bot Enabled</span>
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${botSettings.enabled ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-slate-200 text-slate-600 dark:bg-slate-600 dark:text-slate-400'}`}>
-                  {botSettings.enabled ? 'Yes' : 'No'}
-                </span>
-              </div>
-              {botSettings.welcome_message && (
-                <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-700/50">
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Welcome Message</p>
-                  <p className="text-sm text-slate-900 dark:text-white">{botSettings.welcome_message}</p>
+              {autoReplies.map((reply, index) => (
+                <div key={reply.id || index} className="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="font-medium text-slate-900 dark:text-white">{reply.trigger || reply.keyword}</p>
+                    <span className={`px-2 py-0.5 rounded-full text-xs ${reply.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
+                      {reply.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">{reply.response || reply.message}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Business Profile */}
+      {businessProfile && (
+        <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
+          <CardContent className="p-6">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+              <Building className="w-5 h-5 text-indigo-500" />
+              Business Profile
+            </h3>
+            <div className="space-y-3">
+              {businessProfile.about && (
+                <div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">About</p>
+                  <p className="text-sm text-slate-900 dark:text-white mt-1">{businessProfile.about}</p>
+                </div>
+              )}
+              {businessProfile.description && (
+                <div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Description</p>
+                  <p className="text-sm text-slate-900 dark:text-white mt-1">{businessProfile.description}</p>
+                </div>
+              )}
+              {businessProfile.address && (
+                <div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Address</p>
+                  <p className="text-sm text-slate-900 dark:text-white mt-1">{businessProfile.address}</p>
+                </div>
+              )}
+              {businessProfile.email && (
+                <div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Email</p>
+                  <p className="text-sm text-slate-900 dark:text-white mt-1">{businessProfile.email}</p>
+                </div>
+              )}
+              {businessProfile.websites && businessProfile.websites.length > 0 && (
+                <div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Websites</p>
+                  {businessProfile.websites.map((website, i) => (
+                    <a key={i} href={website} target="_blank" rel="noopener noreferrer" className="text-sm text-violet-600 hover:text-violet-700 block mt-1">
+                      {website}
+                    </a>
+                  ))}
                 </div>
               )}
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Not Connected State */}
+      {!isConnected && (
+        <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
+          <CardContent className="p-8 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mx-auto">
+              <MessageSquare className="w-8 h-8 text-slate-400" />
+            </div>
+            <h3 className="mt-4 text-lg font-semibold text-slate-900 dark:text-white">WhatsApp Not Connected</h3>
+            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+              This shipper has not connected their WhatsApp Business Account yet.
+            </p>
           </CardContent>
         </Card>
       )}

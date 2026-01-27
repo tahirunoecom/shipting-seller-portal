@@ -36,14 +36,14 @@ api.interceptors.response.use(
     return response
   },
   (error) => {
-    // Handle 401 Unauthorized - but NOT during onboarding flow
+    // Handle 401 Unauthorized - but NOT during onboarding flow or admin section
     if (error.response?.status === 401) {
       const currentPath = window.location.pathname
-      const onboardingPaths = ['/register', '/verify-email', '/select-service-type', '/onboarding']
-      const isOnboarding = onboardingPaths.some(path => currentPath.startsWith(path))
+      const excludedPaths = ['/register', '/verify-email', '/select-service-type', '/onboarding', '/admin']
+      const isExcluded = excludedPaths.some(path => currentPath.startsWith(path))
 
-      // Only redirect to login if not in onboarding flow
-      if (!isOnboarding) {
+      // Only redirect to login if not in excluded paths
+      if (!isExcluded) {
         localStorage.removeItem('access_token')
         localStorage.removeItem('user')
         window.location.href = '/login'
