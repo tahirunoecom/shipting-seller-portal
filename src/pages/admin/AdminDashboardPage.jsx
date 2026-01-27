@@ -20,9 +20,12 @@ import toast from 'react-hot-toast'
 
 function AdminDashboardPage() {
   const navigate = useNavigate()
-  const { setShippers, shippers, selectShipper, setLoading, isLoading } = useAdminStore()
+  const { setShippers, shippers: storeShippers, selectShipper, setLoading, isLoading } = useAdminStore()
   const [searchQuery, setSearchQuery] = useState('')
   const [filterStatus, setFilterStatus] = useState('all') // all, approved, pending, rejected
+
+  // Ensure shippers is always an array
+  const shippers = Array.isArray(storeShippers) ? storeShippers : []
 
   // Fetch shippers on mount
   useEffect(() => {
