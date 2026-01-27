@@ -62,22 +62,20 @@ function OverviewTab({ shipper }) {
     if (data && Object.keys(data).length > 0) {
       console.log('=== Admin Shipper Data Debug ===')
       console.log('Full shipper data:', data)
-      console.log('Account type fields:', {
+      console.log('Account type raw values:', {
         scanSell: data.scanSell,
         scan_sell: data.scan_sell,
-        is_seller: data.is_seller,
-        seller: data.seller,
-        scanAndSell: data.scanAndSell,
-        scan_and_sell: data.scan_and_sell,
         localDelivery: data.localDelivery,
         local_delivery: data.local_delivery,
-        is_driver: data.is_driver,
-        driver: data.driver,
         fulfillment: data.fulfillment,
-        is_fulfillment: data.is_fulfillment,
-        service_type: data.service_type,
-        account_type: data.account_type,
-        user_type: data.user_type,
+      })
+      console.log('Verification fields:', {
+        is_verification_submitted: data.is_verification_submitted,
+        approved: data.approved,
+        company_icon: data.company_icon,
+        drivinglicence: data.drivinglicence,
+        zip: data.zip,
+        postcode: data.postcode,
       })
     }
   }, [data])
@@ -121,6 +119,7 @@ function OverviewTab({ shipper }) {
   }
 
   // Helper to check if value is truthy (handles multiple formats from API)
+  // This matches the logic in SettingsPage.jsx: value === '1' || value === 1
   const isTruthy = (value) => {
     if (value === undefined || value === null) return false
     if (typeof value === 'boolean') return value
@@ -133,7 +132,7 @@ function OverviewTab({ shipper }) {
   }
 
   const getStatusBadge = (value, labels = { true: 'Yes', false: 'No' }) => {
-    const isTrue = isTruthy(value)
+    const isTrue = typeof value === 'boolean' ? value : isTruthy(value)
     return isTrue ? (
       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
         <CheckCircle className="w-3 h-3" />
@@ -147,24 +146,20 @@ function OverviewTab({ shipper }) {
     )
   }
 
-  // Check account type fields with ALL possible variations
-  // The API might use camelCase, snake_case, or other naming conventions
+  // Check account type fields - matches SettingsPage.jsx logic exactly
+  // SettingsPage uses: user?.scanSell === '1' || user?.scanSell === 1
   const isSeller = isTruthy(data.scanSell) || isTruthy(data.scan_sell) ||
                    isTruthy(data.is_seller) || isTruthy(data.seller) ||
-                   isTruthy(data.scanAndSell) || isTruthy(data.scan_and_sell) ||
-                   (data.service_type && String(data.service_type).toLowerCase().includes('seller')) ||
-                   (data.account_type && String(data.account_type).toLowerCase().includes('seller')) ||
-                   (data.user_type && String(data.user_type).toLowerCase().includes('seller'))
+                   isTruthy(data.scanAndSell) || isTruthy(data.scan_and_sell)
 
   const isDriver = isTruthy(data.localDelivery) || isTruthy(data.local_delivery) ||
-                   isTruthy(data.is_driver) || isTruthy(data.driver) ||
-                   (data.service_type && String(data.service_type).toLowerCase().includes('driver')) ||
-                   (data.account_type && String(data.account_type).toLowerCase().includes('driver')) ||
-                   (data.user_type && String(data.user_type).toLowerCase().includes('driver'))
+                   isTruthy(data.is_driver) || isTruthy(data.driver)
 
-  const isFulfillment = isTruthy(data.fulfillment) || isTruthy(data.is_fulfillment) ||
-                        (data.service_type && String(data.service_type).toLowerCase().includes('fulfillment')) ||
-                        (data.account_type && String(data.account_type).toLowerCase().includes('fulfillment'))
+  const isFulfillment = isTruthy(data.fulfillment) || isTruthy(data.is_fulfillment)
+
+  // Verification status - matches SettingsPage.jsx
+  const isApproved = isTruthy(data.approved)
+  const isVerificationSubmitted = isTruthy(data.is_verification_submitted)
 
   const InfoRow = ({ icon: Icon, label, value, isBadge }) => (
     <div className="flex items-center justify-between py-3 border-b border-slate-100 dark:border-slate-700 last:border-0">
@@ -177,6 +172,18 @@ function OverviewTab({ shipper }) {
       )}
     </div>
   )
+
+  // Get verification address details
+  const getVerificationAddress = () => {
+    const address1 = data.address_1 || data.verification_address_1 || ''
+    const address2 = data.address_2 || data.verification_address_2 || ''
+    return [address1, address2].filter(Boolean).join(', ') || 'Not provided'
+  }
+
+  const getVerificationCity = () => data.city || data.verification_city || 'Not provided'
+  const getVerificationState = () => data.state || data.verification_state || 'Not provided'
+  const getVerificationZip = () => data.zip || data.postcode || data.verification_zip || 'Not provided'
+  const getVerificationCountry = () => data.country || data.verification_country || 'Not provided'
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -197,6 +204,129 @@ function OverviewTab({ shipper }) {
         </CardContent>
       </Card>
 
+      {/* Account Type - Now with raw values for debugging */}
+      <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
+        <CardContent className="p-6">
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+            <User className="w-5 h-5 text-emerald-500" />
+            Account Type
+          </h3>
+          <div className="space-y-0">
+            <InfoRow icon={Store} label="Seller (Scan & Sell)" value={getStatusBadge(isSeller)} isBadge />
+            <InfoRow icon={Truck} label="Driver (Local Delivery)" value={getStatusBadge(isDriver)} isBadge />
+            <InfoRow icon={Package} label="Fulfillment" value={getStatusBadge(isFulfillment)} isBadge />
+          </div>
+          {/* Debug: Show raw values */}
+          <div className="mt-4 p-3 rounded-lg bg-slate-50 dark:bg-slate-700/50">
+            <p className="text-xs text-slate-400 mb-2">Raw API Values:</p>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <span className="text-slate-500">scanSell:</span>
+              <span className="font-mono text-slate-700 dark:text-slate-300">{String(data.scanSell ?? 'undefined')}</span>
+              <span className="text-slate-500">localDelivery:</span>
+              <span className="font-mono text-slate-700 dark:text-slate-300">{String(data.localDelivery ?? 'undefined')}</span>
+              <span className="text-slate-500">fulfillment:</span>
+              <span className="font-mono text-slate-700 dark:text-slate-300">{String(data.fulfillment ?? 'undefined')}</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Verification Status */}
+      <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
+        <CardContent className="p-6">
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+            <FileText className="w-5 h-5 text-amber-500" />
+            Verification Status
+          </h3>
+
+          {/* Status Banner - like SettingsPage */}
+          <div className="mb-4 p-3 rounded-xl flex items-center gap-3">
+            {isApproved ? (
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 w-full">
+                <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+                  <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                <div>
+                  <p className="font-medium text-emerald-700 dark:text-emerald-400">Account Verified</p>
+                  <p className="text-xs text-emerald-600 dark:text-emerald-500">Account has been approved</p>
+                </div>
+              </div>
+            ) : isVerificationSubmitted ? (
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 w-full">
+                <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                  <Clock className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div>
+                  <p className="font-medium text-amber-700 dark:text-amber-400">Verification Pending</p>
+                  <p className="text-xs text-amber-600 dark:text-amber-500">Under review</p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50 w-full">
+                <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-600 flex items-center justify-center">
+                  <AlertCircle className="w-5 h-5 text-slate-500 dark:text-slate-400" />
+                </div>
+                <div>
+                  <p className="font-medium text-slate-700 dark:text-slate-300">Not Verified</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Verification not submitted</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-0">
+            <InfoRow icon={CheckCircle} label="Verification Submitted" value={getStatusBadge(isVerificationSubmitted)} isBadge />
+            <InfoRow icon={CheckCircle} label="Approved" value={getStatusBadge(isApproved, { true: 'Approved', false: 'Not Approved' })} isBadge />
+            <InfoRow icon={CreditCard} label="Stripe Connected" value={getStatusBadge(data.stripe_connect)} isBadge />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Verification Details - Address & Documents (like SettingsPage verification tab) */}
+      <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
+        <CardContent className="p-6">
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+            <MapPin className="w-5 h-5 text-blue-500" />
+            Verification Details
+          </h3>
+          <div className="space-y-0">
+            <InfoRow icon={MapPin} label="Address" value={getVerificationAddress()} />
+            <InfoRow icon={MapPin} label="City" value={getVerificationCity()} />
+            <InfoRow icon={MapPin} label="State" value={getVerificationState()} />
+            <InfoRow icon={MapPin} label="ZIP Code" value={getVerificationZip()} />
+            <InfoRow icon={Globe} label="Country" value={getVerificationCountry()} />
+            <InfoRow icon={Building} label="Company Name" value={data.company || data.company_name || 'Not provided'} />
+          </div>
+
+          {/* Document Images */}
+          <div className="mt-4 space-y-3">
+            {(data.company_icon || data.company_logo) && (
+              <div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">Business Logo</p>
+                <img
+                  src={data.company_icon || data.company_logo}
+                  alt="Business Logo"
+                  className="h-16 w-16 rounded-lg object-cover border border-slate-200 dark:border-slate-600"
+                />
+              </div>
+            )}
+            {(data.drivinglicence || data.driving_licence || data.id_document) && (
+              <div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">ID Document / Driver's License</p>
+                <img
+                  src={data.drivinglicence || data.driving_licence || data.id_document}
+                  alt="ID Document"
+                  className="h-24 w-auto rounded-lg object-cover border border-slate-200 dark:border-slate-600"
+                />
+              </div>
+            )}
+            {!data.company_icon && !data.company_logo && !data.drivinglicence && !data.driving_licence && !data.id_document && (
+              <p className="text-sm text-slate-400 dark:text-slate-500 italic">No documents uploaded</p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Store Details */}
       <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
         <CardContent className="p-6">
@@ -209,56 +339,20 @@ function OverviewTab({ shipper }) {
             <InfoRow icon={MapPin} label="Address" value={getAddress()} />
             <InfoRow icon={MapPin} label="City" value={data.city || data.store_city || 'N/A'} />
             <InfoRow icon={MapPin} label="State" value={data.state || data.store_state || 'N/A'} />
-            <InfoRow icon={MapPin} label="ZIP Code" value={data.postcode || data.zip_code || data.store_zip_code || 'N/A'} />
+            <InfoRow icon={MapPin} label="ZIP Code" value={data.postcode || data.zip || data.zip_code || data.store_zip_code || 'N/A'} />
             <InfoRow icon={Globe} label="Country" value={data.country || data.store_country || 'N/A'} />
           </div>
         </CardContent>
       </Card>
 
-      {/* Verification Status */}
-      <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
-        <CardContent className="p-6">
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-            <FileText className="w-5 h-5 text-amber-500" />
-            Verification Status
-          </h3>
-          <div className="space-y-0">
-            <InfoRow icon={CheckCircle} label="Verification Submitted" value={getStatusBadge(data.is_verification_submitted)} isBadge />
-            <InfoRow icon={CheckCircle} label="Approved" value={getStatusBadge(data.approved, { true: 'Approved', false: 'Not Approved' })} isBadge />
-            <InfoRow icon={CreditCard} label="Stripe Connected" value={getStatusBadge(data.stripe_connect)} isBadge />
-            {data.license_number && (
-              <InfoRow icon={FileText} label="License Number" value={data.license_number} />
-            )}
-            {data.ein_number && (
-              <InfoRow icon={FileText} label="EIN Number" value={data.ein_number} />
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Account Type */}
-      <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
-        <CardContent className="p-6">
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-            <User className="w-5 h-5 text-emerald-500" />
-            Account Type
-          </h3>
-          <div className="space-y-0">
-            <InfoRow icon={Store} label="Seller (Scan & Sell)" value={getStatusBadge(isSeller)} isBadge />
-            <InfoRow icon={Truck} label="Driver (Local Delivery)" value={getStatusBadge(isDriver)} isBadge />
-            <InfoRow icon={Package} label="Fulfillment" value={getStatusBadge(isFulfillment)} isBadge />
-          </div>
-        </CardContent>
-      </Card>
-
       {/* IDs */}
-      <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm lg:col-span-2">
+      <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
         <CardContent className="p-6">
           <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
             <Key className="w-5 h-5 text-slate-500" />
             System IDs
           </h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50">
               <p className="text-xs text-slate-500 dark:text-slate-400">User ID</p>
               <p className="font-mono text-sm font-medium text-slate-900 dark:text-white mt-1">{data.warehouse_user_id || data.id || 'N/A'}</p>
@@ -297,11 +391,13 @@ function DashboardTab({ shipperId }) {
       const response = await adminService.getShipperDashboard({
         wh_account_id: shipperId,
         days: days,
+        items: 5,
       })
+      console.log('=== Dashboard API Response Debug ===')
+      console.log('Full response:', response)
       if (response.status === 1) {
-        // Handle nested response data
-        const data = response.data?.dashboardData || response.data || response
-        setDashboardData(data)
+        // The API response structure has the data directly
+        setDashboardData(response.data)
       }
     } catch (error) {
       console.error('Error fetching dashboard:', error)
@@ -318,13 +414,35 @@ function DashboardTab({ shipperId }) {
     )
   }
 
-  const stats = dashboardData || {}
+  // Extract data from the actual API response structure
+  // The response has: latest_ai_orders_count, statementdetails, statement_balance, latest_ai_orders
+  const orderCounts = dashboardData?.latest_ai_orders_count || {}
+  const statementBalance = dashboardData?.statement_balance || {}
+  const recentOrders = dashboardData?.latest_ai_orders || []
 
-  // Extract values from different possible response structures
-  const getTotalOrders = () => stats.total_orders || stats.totalOrders || stats.orders_count || 0
-  const getRevenue = () => stats.total_revenue || stats.totalRevenue || stats.revenue || stats.total_sales || 0
-  const getProducts = () => stats.total_products || stats.totalProducts || stats.products_count || 0
-  const getPending = () => stats.pending_orders || stats.pendingOrders || stats.new_orders || 0
+  // Order status colors for consistency
+  const STATUS_COLORS = {
+    Pending: { bg: 'bg-amber-100 dark:bg-amber-900/30', text: 'text-amber-600 dark:text-amber-400' },
+    Accepted: { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-600 dark:text-blue-400' },
+    Packed: { bg: 'bg-violet-100 dark:bg-violet-900/30', text: 'text-violet-600 dark:text-violet-400' },
+    Shipped: { bg: 'bg-cyan-100 dark:bg-cyan-900/30', text: 'text-cyan-600 dark:text-cyan-400' },
+    Intransit: { bg: 'bg-indigo-100 dark:bg-indigo-900/30', text: 'text-indigo-600 dark:text-indigo-400' },
+    Delivered: { bg: 'bg-emerald-100 dark:bg-emerald-900/30', text: 'text-emerald-600 dark:text-emerald-400' },
+    Cancelled: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-600 dark:text-red-400' },
+  }
+
+  // Helper to get order status badge
+  const getOrderStatusBadge = (order) => {
+    if (order.cancelled === 'Y') return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">Cancelled</span>
+    if (order.delivered === 'Y') return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">Delivered</span>
+    if (order.Shipped === 'Y') return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-cyan-100 text-cyan-700">In Transit</span>
+    if (order.packed === 'Y') return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-violet-100 text-violet-700">Packed</span>
+    if (order.accepted === 'Y') return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">Accepted</span>
+    return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">Pending</span>
+  }
+
+  const totalOrders = orderCounts.Total || 0
+  const hasData = totalOrders > 0 || recentOrders.length > 0
 
   return (
     <div className="space-y-6">
@@ -354,8 +472,8 @@ function DashboardTab({ shipperId }) {
         </button>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {/* Main Stats - Order Counts from latest_ai_orders_count */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -363,7 +481,7 @@ function DashboardTab({ shipperId }) {
                 <ShoppingCart className="w-5 h-5 text-blue-600 dark:text-blue-400" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{getTotalOrders()}</p>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">{orderCounts.Total || 0}</p>
                 <p className="text-xs text-slate-500 dark:text-slate-400">Total Orders</p>
               </div>
             </div>
@@ -373,59 +491,166 @@ function DashboardTab({ shipperId }) {
         <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
-                <DollarSign className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              <div className={`w-10 h-10 rounded-xl ${STATUS_COLORS.Pending.bg} flex items-center justify-center`}>
+                <Clock className={`w-5 h-5 ${STATUS_COLORS.Pending.text}`} />
               </div>
               <div>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">${getRevenue()}</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Revenue</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
-                <Package className="w-5 h-5 text-violet-600 dark:text-violet-400" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{getProducts()}</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Products</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
-                <Clock className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{getPending()}</p>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">{orderCounts.Pending || 0}</p>
                 <p className="text-xs text-slate-500 dark:text-slate-400">Pending</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-xl ${STATUS_COLORS.Accepted.bg} flex items-center justify-center`}>
+                <CheckCircle className={`w-5 h-5 ${STATUS_COLORS.Accepted.text}`} />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">{orderCounts.Accepted || 0}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Accepted</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-xl ${STATUS_COLORS.Intransit.bg} flex items-center justify-center`}>
+                <Truck className={`w-5 h-5 ${STATUS_COLORS.Intransit.text}`} />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">{orderCounts.Intransit || 0}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">In Transit</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-xl ${STATUS_COLORS.Delivered.bg} flex items-center justify-center`}>
+                <Package className={`w-5 h-5 ${STATUS_COLORS.Delivered.text}`} />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">{orderCounts.Delivered || 0}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Delivered</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-xl ${STATUS_COLORS.Cancelled.bg} flex items-center justify-center`}>
+                <XCircle className={`w-5 h-5 ${STATUS_COLORS.Cancelled.text}`} />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">{orderCounts.Cancelled || 0}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Cancelled</p>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Recent Orders */}
-      {stats.recent_orders && stats.recent_orders.length > 0 && (
+      {/* Account Statement */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
           <CardContent className="p-6">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Recent Orders</h3>
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+              <DollarSign className="w-5 h-5 text-emerald-500" />
+              Account Statement
+            </h3>
+            <div className="space-y-4">
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50">
+                <p className="text-xs text-slate-500 dark:text-slate-400">Opening Balance</p>
+                <p className="text-xl font-bold text-slate-900 dark:text-white mt-1">
+                  ${statementBalance.opening_balance || '0.00'}
+                </p>
+              </div>
+              <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800">
+                <p className="text-xs text-emerald-600 dark:text-emerald-400">Closing Balance</p>
+                <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300 mt-1">
+                  ${statementBalance.closing_balance || '0.00'}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Order Pipeline / Additional Stats */}
+        <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm lg:col-span-2">
+          <CardContent className="p-6">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+              <Package className="w-5 h-5 text-violet-500" />
+              Order Pipeline
+            </h3>
+            <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
+              {[
+                { label: 'Packed', count: orderCounts.Packed || 0, color: STATUS_COLORS.Packed },
+                { label: 'Shipped', count: orderCounts.Shipped || 0, color: STATUS_COLORS.Shipped },
+              ].map((item, idx) => (
+                <div key={idx} className={`p-3 rounded-xl ${item.color.bg}`}>
+                  <p className={`text-xl font-bold ${item.color.text}`}>{item.count}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">{item.label}</p>
+                </div>
+              ))}
+            </div>
+            {totalOrders > 0 && (
+              <div className="mt-4 p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-slate-600 dark:text-slate-400">Fulfillment Rate</span>
+                  <span className="text-sm font-semibold text-emerald-600">
+                    {Math.round(((orderCounts.Delivered || 0) / totalOrders) * 100)}%
+                  </span>
+                </div>
+                <div className="w-full h-2 bg-slate-200 dark:bg-slate-600 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-emerald-500 rounded-full transition-all"
+                    style={{ width: `${Math.round(((orderCounts.Delivered || 0) / totalOrders) * 100)}%` }}
+                  />
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Recent Orders */}
+      {recentOrders.length > 0 && (
+        <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
+          <CardContent className="p-6">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+              <ShoppingCart className="w-5 h-5 text-blue-500" />
+              Recent Orders
+            </h3>
             <div className="space-y-3">
-              {stats.recent_orders.map((order, index) => (
-                <div key={order.id || index} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50">
-                  <div>
-                    <p className="font-medium text-slate-900 dark:text-white">Order #{order.order_id || order.id}</p>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">{order.date_added || order.created_at}</p>
+              {recentOrders.map((order, index) => (
+                <div key={order.id || index} className="flex items-center justify-between p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50 hover:bg-slate-100 dark:hover:bg-slate-600/50 transition-colors">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="font-semibold text-slate-900 dark:text-white">#{order.id}</p>
+                      {getOrderStatusBadge(order)}
+                    </div>
+                    <div className="flex items-center gap-3 text-sm text-slate-500 dark:text-slate-400">
+                      <span>{order.name || 'Customer'}</span>
+                      <span>{order.order_date || order.date_added}</span>
+                      {order.city && <span>{order.city}, {order.state}</span>}
+                    </div>
                   </div>
-                  <p className="font-semibold text-slate-900 dark:text-white">${order.order_amount || order.total_amount || 0}</p>
+                  <div className="text-right">
+                    <p className="font-bold text-slate-900 dark:text-white">${order.total_amount || 0}</p>
+                    {order.shipper_payout && (
+                      <p className="text-xs text-emerald-600">Payout: ${order.shipper_payout}</p>
+                    )}
+                    <p className="text-xs text-slate-400">{order.total_product_quantity || 1} item(s)</p>
+                  </div>
                 </div>
               ))}
             </div>
@@ -434,7 +659,7 @@ function DashboardTab({ shipperId }) {
       )}
 
       {/* No data state */}
-      {!stats.recent_orders && getTotalOrders() === 0 && (
+      {!hasData && (
         <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
           <CardContent className="p-8 text-center">
             <LayoutDashboard className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto" />
@@ -452,9 +677,19 @@ function ProductsTab({ shipperId }) {
   const [error, setError] = useState(null)
   const [selectedProduct, setSelectedProduct] = useState(null)
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [searchQuery, setSearchQuery] = useState('')
+  const itemsPerPage = 12 // 12 for grid (4x3)
+
   useEffect(() => {
     fetchProducts()
   }, [shipperId])
+
+  // Reset to page 1 when search changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery])
 
   const fetchProducts = async () => {
     setIsLoading(true)
@@ -649,66 +884,162 @@ function ProductsTab({ shipperId }) {
     )
   }
 
+  // Filter products by search query
+  const filteredProducts = products.filter((product) => {
+    if (!searchQuery) return true
+    const name = getProductName(product).toLowerCase()
+    const category = (product.category || product.category_name || '').toLowerCase()
+    const searchLower = searchQuery.toLowerCase()
+    return name.includes(searchLower) || category.includes(searchLower)
+  })
+
+  // Calculate pagination
+  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const paginatedProducts = filteredProducts.slice(startIndex, startIndex + itemsPerPage)
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-500 dark:text-slate-400">{products.length} products</p>
-        <button
-          onClick={fetchProducts}
-          className="text-sm text-violet-600 hover:text-violet-700 flex items-center gap-1"
-        >
-          <RefreshCw className="w-4 h-4" />
-          Refresh
-        </button>
+      {/* Search and Info Header */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <p className="text-sm text-slate-500 dark:text-slate-400">{filteredProducts.length} products</p>
+          {searchQuery && filteredProducts.length !== products.length && (
+            <span className="text-xs text-violet-600">({products.length} total)</span>
+          )}
+        </div>
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="relative flex-1 sm:flex-none">
+            <input
+              type="text"
+              placeholder="Search products..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full sm:w-64 pl-9 pr-4 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500"
+            />
+            <Eye className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          </div>
+          <button
+            onClick={fetchProducts}
+            className="text-sm text-violet-600 hover:text-violet-700 flex items-center gap-1 whitespace-nowrap"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Refresh
+          </button>
+        </div>
       </div>
 
-      {products.length === 0 ? (
+      {filteredProducts.length === 0 ? (
         <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
           <CardContent className="p-12 text-center">
             <Package className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto" />
-            <p className="mt-4 text-slate-500 dark:text-slate-400">No products found</p>
+            <p className="mt-4 text-slate-500 dark:text-slate-400">
+              {searchQuery ? 'No products match your search' : 'No products found'}
+            </p>
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="mt-2 text-sm text-violet-600 hover:text-violet-700"
+              >
+                Clear search
+              </button>
+            )}
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {products.map((product, index) => (
-            <Card
-              key={product.id || product.product_id || index}
-              className="bg-white dark:bg-slate-800 border-0 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-              onClick={() => setSelectedProduct(product)}
-            >
-              <CardContent className="p-4">
-                <div className="flex gap-4">
-                  {getProductImage(product) ? (
-                    <img src={getProductImage(product)} alt={getProductName(product)} className="w-16 h-16 rounded-lg object-cover" />
-                  ) : (
-                    <div className="w-16 h-16 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
-                      <Package className="w-6 h-6 text-slate-400" />
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {paginatedProducts.map((product, index) => (
+              <Card
+                key={product.id || product.product_id || index}
+                className="bg-white dark:bg-slate-800 border-0 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                onClick={() => setSelectedProduct(product)}
+              >
+                <CardContent className="p-4">
+                  <div className="flex gap-4">
+                    {getProductImage(product) ? (
+                      <img src={getProductImage(product)} alt={getProductName(product)} className="w-16 h-16 rounded-lg object-cover" />
+                    ) : (
+                      <div className="w-16 h-16 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
+                        <Package className="w-6 h-6 text-slate-400" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-medium text-slate-900 dark:text-white truncate">{getProductName(product)}</h4>
+                      <p className="text-sm text-slate-500 dark:text-slate-400 truncate">{product.category || product.category_name || 'No category'}</p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className="font-semibold text-slate-900 dark:text-white">${getProductPrice(product)}</span>
+                        <button
+                          onClick={(e) => handleToggleStatus(product, e)}
+                          className={`text-xs px-2 py-0.5 rounded-full cursor-pointer hover:opacity-80 ${
+                            isProductActive(product)
+                              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                              : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'
+                          }`}
+                        >
+                          {isProductActive(product) ? 'Active' : 'Inactive'}
+                        </button>
+                      </div>
                     </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-medium text-slate-900 dark:text-white truncate">{getProductName(product)}</h4>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 truncate">{product.category || product.category_name || 'No category'}</p>
-                    <div className="flex items-center gap-2 mt-2">
-                      <span className="font-semibold text-slate-900 dark:text-white">${getProductPrice(product)}</span>
+                    <ChevronRight className="w-5 h-5 text-slate-400 self-center" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-slate-100 dark:border-slate-700">
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredProducts.length)} of {filteredProducts.length}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1.5 text-sm font-medium rounded-lg bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                    let pageNum
+                    if (totalPages <= 5) {
+                      pageNum = i + 1
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i
+                    } else {
+                      pageNum = currentPage - 2 + i
+                    }
+                    return (
                       <button
-                        onClick={(e) => handleToggleStatus(product, e)}
-                        className={`text-xs px-2 py-0.5 rounded-full cursor-pointer hover:opacity-80 ${
-                          isProductActive(product)
-                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                            : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'
+                        key={pageNum}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`w-8 h-8 text-sm font-medium rounded-lg transition-colors ${
+                          currentPage === pageNum
+                            ? 'bg-violet-500 text-white'
+                            : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'
                         }`}
                       >
-                        {isProductActive(product) ? 'Active' : 'Inactive'}
+                        {pageNum}
                       </button>
-                    </div>
-                  </div>
-                  <ChevronRight className="w-5 h-5 text-slate-400 self-center" />
+                    )
+                  })}
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1.5 text-sm font-medium rounded-lg bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   )
