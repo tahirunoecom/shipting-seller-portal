@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Navigate } from 'react-router-dom'
 import { useAdminStore } from '@/store'
-import { Button, Input, Card, CardContent } from '@/components/ui'
+import { Button, Card, CardContent } from '@/components/ui'
 import { Shield, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -13,10 +13,9 @@ function AdminLoginPage() {
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
 
-  // If already authenticated, redirect to dashboard
+  // If already authenticated, redirect to dashboard using Navigate component
   if (isAdminAuthenticated) {
-    navigate('/admin/dashboard', { replace: true })
-    return null
+    return <Navigate to="/admin/dashboard" replace />
   }
 
   const handleSubmit = async (e) => {
