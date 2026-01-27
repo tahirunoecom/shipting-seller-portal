@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useAdminStore } from '@/store'
 import { adminService } from '@/services'
 import { Card, CardContent } from '@/components/ui'
@@ -15,6 +15,8 @@ import {
   XCircle,
   RefreshCw,
   AlertCircle,
+  LogIn,
+  Shield,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -23,6 +25,7 @@ function AdminDashboardPage() {
   const { setShippers, shippers: storeShippers, selectShipper, setLoading, isLoading } = useAdminStore()
   const [searchQuery, setSearchQuery] = useState('')
   const [filterStatus, setFilterStatus] = useState('all') // all, approved, pending, rejected
+  const [authError, setAuthError] = useState(false)
 
   // Ensure shippers is always an array
   const shippers = Array.isArray(storeShippers) ? storeShippers : []
@@ -34,6 +37,7 @@ function AdminDashboardPage() {
 
   const fetchShippers = async () => {
     setLoading(true)
+    setAuthError(false)
     try {
       const response = await adminService.getAllShippers()
       if (response.status === 1) {
@@ -45,7 +49,11 @@ function AdminDashboardPage() {
       }
     } catch (error) {
       console.error('Error fetching shippers:', error)
-      toast.error('Failed to fetch shippers')
+      if (error.response?.status === 401 || error.isAdminAuthError) {
+        setAuthError(true)
+      } else {
+        toast.error('Failed to fetch shippers')
+      }
     } finally {
       setLoading(false)
     }
@@ -120,10 +128,17 @@ function AdminDashboardPage() {
     )
   }
 
+  // Helper to check if value is truthy (handles 1, '1', 'Y', 'y', true)
+  const isTruthy = (value) => {
+    return value === 1 || value === '1' || value === 'Y' || value === 'y' || value === true
+  }
+
   const getAccountTypeBadges = (shipper) => {
     const badges = []
-    const isSeller = shipper.scanSell === 1 || shipper.scanSell === '1'
-    const isDriver = shipper.localDelivery === 1 || shipper.localDelivery === '1'
+    // Check multiple possible field names for seller
+    const isSeller = isTruthy(shipper.scanSell) || isTruthy(shipper.scan_sell) || isTruthy(shipper.is_seller)
+    // Check multiple possible field names for driver
+    const isDriver = isTruthy(shipper.localDelivery) || isTruthy(shipper.local_delivery) || isTruthy(shipper.is_driver)
 
     if (isSeller) {
       badges.push(
@@ -149,14 +164,54 @@ function AdminDashboardPage() {
 
   // Stats
   const totalShippers = shippers.length
-  const approvedCount = shippers.filter(s => s.approved === 1 || s.approved === '1').length
+  const approvedCount = shippers.filter(s => isTruthy(s.approved)).length
   const pendingCount = shippers.filter(s => {
-    const isApproved = s.approved === 1 || s.approved === '1'
-    const isRejected = s.rejected === 1 || s.rejected === '1'
+    const isApproved = isTruthy(s.approved)
+    const isRejected = isTruthy(s.rejected)
     return !isApproved && !isRejected
   }).length
-  const sellerCount = shippers.filter(s => s.scanSell === 1 || s.scanSell === '1').length
-  const driverCount = shippers.filter(s => s.localDelivery === 1 || s.localDelivery === '1').length
+  const sellerCount = shippers.filter(s => isTruthy(s.scanSell) || isTruthy(s.scan_sell) || isTruthy(s.is_seller)).length
+  const driverCount = shippers.filter(s => isTruthy(s.localDelivery) || isTruthy(s.local_delivery) || isTruthy(s.is_driver)).length
+
+  // Show auth error state
+  if (authError) {
+    return (
+      <div className="space-y-6">
+        <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
+          <CardContent className="p-12">
+            <div className="flex flex-col items-center justify-center text-center">
+              <div className="w-20 h-20 rounded-2xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center mb-6">
+                <Shield className="w-10 h-10 text-amber-600 dark:text-amber-400" />
+              </div>
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
+                Authentication Required
+              </h2>
+              <p className="text-slate-500 dark:text-slate-400 max-w-md mb-6">
+                To access the Admin Panel, you need to be logged in as a shipper first.
+                The admin features work alongside your shipper account session.
+              </p>
+              <div className="flex gap-3">
+                <Link
+                  to="/login"
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-violet-500 text-white font-medium hover:bg-violet-600 transition-colors"
+                >
+                  <LogIn className="w-5 h-5" />
+                  Login as Shipper
+                </Link>
+                <button
+                  onClick={fetchShippers}
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-medium hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+                >
+                  <RefreshCw className="w-5 h-5" />
+                  Retry
+                </button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">

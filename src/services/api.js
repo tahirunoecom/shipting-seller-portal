@@ -42,6 +42,12 @@ api.interceptors.response.use(
       const excludedPaths = ['/register', '/verify-email', '/select-service-type', '/onboarding', '/admin']
       const isExcluded = excludedPaths.some(path => currentPath.startsWith(path))
 
+      // For admin section, don't redirect but mark the error specially
+      if (currentPath.startsWith('/admin')) {
+        error.isAdminAuthError = true
+        return Promise.reject(error)
+      }
+
       // Only redirect to login if not in excluded paths
       if (!isExcluded) {
         localStorage.removeItem('access_token')
