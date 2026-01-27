@@ -37,7 +37,9 @@ function AdminDashboardPage() {
     try {
       const response = await adminService.getAllShippers()
       if (response.status === 1) {
-        setShippers(response.data || [])
+        // API returns data nested in getAllShippersForAdmin
+        const shippersList = response.data?.getAllShippersForAdmin || response.data || []
+        setShippers(shippersList)
       } else {
         toast.error(response.message || 'Failed to fetch shippers')
       }
@@ -49,15 +51,26 @@ function AdminDashboardPage() {
     }
   }
 
+  // Helper to get shipper display name
+  const getShipperName = (shipper) => {
+    if (shipper.company) return shipper.company
+    if (shipper.store_name) return shipper.store_name
+    if (shipper.firstname || shipper.lastname) {
+      return `${shipper.firstname || ''} ${shipper.lastname || ''}`.trim()
+    }
+    return shipper.name || 'Unnamed Shipper'
+  }
+
   // Filter shippers based on search and status
   const filteredShippers = shippers.filter(shipper => {
     // Search filter
     const searchLower = searchQuery.toLowerCase()
+    const shipperName = getShipperName(shipper).toLowerCase()
     const matchesSearch = !searchQuery ||
-      (shipper.store_name?.toLowerCase().includes(searchLower)) ||
-      (shipper.name?.toLowerCase().includes(searchLower)) ||
+      shipperName.includes(searchLower) ||
       (shipper.email?.toLowerCase().includes(searchLower)) ||
       (shipper.phone?.includes(searchQuery)) ||
+      (shipper.telephone?.includes(searchQuery)) ||
       (shipper.wh_account_id?.toString().includes(searchQuery)) ||
       (shipper.id?.toString().includes(searchQuery))
 
@@ -315,13 +328,13 @@ function AdminDashboardPage() {
                     {shipper.logo ? (
                       <img
                         src={shipper.logo}
-                        alt={shipper.store_name || shipper.name}
+                        alt={getShipperName(shipper)}
                         className="w-14 h-14 rounded-xl object-cover"
                       />
                     ) : (
                       <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
                         <span className="text-xl font-bold text-white">
-                          {(shipper.store_name || shipper.name || 'S').charAt(0).toUpperCase()}
+                          {getShipperName(shipper).charAt(0).toUpperCase()}
                         </span>
                       </div>
                     )}
@@ -331,7 +344,7 @@ function AdminDashboardPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="font-semibold text-slate-900 dark:text-white truncate">
-                        {shipper.store_name || shipper.name || 'Unnamed Shipper'}
+                        {getShipperName(shipper)}
                       </h3>
                       {getStatusBadge(shipper)}
                     </div>
@@ -344,7 +357,7 @@ function AdminDashboardPage() {
                       </span>
                       <span className="text-slate-300 dark:text-slate-600">|</span>
                       <span className="text-xs text-slate-400">
-                        {shipper.phone || 'No phone'}
+                        {shipper.telephone || shipper.phone || 'No phone'}
                       </span>
                       <span className="text-slate-300 dark:text-slate-600">|</span>
                       <div className="flex items-center gap-1">
