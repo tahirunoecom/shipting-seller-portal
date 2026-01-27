@@ -1,0 +1,372 @@
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useAdminStore } from '@/store'
+import { adminService } from '@/services'
+import { Card, CardContent } from '@/components/ui'
+import {
+  Users,
+  Store,
+  Search,
+  ChevronRight,
+  Truck,
+  ShoppingBag,
+  CheckCircle,
+  Clock,
+  XCircle,
+  RefreshCw,
+  AlertCircle,
+} from 'lucide-react'
+import toast from 'react-hot-toast'
+
+function AdminDashboardPage() {
+  const navigate = useNavigate()
+  const { setShippers, shippers, selectShipper, setLoading, isLoading } = useAdminStore()
+  const [searchQuery, setSearchQuery] = useState('')
+  const [filterStatus, setFilterStatus] = useState('all') // all, approved, pending, rejected
+
+  // Fetch shippers on mount
+  useEffect(() => {
+    fetchShippers()
+  }, [])
+
+  const fetchShippers = async () => {
+    setLoading(true)
+    try {
+      const response = await adminService.getAllShippers()
+      if (response.status === 1) {
+        setShippers(response.data || [])
+      } else {
+        toast.error(response.message || 'Failed to fetch shippers')
+      }
+    } catch (error) {
+      console.error('Error fetching shippers:', error)
+      toast.error('Failed to fetch shippers')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Filter shippers based on search and status
+  const filteredShippers = shippers.filter(shipper => {
+    // Search filter
+    const searchLower = searchQuery.toLowerCase()
+    const matchesSearch = !searchQuery ||
+      (shipper.store_name?.toLowerCase().includes(searchLower)) ||
+      (shipper.name?.toLowerCase().includes(searchLower)) ||
+      (shipper.email?.toLowerCase().includes(searchLower)) ||
+      (shipper.phone?.includes(searchQuery)) ||
+      (shipper.wh_account_id?.toString().includes(searchQuery)) ||
+      (shipper.id?.toString().includes(searchQuery))
+
+    // Status filter
+    const isApproved = shipper.approved === 1 || shipper.approved === '1'
+    const isRejected = shipper.rejected === 1 || shipper.rejected === '1'
+    const isPending = !isApproved && !isRejected
+
+    let matchesStatus = true
+    if (filterStatus === 'approved') matchesStatus = isApproved
+    else if (filterStatus === 'pending') matchesStatus = isPending
+    else if (filterStatus === 'rejected') matchesStatus = isRejected
+
+    return matchesSearch && matchesStatus
+  })
+
+  const handleSelectShipper = (shipper) => {
+    selectShipper(shipper)
+    navigate(`/admin/shipper/${shipper.wh_account_id || shipper.id}`)
+  }
+
+  const getStatusBadge = (shipper) => {
+    const isApproved = shipper.approved === 1 || shipper.approved === '1'
+    const isRejected = shipper.rejected === 1 || shipper.rejected === '1'
+
+    if (isApproved) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+          <CheckCircle className="w-3 h-3" />
+          Approved
+        </span>
+      )
+    }
+    if (isRejected) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+          <XCircle className="w-3 h-3" />
+          Rejected
+        </span>
+      )
+    }
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+        <Clock className="w-3 h-3" />
+        Pending
+      </span>
+    )
+  }
+
+  const getAccountTypeBadges = (shipper) => {
+    const badges = []
+    const isSeller = shipper.scanSell === 1 || shipper.scanSell === '1'
+    const isDriver = shipper.localDelivery === 1 || shipper.localDelivery === '1'
+
+    if (isSeller) {
+      badges.push(
+        <span key="seller" className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+          <Store className="w-3 h-3" />
+          Seller
+        </span>
+      )
+    }
+    if (isDriver) {
+      badges.push(
+        <span key="driver" className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">
+          <Truck className="w-3 h-3" />
+          Driver
+        </span>
+      )
+    }
+
+    return badges.length > 0 ? badges : (
+      <span className="text-xs text-slate-400">No type set</span>
+    )
+  }
+
+  // Stats
+  const totalShippers = shippers.length
+  const approvedCount = shippers.filter(s => s.approved === 1 || s.approved === '1').length
+  const pendingCount = shippers.filter(s => {
+    const isApproved = s.approved === 1 || s.approved === '1'
+    const isRejected = s.rejected === 1 || s.rejected === '1'
+    return !isApproved && !isRejected
+  }).length
+  const sellerCount = shippers.filter(s => s.scanSell === 1 || s.scanSell === '1').length
+  const driverCount = shippers.filter(s => s.localDelivery === 1 || s.localDelivery === '1').length
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">All Shippers</h1>
+          <p className="text-slate-500 dark:text-slate-400 mt-1">
+            Manage and view all registered shippers
+          </p>
+        </div>
+        <button
+          onClick={fetchShippers}
+          disabled={isLoading}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-medium hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors disabled:opacity-50"
+        >
+          <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+          Refresh
+        </button>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
+                <Users className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">{totalShippers}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Total</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+                <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">{approvedCount}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Approved</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                <Clock className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">{pendingCount}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Pending</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                <Store className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">{sellerCount}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Sellers</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
+                <Truck className="w-5 h-5 text-violet-600 dark:text-violet-400" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">{driverCount}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Drivers</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Search and Filters */}
+      <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
+        <CardContent className="p-4">
+          <div className="flex flex-col sm:flex-row gap-4">
+            {/* Search */}
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by name, email, phone, or ID..."
+                className="w-full h-11 pl-10 pr-4 rounded-xl bg-slate-100 dark:bg-slate-700 border-0 text-slate-900 dark:text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500"
+              />
+            </div>
+
+            {/* Status filter */}
+            <div className="flex gap-2">
+              {['all', 'approved', 'pending', 'rejected'].map((status) => (
+                <button
+                  key={status}
+                  onClick={() => setFilterStatus(status)}
+                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+                    filterStatus === status
+                      ? 'bg-violet-500 text-white'
+                      : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600'
+                  }`}
+                >
+                  {status.charAt(0).toUpperCase() + status.slice(1)}
+                </button>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Shippers List */}
+      {isLoading ? (
+        <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
+          <CardContent className="p-12">
+            <div className="flex flex-col items-center justify-center">
+              <RefreshCw className="w-8 h-8 text-violet-500 animate-spin" />
+              <p className="mt-4 text-slate-500 dark:text-slate-400">Loading shippers...</p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : filteredShippers.length === 0 ? (
+        <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
+          <CardContent className="p-12">
+            <div className="flex flex-col items-center justify-center">
+              <div className="w-16 h-16 rounded-2xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
+                <AlertCircle className="w-8 h-8 text-slate-400" />
+              </div>
+              <p className="mt-4 text-slate-500 dark:text-slate-400">
+                {searchQuery || filterStatus !== 'all'
+                  ? 'No shippers match your search criteria'
+                  : 'No shippers found'
+                }
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {filteredShippers.map((shipper) => (
+            <Card
+              key={shipper.id || shipper.wh_account_id}
+              className="bg-white dark:bg-slate-800 border-0 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+              onClick={() => handleSelectShipper(shipper)}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-center gap-4">
+                  {/* Avatar */}
+                  <div className="flex-shrink-0">
+                    {shipper.logo ? (
+                      <img
+                        src={shipper.logo}
+                        alt={shipper.store_name || shipper.name}
+                        className="w-14 h-14 rounded-xl object-cover"
+                      />
+                    ) : (
+                      <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+                        <span className="text-xl font-bold text-white">
+                          {(shipper.store_name || shipper.name || 'S').charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-semibold text-slate-900 dark:text-white truncate">
+                        {shipper.store_name || shipper.name || 'Unnamed Shipper'}
+                      </h3>
+                      {getStatusBadge(shipper)}
+                    </div>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+                      {shipper.email}
+                    </p>
+                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                      <span className="text-xs text-slate-400">
+                        ID: {shipper.wh_account_id || shipper.id}
+                      </span>
+                      <span className="text-slate-300 dark:text-slate-600">|</span>
+                      <span className="text-xs text-slate-400">
+                        {shipper.phone || 'No phone'}
+                      </span>
+                      <span className="text-slate-300 dark:text-slate-600">|</span>
+                      <div className="flex items-center gap-1">
+                        {getAccountTypeBadges(shipper)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Arrow */}
+                  <ChevronRight className="w-5 h-5 text-slate-400 flex-shrink-0" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Results count */}
+      {!isLoading && filteredShippers.length > 0 && (
+        <p className="text-center text-sm text-slate-500 dark:text-slate-400">
+          Showing {filteredShippers.length} of {totalShippers} shippers
+        </p>
+      )}
+    </div>
+  )
+}
+
+export default AdminDashboardPage

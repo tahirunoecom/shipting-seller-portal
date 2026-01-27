@@ -1,6 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { Suspense, lazy } from 'react'
-import { Layout, AuthLayout } from '@/components/layout'
+import { Layout, AuthLayout, AdminLayout } from '@/components/layout'
 
 // Loading fallback component
 const PageLoader = () => (
@@ -17,6 +17,11 @@ const ServiceTypeSelectionPage = lazy(() => import('@/pages/auth/ServiceTypeSele
 const VerificationPage = lazy(() => import('@/pages/auth/VerificationPage'))
 const PendingApprovalPage = lazy(() => import('@/pages/auth/PendingApprovalPage'))
 const ModeSelectionPage = lazy(() => import('@/pages/auth/ModeSelectionPage'))
+
+// Admin pages - Lazy loaded
+const AdminLoginPage = lazy(() => import('@/pages/admin/AdminLoginPage'))
+const AdminDashboardPage = lazy(() => import('@/pages/admin/AdminDashboardPage'))
+const AdminShipperDetailPage = lazy(() => import('@/pages/admin/AdminShipperDetailPage'))
 
 // Main pages (Seller) - Lazy loaded
 const DashboardPage = lazy(() => import('@/pages/dashboard/DashboardPage'))
@@ -95,6 +100,13 @@ function App() {
           <Route path="/driver/earnings" element={<DriverEarningsPage />} />
           <Route path="/driver/history" element={<DriverHistoryPage />} />
           <Route path="/driver/settings" element={<DriverSettingsPage />} />
+        </Route>
+
+        {/* Admin routes */}
+        <Route path="/admin" element={<AdminLoginPage />} />
+        <Route element={<AdminLayout />}>
+          <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
+          <Route path="/admin/shipper/:shipperId" element={<AdminShipperDetailPage />} />
         </Route>
 
         {/* Default redirect */}
