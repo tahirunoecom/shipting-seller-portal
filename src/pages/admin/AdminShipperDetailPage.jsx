@@ -57,6 +57,31 @@ function OverviewTab({ shipper }) {
   // Use shipper data directly - it comes from getAllShippersForAdmin
   const data = shipper || {}
 
+  // Debug: Log shipper data to console to see actual field names
+  useEffect(() => {
+    if (data && Object.keys(data).length > 0) {
+      console.log('=== Admin Shipper Data Debug ===')
+      console.log('Full shipper data:', data)
+      console.log('Account type fields:', {
+        scanSell: data.scanSell,
+        scan_sell: data.scan_sell,
+        is_seller: data.is_seller,
+        seller: data.seller,
+        scanAndSell: data.scanAndSell,
+        scan_and_sell: data.scan_and_sell,
+        localDelivery: data.localDelivery,
+        local_delivery: data.local_delivery,
+        is_driver: data.is_driver,
+        driver: data.driver,
+        fulfillment: data.fulfillment,
+        is_fulfillment: data.is_fulfillment,
+        service_type: data.service_type,
+        account_type: data.account_type,
+        user_type: data.user_type,
+      })
+    }
+  }, [data])
+
   // Helper to get name from different field names
   const getName = () => {
     if (data.firstname || data.lastname) {
@@ -95,9 +120,16 @@ function OverviewTab({ shipper }) {
     return data.wh_account_id || data.id || data.warehouse_user_id || 'N/A'
   }
 
-  // Helper to check if value is truthy
+  // Helper to check if value is truthy (handles multiple formats from API)
   const isTruthy = (value) => {
-    return value === 1 || value === '1' || value === 'Y' || value === 'y' || value === true
+    if (value === undefined || value === null) return false
+    if (typeof value === 'boolean') return value
+    if (typeof value === 'number') return value === 1
+    if (typeof value === 'string') {
+      const v = value.toLowerCase().trim()
+      return v === '1' || v === 'y' || v === 'yes' || v === 'true'
+    }
+    return false
   }
 
   const getStatusBadge = (value, labels = { true: 'Yes', false: 'No' }) => {
@@ -115,10 +147,24 @@ function OverviewTab({ shipper }) {
     )
   }
 
-  // Check account type fields with multiple possible names
-  const isSeller = isTruthy(data.scanSell) || isTruthy(data.scan_sell) || isTruthy(data.is_seller)
-  const isDriver = isTruthy(data.localDelivery) || isTruthy(data.local_delivery) || isTruthy(data.is_driver)
-  const isFulfillment = isTruthy(data.fulfillment) || isTruthy(data.is_fulfillment)
+  // Check account type fields with ALL possible variations
+  // The API might use camelCase, snake_case, or other naming conventions
+  const isSeller = isTruthy(data.scanSell) || isTruthy(data.scan_sell) ||
+                   isTruthy(data.is_seller) || isTruthy(data.seller) ||
+                   isTruthy(data.scanAndSell) || isTruthy(data.scan_and_sell) ||
+                   (data.service_type && String(data.service_type).toLowerCase().includes('seller')) ||
+                   (data.account_type && String(data.account_type).toLowerCase().includes('seller')) ||
+                   (data.user_type && String(data.user_type).toLowerCase().includes('seller'))
+
+  const isDriver = isTruthy(data.localDelivery) || isTruthy(data.local_delivery) ||
+                   isTruthy(data.is_driver) || isTruthy(data.driver) ||
+                   (data.service_type && String(data.service_type).toLowerCase().includes('driver')) ||
+                   (data.account_type && String(data.account_type).toLowerCase().includes('driver')) ||
+                   (data.user_type && String(data.user_type).toLowerCase().includes('driver'))
+
+  const isFulfillment = isTruthy(data.fulfillment) || isTruthy(data.is_fulfillment) ||
+                        (data.service_type && String(data.service_type).toLowerCase().includes('fulfillment')) ||
+                        (data.account_type && String(data.account_type).toLowerCase().includes('fulfillment'))
 
   const InfoRow = ({ icon: Icon, label, value, isBadge }) => (
     <div className="flex items-center justify-between py-3 border-b border-slate-100 dark:border-slate-700 last:border-0">
@@ -1116,7 +1162,17 @@ function WhatsAppTab({ shipperId }) {
         whatsappService.getBusinessProfile(shipperId).catch(() => ({ status: 0 })),
       ])
 
+      // Debug: Log all WhatsApp API responses
+      console.log('=== WhatsApp Data Debug ===')
+      console.log('Status Response:', statusRes)
+      console.log('Settings Response:', settingsRes)
+      console.log('Phone Response:', phoneRes)
+      console.log('Catalogs Response:', catalogsRes)
+      console.log('AutoReplies Response:', autoRepliesRes)
+      console.log('Profile Response:', profileRes)
+
       if (statusRes.status === 1) {
+        console.log('WhatsApp Status Data:', statusRes.data)
         setWhatsappStatus(statusRes.data)
       }
       if (settingsRes.status === 1) {
@@ -1126,7 +1182,9 @@ function WhatsAppTab({ shipperId }) {
         setPhoneStatus(phoneRes.data)
       }
       if (catalogsRes.status === 1) {
-        setCatalogs(catalogsRes.data?.catalogs || catalogsRes.data || [])
+        const catalogData = catalogsRes.data?.catalogs || catalogsRes.data || []
+        console.log('Processed Catalogs:', catalogData)
+        setCatalogs(catalogData)
       }
       if (autoRepliesRes.status === 1) {
         setAutoReplies(autoRepliesRes.data?.auto_replies || autoRepliesRes.data || [])
@@ -1466,23 +1524,29 @@ function WhatsAppTab({ shipperId }) {
               <div>
                 <p className="text-sm font-medium text-slate-900 dark:text-white">Current Catalog</p>
                 <p className="font-mono text-sm text-slate-500 dark:text-slate-400 mt-1">
-                  {whatsappStatus?.catalog_id || 'Not configured'}
+                  {whatsappStatus?.catalog_id || whatsappStatus?.catalogId || 'Not configured'}
                 </p>
               </div>
-              {whatsappStatus?.catalog_id && (
+              {(whatsappStatus?.catalog_id || whatsappStatus?.catalogId) && (
                 <span className="px-3 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
                   Active
                 </span>
               )}
             </div>
-            {whatsappStatus?.catalog_name && (
-              <p className="text-xs text-slate-400 mt-2">Name: {whatsappStatus.catalog_name}</p>
+            {(whatsappStatus?.catalog_name || whatsappStatus?.catalogName || whatsappStatus?.name) && (
+              <p className="text-xs text-slate-400 mt-2">Name: {whatsappStatus.catalog_name || whatsappStatus.catalogName || whatsappStatus.name}</p>
             )}
-            {whatsappStatus?.catalog_type && (
-              <p className="text-xs text-slate-400 mt-1">Type: {whatsappStatus.catalog_type}</p>
-            )}
-            {whatsappStatus?.product_count !== undefined && (
-              <p className="text-xs text-slate-400 mt-1">Products: {whatsappStatus.product_count}</p>
+            {/* Check all possible catalog type field names */}
+            {(() => {
+              const catalogType = whatsappStatus?.catalog_type || whatsappStatus?.catalogType ||
+                                  whatsappStatus?.type || whatsappStatus?.vertical ||
+                                  whatsappStatus?.business_vertical || whatsappStatus?.businessVertical
+              return catalogType ? (
+                <p className="text-xs text-slate-400 mt-1">Type: {catalogType}</p>
+              ) : null
+            })()}
+            {(whatsappStatus?.product_count !== undefined || whatsappStatus?.productCount !== undefined || whatsappStatus?.products_count !== undefined) && (
+              <p className="text-xs text-slate-400 mt-1">Products: {whatsappStatus.product_count ?? whatsappStatus.productCount ?? whatsappStatus.products_count}</p>
             )}
           </div>
 
@@ -1492,17 +1556,23 @@ function WhatsAppTab({ shipperId }) {
               <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Available Catalogs ({catalogs.length})</p>
               <div className="space-y-2">
                 {catalogs.map((catalog, index) => {
-                  const isActive = catalog.id === whatsappStatus?.catalog_id || catalog.is_active
+                  const isActive = catalog.id === whatsappStatus?.catalog_id ||
+                                   catalog.id === whatsappStatus?.catalogId ||
+                                   catalog.is_active
+                  // Get catalog type from multiple possible field names
+                  const catalogType = catalog.type || catalog.catalog_type || catalog.catalogType ||
+                                      catalog.vertical || catalog.business_vertical || catalog.businessVertical
+                  const productCount = catalog.product_count ?? catalog.productCount ?? catalog.products_count
                   return (
                     <div key={catalog.id || index} className={`p-3 rounded-lg flex items-center justify-between ${isActive ? 'bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800' : 'bg-slate-100 dark:bg-slate-600/50'}`}>
                       <div>
                         <p className="text-sm font-medium text-slate-900 dark:text-white">{catalog.name || `Catalog ${index + 1}`}</p>
                         <p className="text-xs text-slate-500">{catalog.id}</p>
-                        {catalog.type && (
-                          <p className="text-xs text-slate-400 mt-0.5">Type: {catalog.type}</p>
+                        {catalogType && (
+                          <p className="text-xs text-slate-400 mt-0.5">Type: {catalogType}</p>
                         )}
-                        {catalog.product_count !== undefined && (
-                          <p className="text-xs text-slate-400">Products: {catalog.product_count}</p>
+                        {productCount !== undefined && (
+                          <p className="text-xs text-slate-400">Products: {productCount}</p>
                         )}
                       </div>
                       <div className="flex items-center gap-2">
@@ -1743,8 +1813,30 @@ function DriverTab({ shipper, shipperId }) {
   const [activeOrders, setActiveOrders] = useState([])
   const [isLoading, setIsLoading] = useState(true)
 
+  // Helper to check if shipper is a driver (with all possible field names)
+  const checkIsDriver = (data) => {
+    if (!data) return false
+    const isTruthy = (value) => {
+      if (value === undefined || value === null) return false
+      if (typeof value === 'boolean') return value
+      if (typeof value === 'number') return value === 1
+      if (typeof value === 'string') {
+        const v = value.toLowerCase().trim()
+        return v === '1' || v === 'y' || v === 'yes' || v === 'true'
+      }
+      return false
+    }
+    return isTruthy(data.localDelivery) || isTruthy(data.local_delivery) ||
+           isTruthy(data.is_driver) || isTruthy(data.driver) ||
+           (data.service_type && String(data.service_type).toLowerCase().includes('driver')) ||
+           (data.account_type && String(data.account_type).toLowerCase().includes('driver')) ||
+           (data.user_type && String(data.user_type).toLowerCase().includes('driver'))
+  }
+
+  const isDriver = checkIsDriver(shipper)
+
   useEffect(() => {
-    if (shipper?.localDelivery === 1 || shipper?.localDelivery === '1') {
+    if (isDriver) {
       fetchDriverData()
     } else {
       setIsLoading(false)
@@ -1773,7 +1865,7 @@ function DriverTab({ shipper, shipperId }) {
     }
   }
 
-  if (!(shipper?.localDelivery === 1 || shipper?.localDelivery === '1')) {
+  if (!isDriver) {
     return (
       <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
         <CardContent className="p-12 text-center">
@@ -1958,6 +2050,28 @@ function AdminShipperDetailPage() {
     return shipper.wh_account_id || shipper.id || shipperId
   }
 
+  // Helper to check if shipper is a driver (with all possible field names)
+  const checkIsDriver = (data) => {
+    if (!data) return false
+    const isTruthy = (value) => {
+      if (value === undefined || value === null) return false
+      if (typeof value === 'boolean') return value
+      if (typeof value === 'number') return value === 1
+      if (typeof value === 'string') {
+        const v = value.toLowerCase().trim()
+        return v === '1' || v === 'y' || v === 'yes' || v === 'true'
+      }
+      return false
+    }
+    return isTruthy(data.localDelivery) || isTruthy(data.local_delivery) ||
+           isTruthy(data.is_driver) || isTruthy(data.driver) ||
+           (data.service_type && String(data.service_type).toLowerCase().includes('driver')) ||
+           (data.account_type && String(data.account_type).toLowerCase().includes('driver')) ||
+           (data.user_type && String(data.user_type).toLowerCase().includes('driver'))
+  }
+
+  const isShipperDriver = checkIsDriver(shipper)
+
   const tabs = [
     { id: 'overview', label: 'Overview', icon: User },
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -1968,7 +2082,7 @@ function AdminShipperDetailPage() {
   ]
 
   // Add driver tab if shipper is also a driver
-  if (shipper?.localDelivery === 1 || shipper?.localDelivery === '1') {
+  if (isShipperDriver) {
     tabs.push({ id: 'driver', label: 'Driver', icon: Truck })
   }
 
