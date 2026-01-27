@@ -95,8 +95,13 @@ function OverviewTab({ shipper }) {
     return data.wh_account_id || data.id || data.warehouse_user_id || 'N/A'
   }
 
+  // Helper to check if value is truthy
+  const isTruthy = (value) => {
+    return value === 1 || value === '1' || value === 'Y' || value === 'y' || value === true
+  }
+
   const getStatusBadge = (value, labels = { true: 'Yes', false: 'No' }) => {
-    const isTrue = value === 1 || value === '1' || value === true
+    const isTrue = isTruthy(value)
     return isTrue ? (
       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
         <CheckCircle className="w-3 h-3" />
@@ -109,6 +114,11 @@ function OverviewTab({ shipper }) {
       </span>
     )
   }
+
+  // Check account type fields with multiple possible names
+  const isSeller = isTruthy(data.scanSell) || isTruthy(data.scan_sell) || isTruthy(data.is_seller)
+  const isDriver = isTruthy(data.localDelivery) || isTruthy(data.local_delivery) || isTruthy(data.is_driver)
+  const isFulfillment = isTruthy(data.fulfillment) || isTruthy(data.is_fulfillment)
 
   const InfoRow = ({ icon: Icon, label, value, isBadge }) => (
     <div className="flex items-center justify-between py-3 border-b border-slate-100 dark:border-slate-700 last:border-0">
@@ -188,9 +198,9 @@ function OverviewTab({ shipper }) {
             Account Type
           </h3>
           <div className="space-y-0">
-            <InfoRow icon={Store} label="Seller (Scan & Sell)" value={getStatusBadge(data.scanSell)} isBadge />
-            <InfoRow icon={Truck} label="Driver (Local Delivery)" value={getStatusBadge(data.localDelivery)} isBadge />
-            <InfoRow icon={Package} label="Fulfillment" value={getStatusBadge(data.fulfillment)} isBadge />
+            <InfoRow icon={Store} label="Seller (Scan & Sell)" value={getStatusBadge(isSeller)} isBadge />
+            <InfoRow icon={Truck} label="Driver (Local Delivery)" value={getStatusBadge(isDriver)} isBadge />
+            <InfoRow icon={Package} label="Fulfillment" value={getStatusBadge(isFulfillment)} isBadge />
           </div>
         </CardContent>
       </Card>
@@ -394,6 +404,7 @@ function ProductsTab({ shipperId }) {
   const [products, setProducts] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [selectedProduct, setSelectedProduct] = useState(null)
 
   useEffect(() => {
     fetchProducts()
@@ -442,7 +453,8 @@ function ProductsTab({ shipperId }) {
   }
 
   // Toggle product status
-  const handleToggleStatus = async (product) => {
+  const handleToggleStatus = async (product, e) => {
+    if (e) e.stopPropagation()
     try {
       const response = await productService.toggleProductStatus({
         wh_account_id: shipperId,
@@ -452,6 +464,9 @@ function ProductsTab({ shipperId }) {
       if (response.status === 1) {
         toast.success('Product status updated')
         fetchProducts()
+        if (selectedProduct?.id === product.id || selectedProduct?.product_id === product.product_id) {
+          setSelectedProduct(null)
+        }
       } else {
         toast.error(response.message || 'Failed to update status')
       }
@@ -485,6 +500,109 @@ function ProductsTab({ shipperId }) {
     )
   }
 
+  // Product Detail View
+  if (selectedProduct) {
+    return (
+      <div className="space-y-4">
+        <button
+          onClick={() => setSelectedProduct(null)}
+          className="flex items-center gap-2 text-sm text-violet-600 hover:text-violet-700"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Products
+        </button>
+
+        <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
+          <CardContent className="p-6">
+            <div className="flex flex-col md:flex-row gap-6">
+              {/* Product Image */}
+              <div className="flex-shrink-0">
+                {getProductImage(selectedProduct) ? (
+                  <img
+                    src={getProductImage(selectedProduct)}
+                    alt={getProductName(selectedProduct)}
+                    className="w-full md:w-64 h-64 rounded-xl object-cover"
+                  />
+                ) : (
+                  <div className="w-full md:w-64 h-64 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
+                    <Package className="w-16 h-16 text-slate-400" />
+                  </div>
+                )}
+              </div>
+
+              {/* Product Details */}
+              <div className="flex-1 space-y-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white">{getProductName(selectedProduct)}</h2>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                      {selectedProduct.category || selectedProduct.category_name || 'No category'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={(e) => handleToggleStatus(selectedProduct, e)}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium ${
+                      isProductActive(selectedProduct)
+                        ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {isProductActive(selectedProduct) ? 'Active' : 'Inactive'}
+                  </button>
+                </div>
+
+                <div className="text-3xl font-bold text-violet-600">${getProductPrice(selectedProduct)}</div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-700/50">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Product ID</p>
+                    <p className="font-mono text-sm text-slate-900 dark:text-white mt-1">
+                      {selectedProduct.product_id || selectedProduct.id || 'N/A'}
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-700/50">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">SKU/UPC</p>
+                    <p className="font-mono text-sm text-slate-900 dark:text-white mt-1">
+                      {selectedProduct.upc || selectedProduct.sku || selectedProduct.barcode || 'N/A'}
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-700/50">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Stock Quantity</p>
+                    <p className="text-sm text-slate-900 dark:text-white mt-1">
+                      {selectedProduct.quantity ?? selectedProduct.stock ?? 'N/A'}
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-700/50">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Weight</p>
+                    <p className="text-sm text-slate-900 dark:text-white mt-1">
+                      {selectedProduct.weight ? `${selectedProduct.weight} lbs` : 'N/A'}
+                    </p>
+                  </div>
+                </div>
+
+                {(selectedProduct.description || selectedProduct.product_description) && (
+                  <div>
+                    <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Description</h4>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">
+                      {selectedProduct.description || selectedProduct.product_description}
+                    </p>
+                  </div>
+                )}
+
+                {selectedProduct.subcategory && (
+                  <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-700/50">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Subcategory</p>
+                    <p className="text-sm text-slate-900 dark:text-white mt-1">{selectedProduct.subcategory}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -508,7 +626,11 @@ function ProductsTab({ shipperId }) {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {products.map((product, index) => (
-            <Card key={product.id || product.product_id || index} className="bg-white dark:bg-slate-800 border-0 shadow-sm">
+            <Card
+              key={product.id || product.product_id || index}
+              className="bg-white dark:bg-slate-800 border-0 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+              onClick={() => setSelectedProduct(product)}
+            >
               <CardContent className="p-4">
                 <div className="flex gap-4">
                   {getProductImage(product) ? (
@@ -520,11 +642,11 @@ function ProductsTab({ shipperId }) {
                   )}
                   <div className="flex-1 min-w-0">
                     <h4 className="font-medium text-slate-900 dark:text-white truncate">{getProductName(product)}</h4>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">{product.category || product.category_name || 'No category'}</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 truncate">{product.category || product.category_name || 'No category'}</p>
                     <div className="flex items-center gap-2 mt-2">
                       <span className="font-semibold text-slate-900 dark:text-white">${getProductPrice(product)}</span>
                       <button
-                        onClick={() => handleToggleStatus(product)}
+                        onClick={(e) => handleToggleStatus(product, e)}
                         className={`text-xs px-2 py-0.5 rounded-full cursor-pointer hover:opacity-80 ${
                           isProductActive(product)
                             ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
@@ -534,10 +656,8 @@ function ProductsTab({ shipperId }) {
                         {isProductActive(product) ? 'Active' : 'Inactive'}
                       </button>
                     </div>
-                    {product.quantity !== undefined && (
-                      <p className="text-xs text-slate-400 mt-1">Stock: {product.quantity}</p>
-                    )}
                   </div>
+                  <ChevronRight className="w-5 h-5 text-slate-400 self-center" />
                 </div>
               </CardContent>
             </Card>
@@ -583,27 +703,41 @@ function OrdersTab({ shipperId }) {
     return order.order_id || order.id || order.order_number || 'N/A'
   }
 
+  // Helper to check truthy values
+  const isTruthy = (value) => {
+    return value === 1 || value === '1' || value === 'Y' || value === 'y' || value === true
+  }
+
   // Get order status with proper detection
   const getOrderStatus = (order) => {
-    // Check for cancelled first
-    if (order.is_cancelled === 1 || order.is_cancelled === '1' || order.order_cancelled === 'Y') {
+    // Check for cancelled first - try multiple field names
+    if (isTruthy(order.is_cancelled) || order.order_cancelled === 'Y' || order.status === 'cancelled') {
       return 'cancelled'
     }
     // Check for delivered
-    if (order.order_delivered === 'Y' || order.is_delivered === 1 || order.is_delivered === '1') {
+    if (order.order_delivered === 'Y' || isTruthy(order.is_delivered) || order.status === 'delivered') {
       return 'delivered'
     }
     // Check for shipped
-    if (order.order_shipped === 'Y' || order.is_shipped === 1 || order.is_shipped === '1') {
+    if (order.order_shipped === 'Y' || isTruthy(order.is_shipped) || order.status === 'shipped') {
       return 'shipped'
     }
     // Check for packed
-    if (order.order_packed === 'Y' || order.is_packed === 1 || order.is_packed === '1') {
+    if (order.order_packed === 'Y' || isTruthy(order.is_packed) || order.status === 'packed') {
       return 'packed'
     }
     // Check for accepted
-    if (order.order_accept === 'Y' || order.is_accepted === 1 || order.is_accepted === '1') {
+    if (order.order_accept === 'Y' || isTruthy(order.is_accepted) || isTruthy(order.order_accepted) || order.status === 'accepted') {
       return 'accepted'
+    }
+    // Check for order_status field
+    if (order.order_status) {
+      const status = String(order.order_status).toLowerCase()
+      if (status.includes('cancel')) return 'cancelled'
+      if (status.includes('deliver')) return 'delivered'
+      if (status.includes('ship')) return 'shipped'
+      if (status.includes('pack')) return 'packed'
+      if (status.includes('accept')) return 'accepted'
     }
     return 'new'
   }
@@ -621,7 +755,7 @@ function OrdersTab({ shipperId }) {
     return badges[status] || badges.new
   }
 
-  // Get customer name
+  // Get customer name - try multiple field combinations
   const getCustomerName = (order) => {
     if (order.customer_name) return order.customer_name
     if (order.shipping_firstname || order.shipping_lastname) {
@@ -631,7 +765,43 @@ function OrdersTab({ shipperId }) {
       return `${order.firstname || ''} ${order.lastname || ''}`.trim()
     }
     if (order.drop_off?.customer_name) return order.drop_off.customer_name
+    if (order.drop_off?.firstname || order.drop_off?.lastname) {
+      return `${order.drop_off.firstname || ''} ${order.drop_off.lastname || ''}`.trim()
+    }
+    if (order.customer?.name) return order.customer.name
+    if (order.customer?.firstname || order.customer?.lastname) {
+      return `${order.customer.firstname || ''} ${order.customer.lastname || ''}`.trim()
+    }
     return 'N/A'
+  }
+
+  // Get customer phone
+  const getCustomerPhone = (order) => {
+    return order.shipping_telephone || order.telephone || order.customer_phone || order.phone ||
+           order.drop_off?.telephone || order.drop_off?.phone || order.customer?.phone || 'N/A'
+  }
+
+  // Get customer email
+  const getCustomerEmail = (order) => {
+    return order.email || order.customer_email || order.shipping_email ||
+           order.drop_off?.email || order.customer?.email || 'N/A'
+  }
+
+  // Get full shipping address
+  const getShippingAddress = (order) => {
+    // Try to build a complete address
+    const name = order.shipping_firstname || order.shipping_lastname
+      ? `${order.shipping_firstname || ''} ${order.shipping_lastname || ''}`.trim()
+      : null
+    const address1 = order.shipping_address_1 || order.address_1 || order.drop_off?.address
+    const address2 = order.shipping_address_2 || order.address_2 || order.drop_off?.address_2
+    const city = order.shipping_city || order.city || order.drop_off?.city
+    const state = order.shipping_zone || order.state || order.zone || order.drop_off?.state
+    const postcode = order.shipping_postcode || order.postcode || order.zip_code || order.drop_off?.zip_code
+    const country = order.shipping_country || order.country || order.drop_off?.country
+
+    const parts = [name, address1, address2, city, state, postcode, country].filter(Boolean)
+    return parts.join(', ') || 'N/A'
   }
 
   // Update order status
@@ -801,11 +971,11 @@ function OrdersTab({ shipperId }) {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">Phone</span>
-                    <span className="text-slate-900 dark:text-white">{selectedOrder.shipping_telephone || selectedOrder.telephone || selectedOrder.customer_phone || selectedOrder.phone || 'N/A'}</span>
+                    <span className="text-slate-900 dark:text-white">{getCustomerPhone(selectedOrder)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">Email</span>
-                    <span className="text-slate-900 dark:text-white">{selectedOrder.email || selectedOrder.customer_email || 'N/A'}</span>
+                    <span className="text-slate-900 dark:text-white">{getCustomerEmail(selectedOrder)}</span>
                   </div>
                 </div>
               </div>
@@ -814,14 +984,7 @@ function OrdersTab({ shipperId }) {
               <div className="space-y-4 md:col-span-2">
                 <h4 className="font-semibold text-slate-900 dark:text-white">Shipping Address</h4>
                 <p className="text-sm text-slate-600 dark:text-slate-400">
-                  {[
-                    selectedOrder.shipping_address_1 || selectedOrder.address_1 || selectedOrder.drop_off?.address,
-                    selectedOrder.shipping_address_2 || selectedOrder.address_2,
-                    selectedOrder.shipping_city || selectedOrder.city || selectedOrder.drop_off?.city,
-                    selectedOrder.shipping_zone || selectedOrder.state || selectedOrder.drop_off?.state,
-                    selectedOrder.shipping_postcode || selectedOrder.postcode || selectedOrder.drop_off?.zip_code,
-                    selectedOrder.shipping_country || selectedOrder.country || selectedOrder.drop_off?.country,
-                  ].filter(Boolean).join(', ') || 'N/A'}
+                  {getShippingAddress(selectedOrder)}
                 </p>
               </div>
 
@@ -933,6 +1096,8 @@ function WhatsAppTab({ shipperId }) {
   const [businessProfile, setBusinessProfile] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSyncing, setIsSyncing] = useState(false)
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false)
+  const [isLoadingCatalogs, setIsLoadingCatalogs] = useState(false)
 
   useEffect(() => {
     fetchWhatsAppData()
@@ -1056,6 +1221,57 @@ function WhatsAppTab({ shipperId }) {
     }
   }
 
+  // Check Phone Number Status
+  const handleCheckPhoneStatus = async () => {
+    setIsCheckingStatus(true)
+    try {
+      const response = await whatsappService.getPhoneStatus(shipperId)
+      if (response.status === 1) {
+        setPhoneStatus(response.data)
+        toast.success('Phone status updated')
+      } else {
+        toast.error(response.message || 'Failed to check phone status')
+      }
+    } catch (error) {
+      toast.error('Failed to check phone status')
+    } finally {
+      setIsCheckingStatus(false)
+    }
+  }
+
+  // Load Catalogs from WhatsApp
+  const handleLoadCatalogs = async () => {
+    setIsLoadingCatalogs(true)
+    try {
+      const response = await whatsappService.listCatalogs(shipperId)
+      if (response.status === 1) {
+        setCatalogs(response.data?.catalogs || response.data || [])
+        toast.success('Catalogs loaded')
+      } else {
+        toast.error(response.message || 'Failed to load catalogs')
+      }
+    } catch (error) {
+      toast.error('Failed to load catalogs')
+    } finally {
+      setIsLoadingCatalogs(false)
+    }
+  }
+
+  // Select/Set Active Catalog
+  const handleSelectCatalog = async (catalogId) => {
+    try {
+      const response = await whatsappService.setCatalog(shipperId, catalogId)
+      if (response.status === 1) {
+        toast.success('Catalog selected successfully')
+        fetchWhatsAppData()
+      } else {
+        toast.error(response.message || 'Failed to select catalog')
+      }
+    } catch (error) {
+      toast.error('Failed to select catalog')
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -1129,10 +1345,20 @@ function WhatsAppTab({ shipperId }) {
       {isConnected && (
         <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
           <CardContent className="p-6">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-              <Phone className="w-5 h-5 text-blue-500" />
-              Phone Number Status
-            </h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                <Phone className="w-5 h-5 text-blue-500" />
+                Phone Number Status
+              </h3>
+              <button
+                onClick={handleCheckPhoneStatus}
+                disabled={isCheckingStatus}
+                className="px-3 py-1.5 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-1 disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 ${isCheckingStatus ? 'animate-spin' : ''}`} />
+                Check Status
+              </button>
+            </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50">
                 <p className="text-xs text-slate-500 dark:text-slate-400">Quality Rating</p>
@@ -1202,6 +1428,16 @@ function WhatsAppTab({ shipperId }) {
               Catalog
             </h3>
             <div className="flex gap-2">
+              {isConnected && (
+                <button
+                  onClick={handleLoadCatalogs}
+                  disabled={isLoadingCatalogs}
+                  className="px-3 py-1.5 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-1 disabled:opacity-50"
+                >
+                  <List className={`w-4 h-4 ${isLoadingCatalogs ? 'animate-spin' : ''}`} />
+                  Load Catalogs
+                </button>
+              )}
               {!whatsappStatus?.catalog_id && isConnected && (
                 <button
                   onClick={handleCreateCatalog}
@@ -1224,10 +1460,11 @@ function WhatsAppTab({ shipperId }) {
             </div>
           </div>
 
+          {/* Current Active Catalog */}
           <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-slate-900 dark:text-white">Catalog ID</p>
+                <p className="text-sm font-medium text-slate-900 dark:text-white">Current Catalog</p>
                 <p className="font-mono text-sm text-slate-500 dark:text-slate-400 mt-1">
                   {whatsappStatus?.catalog_id || 'Not configured'}
                 </p>
@@ -1241,27 +1478,60 @@ function WhatsAppTab({ shipperId }) {
             {whatsappStatus?.catalog_name && (
               <p className="text-xs text-slate-400 mt-2">Name: {whatsappStatus.catalog_name}</p>
             )}
+            {whatsappStatus?.catalog_type && (
+              <p className="text-xs text-slate-400 mt-1">Type: {whatsappStatus.catalog_type}</p>
+            )}
             {whatsappStatus?.product_count !== undefined && (
               <p className="text-xs text-slate-400 mt-1">Products: {whatsappStatus.product_count}</p>
             )}
           </div>
 
+          {/* Available Catalogs with Selection */}
           {catalogs.length > 0 && (
             <div className="mt-4">
-              <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Available Catalogs</p>
+              <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Available Catalogs ({catalogs.length})</p>
               <div className="space-y-2">
-                {catalogs.map((catalog, index) => (
-                  <div key={catalog.id || index} className="p-3 rounded-lg bg-slate-100 dark:bg-slate-600/50 flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-slate-900 dark:text-white">{catalog.name || `Catalog ${index + 1}`}</p>
-                      <p className="text-xs text-slate-500">{catalog.id}</p>
+                {catalogs.map((catalog, index) => {
+                  const isActive = catalog.id === whatsappStatus?.catalog_id || catalog.is_active
+                  return (
+                    <div key={catalog.id || index} className={`p-3 rounded-lg flex items-center justify-between ${isActive ? 'bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800' : 'bg-slate-100 dark:bg-slate-600/50'}`}>
+                      <div>
+                        <p className="text-sm font-medium text-slate-900 dark:text-white">{catalog.name || `Catalog ${index + 1}`}</p>
+                        <p className="text-xs text-slate-500">{catalog.id}</p>
+                        {catalog.type && (
+                          <p className="text-xs text-slate-400 mt-0.5">Type: {catalog.type}</p>
+                        )}
+                        {catalog.product_count !== undefined && (
+                          <p className="text-xs text-slate-400">Products: {catalog.product_count}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {isActive ? (
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                            Active
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleSelectCatalog(catalog.id)}
+                            className="px-3 py-1 text-xs bg-violet-500 text-white rounded-lg hover:bg-violet-600"
+                          >
+                            Select
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    {catalog.is_active && (
-                      <span className="text-xs text-emerald-600">Active</span>
-                    )}
-                  </div>
-                ))}
+                  )
+                })}
               </div>
+            </div>
+          )}
+
+          {/* No Catalogs State */}
+          {catalogs.length === 0 && isConnected && (
+            <div className="mt-4 text-center py-4 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl">
+              <Package className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto" />
+              <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">No catalogs loaded</p>
+              <p className="text-xs text-slate-400">Click "Load Catalogs" to fetch available catalogs</p>
             </div>
           )}
         </CardContent>
