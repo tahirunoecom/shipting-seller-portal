@@ -128,7 +128,9 @@ function AdminLayout() {
               <>
                 <ChevronRight className="w-4 h-4 text-slate-400" />
                 <span className="text-slate-700 dark:text-white font-medium">
-                  {selectedShipper.store_name || selectedShipper.name || `Shipper #${selectedShipper.id}`}
+                  {selectedShipper.company || selectedShipper.store_name ||
+                   (selectedShipper.firstname ? `${selectedShipper.firstname} ${selectedShipper.lastname || ''}`.trim() : null) ||
+                   selectedShipper.name || `Shipper #${selectedShipper.wh_account_id || selectedShipper.id}`}
                 </span>
               </>
             )}
