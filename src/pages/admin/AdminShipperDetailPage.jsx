@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAdminStore } from '@/store'
 import { adminService } from '@/services'
+import { whatsappService } from '@/services/whatsapp'
+import { productService } from '@/services/products'
+import { orderService } from '@/services/orders'
 import { DRIVER_STATUS_LABELS } from '@/services/driver'
 import { Card, CardContent } from '@/components/ui'
 import {
@@ -31,44 +34,65 @@ import {
   Key,
   Building,
   Globe,
+  Edit,
+  Trash2,
+  Plus,
+  Send,
+  Link,
+  Settings,
+  ExternalLink,
+  Power,
+  Zap,
+  List,
+  ToggleLeft,
+  ToggleRight,
+  Image,
+  MessageCircle,
+  Bot,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 // Tab components
-function OverviewTab({ shipper, shipperDetails }) {
-  const data = shipperDetails || shipper
+function OverviewTab({ shipper }) {
+  // Use shipper data directly - it comes from getAllShippersForAdmin
+  const data = shipper || {}
 
   // Helper to get name from different field names
   const getName = () => {
-    if (data?.firstname || data?.lastname) {
-      return `${data?.firstname || ''} ${data?.lastname || ''}`.trim()
+    if (data.firstname || data.lastname) {
+      return `${data.firstname || ''} ${data.lastname || ''}`.trim()
     }
-    return data?.name || 'N/A'
+    return data.name || 'N/A'
   }
 
   // Helper to get store name
   const getStoreName = () => {
-    return data?.company || data?.store_name || 'N/A'
+    return data.company || data.store_name || 'N/A'
   }
 
   // Helper to get phone
   const getPhone = () => {
-    return data?.telephone || data?.phone || 'N/A'
+    return data.telephone || data.phone || 'N/A'
   }
 
   // Helper to get address
   const getAddress = () => {
-    const parts = [data?.address_1, data?.address_2].filter(Boolean)
-    return parts.join(', ') || data?.address || data?.store_address || 'N/A'
+    const parts = [data.address_1, data.address_2].filter(Boolean)
+    return parts.join(', ') || data.address || data.store_address || 'N/A'
   }
 
   // Helper to get date
   const getCreatedDate = () => {
-    const dateStr = data?.date_added || data?.created_at
+    const dateStr = data.date_added || data.created_at
     if (dateStr) {
       return new Date(dateStr).toLocaleDateString()
     }
     return 'N/A'
+  }
+
+  // Get shipper ID
+  const getShipperId = () => {
+    return data.wh_account_id || data.id || data.warehouse_user_id || 'N/A'
   }
 
   const getStatusBadge = (value, labels = { true: 'Yes', false: 'No' }) => {
@@ -109,10 +133,10 @@ function OverviewTab({ shipper, shipperDetails }) {
           </h3>
           <div className="space-y-0">
             <InfoRow icon={User} label="Name" value={getName()} />
-            <InfoRow icon={Mail} label="Email" value={data?.email} />
+            <InfoRow icon={Mail} label="Email" value={data.email || 'N/A'} />
             <InfoRow icon={Phone} label="Phone" value={getPhone()} />
             <InfoRow icon={Calendar} label="Created" value={getCreatedDate()} />
-            <InfoRow icon={Shield} label="OTP Verified" value={getStatusBadge(data?.otp_verification)} isBadge />
+            <InfoRow icon={Shield} label="OTP Verified" value={getStatusBadge(data.otp_verification)} isBadge />
           </div>
         </CardContent>
       </Card>
@@ -127,10 +151,10 @@ function OverviewTab({ shipper, shipperDetails }) {
           <div className="space-y-0">
             <InfoRow icon={Building} label="Store/Company" value={getStoreName()} />
             <InfoRow icon={MapPin} label="Address" value={getAddress()} />
-            <InfoRow icon={MapPin} label="City" value={data?.city || data?.store_city} />
-            <InfoRow icon={MapPin} label="State" value={data?.state || data?.store_state} />
-            <InfoRow icon={MapPin} label="ZIP Code" value={data?.postcode || data?.zip_code || data?.store_zip_code} />
-            <InfoRow icon={Globe} label="Country" value={data?.country || data?.store_country} />
+            <InfoRow icon={MapPin} label="City" value={data.city || data.store_city || 'N/A'} />
+            <InfoRow icon={MapPin} label="State" value={data.state || data.store_state || 'N/A'} />
+            <InfoRow icon={MapPin} label="ZIP Code" value={data.postcode || data.zip_code || data.store_zip_code || 'N/A'} />
+            <InfoRow icon={Globe} label="Country" value={data.country || data.store_country || 'N/A'} />
           </div>
         </CardContent>
       </Card>
@@ -143,14 +167,14 @@ function OverviewTab({ shipper, shipperDetails }) {
             Verification Status
           </h3>
           <div className="space-y-0">
-            <InfoRow icon={CheckCircle} label="Verification Submitted" value={getStatusBadge(data?.is_verification_submitted)} isBadge />
-            <InfoRow icon={CheckCircle} label="Approved" value={getStatusBadge(data?.approved, { true: 'Approved', false: 'Not Approved' })} isBadge />
-            <InfoRow icon={CreditCard} label="Stripe Connected" value={getStatusBadge(data?.stripe_connect)} isBadge />
-            {data?.license_number && (
-              <InfoRow icon={FileText} label="License Number" value={data?.license_number} />
+            <InfoRow icon={CheckCircle} label="Verification Submitted" value={getStatusBadge(data.is_verification_submitted)} isBadge />
+            <InfoRow icon={CheckCircle} label="Approved" value={getStatusBadge(data.approved, { true: 'Approved', false: 'Not Approved' })} isBadge />
+            <InfoRow icon={CreditCard} label="Stripe Connected" value={getStatusBadge(data.stripe_connect)} isBadge />
+            {data.license_number && (
+              <InfoRow icon={FileText} label="License Number" value={data.license_number} />
             )}
-            {data?.ein_number && (
-              <InfoRow icon={FileText} label="EIN Number" value={data?.ein_number} />
+            {data.ein_number && (
+              <InfoRow icon={FileText} label="EIN Number" value={data.ein_number} />
             )}
           </div>
         </CardContent>
@@ -164,9 +188,9 @@ function OverviewTab({ shipper, shipperDetails }) {
             Account Type
           </h3>
           <div className="space-y-0">
-            <InfoRow icon={Store} label="Seller (Scan & Sell)" value={getStatusBadge(data?.scanSell)} isBadge />
-            <InfoRow icon={Truck} label="Driver (Local Delivery)" value={getStatusBadge(data?.localDelivery)} isBadge />
-            <InfoRow icon={Package} label="Fulfillment" value={getStatusBadge(data?.fulfillment)} isBadge />
+            <InfoRow icon={Store} label="Seller (Scan & Sell)" value={getStatusBadge(data.scanSell)} isBadge />
+            <InfoRow icon={Truck} label="Driver (Local Delivery)" value={getStatusBadge(data.localDelivery)} isBadge />
+            <InfoRow icon={Package} label="Fulfillment" value={getStatusBadge(data.fulfillment)} isBadge />
           </div>
         </CardContent>
       </Card>
@@ -181,19 +205,19 @@ function OverviewTab({ shipper, shipperDetails }) {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50">
               <p className="text-xs text-slate-500 dark:text-slate-400">User ID</p>
-              <p className="font-mono text-sm font-medium text-slate-900 dark:text-white mt-1">{data?.warehouse_user_id || data?.id || 'N/A'}</p>
+              <p className="font-mono text-sm font-medium text-slate-900 dark:text-white mt-1">{data.warehouse_user_id || data.id || 'N/A'}</p>
             </div>
             <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50">
               <p className="text-xs text-slate-500 dark:text-slate-400">WH Account ID</p>
-              <p className="font-mono text-sm font-medium text-slate-900 dark:text-white mt-1">{data?.wh_account_id || 'N/A'}</p>
+              <p className="font-mono text-sm font-medium text-slate-900 dark:text-white mt-1">{getShipperId()}</p>
             </div>
             <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50">
               <p className="text-xs text-slate-500 dark:text-slate-400">Stripe Account</p>
-              <p className="font-mono text-sm font-medium text-slate-900 dark:text-white mt-1 truncate">{data?.stripe_account_id || data?.stripe_connect_id || 'N/A'}</p>
+              <p className="font-mono text-sm font-medium text-slate-900 dark:text-white mt-1 truncate">{data.stripe_account_id || data.stripe_connect_id || 'N/A'}</p>
             </div>
             <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50">
               <p className="text-xs text-slate-500 dark:text-slate-400">WABA ID</p>
-              <p className="font-mono text-sm font-medium text-slate-900 dark:text-white mt-1">{data?.waba_id || 'N/A'}</p>
+              <p className="font-mono text-sm font-medium text-slate-900 dark:text-white mt-1">{data.waba_id || 'N/A'}</p>
             </div>
           </div>
         </CardContent>
@@ -219,7 +243,9 @@ function DashboardTab({ shipperId }) {
         days: days,
       })
       if (response.status === 1) {
-        setDashboardData(response.data)
+        // Handle nested response data
+        const data = response.data?.dashboardData || response.data || response
+        setDashboardData(data)
       }
     } catch (error) {
       console.error('Error fetching dashboard:', error)
@@ -238,23 +264,38 @@ function DashboardTab({ shipperId }) {
 
   const stats = dashboardData || {}
 
+  // Extract values from different possible response structures
+  const getTotalOrders = () => stats.total_orders || stats.totalOrders || stats.orders_count || 0
+  const getRevenue = () => stats.total_revenue || stats.totalRevenue || stats.revenue || stats.total_sales || 0
+  const getProducts = () => stats.total_products || stats.totalProducts || stats.products_count || 0
+  const getPending = () => stats.pending_orders || stats.pendingOrders || stats.new_orders || 0
+
   return (
     <div className="space-y-6">
       {/* Period selector */}
-      <div className="flex gap-2">
-        {[{ label: 'Today', value: 1 }, { label: '7 Days', value: 7 }, { label: '30 Days', value: 30 }, { label: 'Year', value: 365 }].map((period) => (
-          <button
-            key={period.value}
-            onClick={() => setDays(period.value)}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
-              days === period.value
-                ? 'bg-violet-500 text-white'
-                : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
-            }`}
-          >
-            {period.label}
-          </button>
-        ))}
+      <div className="flex items-center justify-between">
+        <div className="flex gap-2">
+          {[{ label: 'Today', value: 1 }, { label: '7 Days', value: 7 }, { label: '30 Days', value: 30 }, { label: 'Year', value: 365 }].map((period) => (
+            <button
+              key={period.value}
+              onClick={() => setDays(period.value)}
+              className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+                days === period.value
+                  ? 'bg-violet-500 text-white'
+                  : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
+              }`}
+            >
+              {period.label}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={fetchDashboard}
+          className="flex items-center gap-2 px-3 py-2 text-sm text-violet-600 hover:text-violet-700"
+        >
+          <RefreshCw className="w-4 h-4" />
+          Refresh
+        </button>
       </div>
 
       {/* Stats */}
@@ -266,7 +307,7 @@ function DashboardTab({ shipperId }) {
                 <ShoppingCart className="w-5 h-5 text-blue-600 dark:text-blue-400" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.total_orders || 0}</p>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">{getTotalOrders()}</p>
                 <p className="text-xs text-slate-500 dark:text-slate-400">Total Orders</p>
               </div>
             </div>
@@ -280,7 +321,7 @@ function DashboardTab({ shipperId }) {
                 <DollarSign className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">${stats.total_revenue || 0}</p>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">${getRevenue()}</p>
                 <p className="text-xs text-slate-500 dark:text-slate-400">Revenue</p>
               </div>
             </div>
@@ -294,7 +335,7 @@ function DashboardTab({ shipperId }) {
                 <Package className="w-5 h-5 text-violet-600 dark:text-violet-400" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.total_products || 0}</p>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">{getProducts()}</p>
                 <p className="text-xs text-slate-500 dark:text-slate-400">Products</p>
               </div>
             </div>
@@ -308,7 +349,7 @@ function DashboardTab({ shipperId }) {
                 <Clock className="w-5 h-5 text-amber-600 dark:text-amber-400" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.pending_orders || 0}</p>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">{getPending()}</p>
                 <p className="text-xs text-slate-500 dark:text-slate-400">Pending</p>
               </div>
             </div>
@@ -325,13 +366,23 @@ function DashboardTab({ shipperId }) {
               {stats.recent_orders.map((order, index) => (
                 <div key={order.id || index} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50">
                   <div>
-                    <p className="font-medium text-slate-900 dark:text-white">Order #{order.id}</p>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">{order.created_at}</p>
+                    <p className="font-medium text-slate-900 dark:text-white">Order #{order.order_id || order.id}</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">{order.date_added || order.created_at}</p>
                   </div>
-                  <p className="font-semibold text-slate-900 dark:text-white">${order.total_amount || order.order_amount || 0}</p>
+                  <p className="font-semibold text-slate-900 dark:text-white">${order.order_amount || order.total_amount || 0}</p>
                 </div>
               ))}
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* No data state */}
+      {!stats.recent_orders && getTotalOrders() === 0 && (
+        <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
+          <CardContent className="p-8 text-center">
+            <LayoutDashboard className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto" />
+            <p className="mt-4 text-slate-500 dark:text-slate-400">No dashboard data available for this period</p>
           </CardContent>
         </Card>
       )}
@@ -352,10 +403,11 @@ function ProductsTab({ shipperId }) {
     setIsLoading(true)
     setError(null)
     try {
-      const response = await adminService.getShipperProducts(shipperId)
+      // Use productService directly with wh_account_id
+      const response = await productService.getSellerProducts(shipperId)
       if (response.status === 1) {
         // Handle different response structures
-        const productsList = response.data?.products || response.data || []
+        const productsList = response.data?.products || response.data?.getSellerProducts || response.data || []
         setProducts(Array.isArray(productsList) ? productsList : [])
       } else {
         setError(response.message || 'Failed to fetch products')
@@ -371,22 +423,41 @@ function ProductsTab({ shipperId }) {
 
   // Get product name
   const getProductName = (product) => {
-    return product.name || product.product_name || product.title || 'Unnamed Product'
+    return product.name || product.product_name || product.title || product.product_title || 'Unnamed Product'
   }
 
   // Get product image
   const getProductImage = (product) => {
-    return product.image || product.product_image || product.thumbnail || null
+    return product.image || product.product_image || product.thumbnail || product.main_image || null
   }
 
   // Get product price
   const getProductPrice = (product) => {
-    return product.price || product.selling_price || product.regular_price || 0
+    return product.price || product.selling_price || product.regular_price || product.product_price || 0
   }
 
   // Check if product is active
   const isProductActive = (product) => {
-    return product.status === 'active' || product.status === '1' || product.status === 1 || product.is_active === 1
+    return product.status === 'active' || product.status === '1' || product.status === 1 || product.is_active === 1 || product.product_status === 1
+  }
+
+  // Toggle product status
+  const handleToggleStatus = async (product) => {
+    try {
+      const response = await productService.toggleProductStatus({
+        wh_account_id: shipperId,
+        product_id: product.product_id || product.id,
+        status: isProductActive(product) ? 0 : 1,
+      })
+      if (response.status === 1) {
+        toast.success('Product status updated')
+        fetchProducts()
+      } else {
+        toast.error(response.message || 'Failed to update status')
+      }
+    } catch (error) {
+      toast.error('Failed to update status')
+    }
   }
 
   if (isLoading) {
@@ -452,11 +523,16 @@ function ProductsTab({ shipperId }) {
                     <p className="text-sm text-slate-500 dark:text-slate-400">{product.category || product.category_name || 'No category'}</p>
                     <div className="flex items-center gap-2 mt-2">
                       <span className="font-semibold text-slate-900 dark:text-white">${getProductPrice(product)}</span>
-                      {isProductActive(product) ? (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">Active</span>
-                      ) : (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400">Inactive</span>
-                      )}
+                      <button
+                        onClick={() => handleToggleStatus(product)}
+                        className={`text-xs px-2 py-0.5 rounded-full cursor-pointer hover:opacity-80 ${
+                          isProductActive(product)
+                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                            : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'
+                        }`}
+                      >
+                        {isProductActive(product) ? 'Active' : 'Inactive'}
+                      </button>
                     </div>
                     {product.quantity !== undefined && (
                       <p className="text-xs text-slate-400 mt-1">Stock: {product.quantity}</p>
@@ -477,6 +553,7 @@ function OrdersTab({ shipperId }) {
   const [isLoading, setIsLoading] = useState(true)
   const [filter, setFilter] = useState('All')
   const [selectedOrder, setSelectedOrder] = useState(null)
+  const [isUpdating, setIsUpdating] = useState(false)
 
   useEffect(() => {
     fetchOrders()
@@ -485,12 +562,12 @@ function OrdersTab({ shipperId }) {
   const fetchOrders = async () => {
     setIsLoading(true)
     try {
-      const response = await adminService.getShipperOrders({
+      const response = await orderService.getShipperOrders({
         wh_account_id: shipperId,
         type: filter,
       })
       if (response.status === 1) {
-        const ordersList = response.data?.orders || response.data || []
+        const ordersList = response.data?.orders || response.data?.getShipperOrders || response.data || []
         setOrders(Array.isArray(ordersList) ? ordersList : [])
       }
     } catch (error) {
@@ -550,8 +627,54 @@ function OrdersTab({ shipperId }) {
     if (order.shipping_firstname || order.shipping_lastname) {
       return `${order.shipping_firstname || ''} ${order.shipping_lastname || ''}`.trim()
     }
+    if (order.firstname || order.lastname) {
+      return `${order.firstname || ''} ${order.lastname || ''}`.trim()
+    }
     if (order.drop_off?.customer_name) return order.drop_off.customer_name
-    return null
+    return 'N/A'
+  }
+
+  // Update order status
+  const handleUpdateStatus = async (order, statusType) => {
+    setIsUpdating(true)
+    try {
+      const response = await orderService.updateOrderStatus({
+        wh_account_id: shipperId,
+        order_id: getOrderId(order),
+        status_type: statusType,
+      })
+      if (response.status === 1) {
+        toast.success('Order status updated')
+        fetchOrders()
+        setSelectedOrder(null)
+      } else {
+        toast.error(response.message || 'Failed to update status')
+      }
+    } catch (error) {
+      toast.error('Failed to update status')
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
+  // Cancel order
+  const handleCancelOrder = async (order) => {
+    if (!confirm('Are you sure you want to cancel this order?')) return
+    setIsUpdating(true)
+    try {
+      const response = await orderService.cancelOrder(getOrderId(order))
+      if (response.status === 1) {
+        toast.success('Order cancelled')
+        fetchOrders()
+        setSelectedOrder(null)
+      } else {
+        toast.error(response.message || 'Failed to cancel order')
+      }
+    } catch (error) {
+      toast.error('Failed to cancel order')
+    } finally {
+      setIsUpdating(false)
+    }
   }
 
   if (isLoading) {
@@ -564,6 +687,13 @@ function OrdersTab({ shipperId }) {
 
   // Order Detail Modal
   if (selectedOrder) {
+    const status = getOrderStatus(selectedOrder)
+    const canAccept = status === 'new'
+    const canPack = status === 'accepted'
+    const canShip = status === 'packed'
+    const canDeliver = status === 'shipped'
+    const canCancel = status !== 'cancelled' && status !== 'delivered'
+
     return (
       <div className="space-y-4">
         <button
@@ -583,6 +713,56 @@ function OrdersTab({ shipperId }) {
               {getOrderStatusBadge(selectedOrder)}
             </div>
 
+            {/* Action Buttons */}
+            <div className="flex flex-wrap gap-2 mb-6 p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50">
+              <span className="text-sm text-slate-500 mr-2">Actions:</span>
+              {canAccept && (
+                <button
+                  onClick={() => handleUpdateStatus(selectedOrder, 'OrderAccept')}
+                  disabled={isUpdating}
+                  className="px-3 py-1.5 text-sm bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 disabled:opacity-50"
+                >
+                  Accept Order
+                </button>
+              )}
+              {canPack && (
+                <button
+                  onClick={() => handleUpdateStatus(selectedOrder, 'OrderPacked')}
+                  disabled={isUpdating}
+                  className="px-3 py-1.5 text-sm bg-violet-500 text-white rounded-lg hover:bg-violet-600 disabled:opacity-50"
+                >
+                  Mark Packed
+                </button>
+              )}
+              {canShip && (
+                <button
+                  onClick={() => handleUpdateStatus(selectedOrder, 'OrderShipped')}
+                  disabled={isUpdating}
+                  className="px-3 py-1.5 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
+                >
+                  Mark Shipped
+                </button>
+              )}
+              {canDeliver && (
+                <button
+                  onClick={() => handleUpdateStatus(selectedOrder, 'OrderDelivered')}
+                  disabled={isUpdating}
+                  className="px-3 py-1.5 text-sm bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50"
+                >
+                  Mark Delivered
+                </button>
+              )}
+              {canCancel && (
+                <button
+                  onClick={() => handleCancelOrder(selectedOrder)}
+                  disabled={isUpdating}
+                  className="px-3 py-1.5 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50"
+                >
+                  Cancel Order
+                </button>
+              )}
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Order Info */}
               <div className="space-y-4">
@@ -594,11 +774,11 @@ function OrdersTab({ shipperId }) {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">Amount</span>
-                    <span className="text-slate-900 dark:text-white">${selectedOrder.order_amount || selectedOrder.total_amount || 0}</span>
+                    <span className="text-slate-900 dark:text-white">${selectedOrder.order_amount || selectedOrder.total_amount || selectedOrder.total || 0}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">Items</span>
-                    <span className="text-slate-900 dark:text-white">{selectedOrder.total_product || 1}</span>
+                    <span className="text-slate-900 dark:text-white">{selectedOrder.total_product || selectedOrder.items_count || 1}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">Date</span>
@@ -606,7 +786,7 @@ function OrdersTab({ shipperId }) {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">Payment</span>
-                    <span className="text-slate-900 dark:text-white">{selectedOrder.payment_method || 'N/A'}</span>
+                    <span className="text-slate-900 dark:text-white">{selectedOrder.payment_method || selectedOrder.payment_type || 'N/A'}</span>
                   </div>
                 </div>
               </div>
@@ -617,15 +797,15 @@ function OrdersTab({ shipperId }) {
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-slate-500">Name</span>
-                    <span className="text-slate-900 dark:text-white">{getCustomerName(selectedOrder) || 'N/A'}</span>
+                    <span className="text-slate-900 dark:text-white">{getCustomerName(selectedOrder)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">Phone</span>
-                    <span className="text-slate-900 dark:text-white">{selectedOrder.shipping_telephone || selectedOrder.customer_phone || 'N/A'}</span>
+                    <span className="text-slate-900 dark:text-white">{selectedOrder.shipping_telephone || selectedOrder.telephone || selectedOrder.customer_phone || selectedOrder.phone || 'N/A'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">Email</span>
-                    <span className="text-slate-900 dark:text-white">{selectedOrder.email || 'N/A'}</span>
+                    <span className="text-slate-900 dark:text-white">{selectedOrder.email || selectedOrder.customer_email || 'N/A'}</span>
                   </div>
                 </div>
               </div>
@@ -635,14 +815,36 @@ function OrdersTab({ shipperId }) {
                 <h4 className="font-semibold text-slate-900 dark:text-white">Shipping Address</h4>
                 <p className="text-sm text-slate-600 dark:text-slate-400">
                   {[
-                    selectedOrder.shipping_address_1 || selectedOrder.drop_off?.address,
-                    selectedOrder.shipping_city || selectedOrder.drop_off?.city,
-                    selectedOrder.shipping_zone || selectedOrder.drop_off?.state,
-                    selectedOrder.shipping_postcode || selectedOrder.drop_off?.zip_code,
-                    selectedOrder.shipping_country || selectedOrder.drop_off?.country,
+                    selectedOrder.shipping_address_1 || selectedOrder.address_1 || selectedOrder.drop_off?.address,
+                    selectedOrder.shipping_address_2 || selectedOrder.address_2,
+                    selectedOrder.shipping_city || selectedOrder.city || selectedOrder.drop_off?.city,
+                    selectedOrder.shipping_zone || selectedOrder.state || selectedOrder.drop_off?.state,
+                    selectedOrder.shipping_postcode || selectedOrder.postcode || selectedOrder.drop_off?.zip_code,
+                    selectedOrder.shipping_country || selectedOrder.country || selectedOrder.drop_off?.country,
                   ].filter(Boolean).join(', ') || 'N/A'}
                 </p>
               </div>
+
+              {/* Order Products */}
+              {(selectedOrder.products || selectedOrder.order_products || selectedOrder.items) && (
+                <div className="space-y-4 md:col-span-2">
+                  <h4 className="font-semibold text-slate-900 dark:text-white">Order Products</h4>
+                  <div className="space-y-2">
+                    {(selectedOrder.products || selectedOrder.order_products || selectedOrder.items || []).map((item, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-slate-50 dark:bg-slate-700/50">
+                        <div className="flex items-center gap-3">
+                          {item.image && <img src={item.image} alt="" className="w-10 h-10 rounded object-cover" />}
+                          <div>
+                            <p className="font-medium text-slate-900 dark:text-white">{item.name || item.product_name || 'Product'}</p>
+                            <p className="text-xs text-slate-500">Qty: {item.quantity || 1}</p>
+                          </div>
+                        </div>
+                        <p className="font-medium text-slate-900 dark:text-white">${item.price || item.total || 0}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -653,20 +855,29 @@ function OrdersTab({ shipperId }) {
   return (
     <div className="space-y-4">
       {/* Filters */}
-      <div className="flex gap-2 flex-wrap">
-        {['All', 'New', 'Accepted', 'Packed', 'Shipped', 'Delivered', 'Cancelled'].map((status) => (
-          <button
-            key={status}
-            onClick={() => setFilter(status)}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
-              filter === status
-                ? 'bg-violet-500 text-white'
-                : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
-            }`}
-          >
-            {status}
-          </button>
-        ))}
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <div className="flex gap-2 flex-wrap">
+          {['All', 'New', 'Accepted', 'Packed', 'Shipped', 'Delivered', 'Cancelled'].map((status) => (
+            <button
+              key={status}
+              onClick={() => setFilter(status)}
+              className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+                filter === status
+                  ? 'bg-violet-500 text-white'
+                  : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
+              }`}
+            >
+              {status}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={fetchOrders}
+          className="text-sm text-violet-600 hover:text-violet-700 flex items-center gap-1"
+        >
+          <RefreshCw className="w-4 h-4" />
+          Refresh
+        </button>
       </div>
 
       <p className="text-sm text-slate-500 dark:text-slate-400">{orders.length} orders</p>
@@ -694,15 +905,13 @@ function OrdersTab({ shipperId }) {
                       {getOrderStatusBadge(order)}
                     </div>
                     <div className="flex items-center gap-4 mt-2 text-sm text-slate-500 dark:text-slate-400">
-                      <span>{order.total_product || 1} item(s)</span>
-                      <span>${order.order_amount || order.total_amount || 0}</span>
+                      <span>{order.total_product || order.items_count || 1} item(s)</span>
+                      <span>${order.order_amount || order.total_amount || order.total || 0}</span>
                       <span>{order.date_added || order.created_at || order.order_date || 'N/A'}</span>
                     </div>
-                    {getCustomerName(order) && (
-                      <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                        Customer: {getCustomerName(order)}
-                      </p>
-                    )}
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                      Customer: {getCustomerName(order)}
+                    </p>
                   </div>
                   <ChevronRight className="w-5 h-5 text-slate-400" />
                 </div>
@@ -723,6 +932,7 @@ function WhatsAppTab({ shipperId }) {
   const [autoReplies, setAutoReplies] = useState([])
   const [businessProfile, setBusinessProfile] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isSyncing, setIsSyncing] = useState(false)
 
   useEffect(() => {
     fetchWhatsAppData()
@@ -731,27 +941,118 @@ function WhatsAppTab({ shipperId }) {
   const fetchWhatsAppData = async () => {
     setIsLoading(true)
     try {
-      // Fetch all WhatsApp related data
-      const [statusRes, settingsRes] = await Promise.all([
-        adminService.getWhatsAppStatus(shipperId).catch(() => ({ status: 0 })),
-        adminService.getWhatsAppBotSettings(shipperId).catch(() => ({ status: 0 })),
+      // Fetch all WhatsApp related data using whatsappService
+      const [statusRes, settingsRes, phoneRes, catalogsRes, autoRepliesRes, profileRes] = await Promise.all([
+        whatsappService.getWhatsAppStatus(shipperId).catch(() => ({ status: 0 })),
+        whatsappService.getBotSettings(shipperId).catch(() => ({ status: 0 })),
+        whatsappService.getPhoneStatus(shipperId).catch(() => ({ status: 0 })),
+        whatsappService.listCatalogs(shipperId).catch(() => ({ status: 0 })),
+        whatsappService.getAutoReplies(shipperId).catch(() => ({ status: 0 })),
+        whatsappService.getBusinessProfile(shipperId).catch(() => ({ status: 0 })),
       ])
 
       if (statusRes.status === 1) {
         setWhatsappStatus(statusRes.data)
-        // Extract nested data if available
-        if (statusRes.data?.phone_status) setPhoneStatus(statusRes.data.phone_status)
-        if (statusRes.data?.catalogs) setCatalogs(statusRes.data.catalogs || [])
-        if (statusRes.data?.business_profile) setBusinessProfile(statusRes.data.business_profile)
       }
       if (settingsRes.status === 1) {
         setBotSettings(settingsRes.data)
-        if (settingsRes.data?.auto_replies) setAutoReplies(settingsRes.data.auto_replies || [])
+      }
+      if (phoneRes.status === 1) {
+        setPhoneStatus(phoneRes.data)
+      }
+      if (catalogsRes.status === 1) {
+        setCatalogs(catalogsRes.data?.catalogs || catalogsRes.data || [])
+      }
+      if (autoRepliesRes.status === 1) {
+        setAutoReplies(autoRepliesRes.data?.auto_replies || autoRepliesRes.data || [])
+      }
+      if (profileRes.status === 1) {
+        setBusinessProfile(profileRes.data)
       }
     } catch (error) {
       console.error('Error fetching WhatsApp data:', error)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  // Sync catalog
+  const handleSyncCatalog = async () => {
+    setIsSyncing(true)
+    try {
+      const response = await whatsappService.syncCatalog(shipperId)
+      if (response.status === 1) {
+        toast.success('Catalog synced successfully')
+        fetchWhatsAppData()
+      } else {
+        toast.error(response.message || 'Failed to sync catalog')
+      }
+    } catch (error) {
+      toast.error('Failed to sync catalog')
+    } finally {
+      setIsSyncing(false)
+    }
+  }
+
+  // Create catalog
+  const handleCreateCatalog = async () => {
+    try {
+      const response = await whatsappService.createCatalog(shipperId)
+      if (response.status === 1) {
+        toast.success('Catalog created successfully')
+        fetchWhatsAppData()
+      } else {
+        toast.error(response.message || 'Failed to create catalog')
+      }
+    } catch (error) {
+      toast.error('Failed to create catalog')
+    }
+  }
+
+  // Toggle auto-reply
+  const handleToggleAutoReply = async (replyId) => {
+    try {
+      const response = await whatsappService.toggleAutoReply(shipperId, replyId)
+      if (response.status === 1) {
+        toast.success('Auto-reply toggled')
+        fetchWhatsAppData()
+      } else {
+        toast.error(response.message || 'Failed to toggle auto-reply')
+      }
+    } catch (error) {
+      toast.error('Failed to toggle auto-reply')
+    }
+  }
+
+  // Delete auto-reply
+  const handleDeleteAutoReply = async (replyId) => {
+    if (!confirm('Are you sure you want to delete this auto-reply?')) return
+    try {
+      const response = await whatsappService.deleteAutoReply(shipperId, replyId)
+      if (response.status === 1) {
+        toast.success('Auto-reply deleted')
+        fetchWhatsAppData()
+      } else {
+        toast.error(response.message || 'Failed to delete auto-reply')
+      }
+    } catch (error) {
+      toast.error('Failed to delete auto-reply')
+    }
+  }
+
+  // Disconnect WhatsApp
+  const handleDisconnect = async () => {
+    if (!confirm('Are you sure you want to disconnect WhatsApp for this shipper?')) return
+    try {
+      const response = await whatsappService.disconnect(shipperId)
+      if (response.status === 1) {
+        toast.success('WhatsApp disconnected')
+        fetchWhatsAppData()
+      } else {
+        toast.error(response.message || 'Failed to disconnect')
+      }
+    } catch (error) {
+      toast.error('Failed to disconnect')
     }
   }
 
@@ -775,13 +1076,24 @@ function WhatsAppTab({ shipperId }) {
               <MessageSquare className="w-5 h-5 text-emerald-500" />
               WhatsApp Connection
             </h3>
-            <button
-              onClick={fetchWhatsAppData}
-              className="text-sm text-violet-600 hover:text-violet-700 flex items-center gap-1"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Refresh
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={fetchWhatsAppData}
+                className="text-sm text-violet-600 hover:text-violet-700 flex items-center gap-1"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Refresh
+              </button>
+              {isConnected && (
+                <button
+                  onClick={handleDisconnect}
+                  className="text-sm text-red-600 hover:text-red-700 flex items-center gap-1"
+                >
+                  <Power className="w-4 h-4" />
+                  Disconnect
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="flex items-center gap-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50">
@@ -881,13 +1193,36 @@ function WhatsAppTab({ shipperId }) {
         </CardContent>
       </Card>
 
-      {/* Catalog Information */}
+      {/* Catalog Section */}
       <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
         <CardContent className="p-6">
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-            <Package className="w-5 h-5 text-amber-500" />
-            Catalog
-          </h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+              <Package className="w-5 h-5 text-amber-500" />
+              Catalog
+            </h3>
+            <div className="flex gap-2">
+              {!whatsappStatus?.catalog_id && isConnected && (
+                <button
+                  onClick={handleCreateCatalog}
+                  className="px-3 py-1.5 text-sm bg-amber-500 text-white rounded-lg hover:bg-amber-600 flex items-center gap-1"
+                >
+                  <Plus className="w-4 h-4" />
+                  Create Catalog
+                </button>
+              )}
+              {whatsappStatus?.catalog_id && (
+                <button
+                  onClick={handleSyncCatalog}
+                  disabled={isSyncing}
+                  className="px-3 py-1.5 text-sm bg-violet-500 text-white rounded-lg hover:bg-violet-600 flex items-center gap-1 disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                  Sync Products
+                </button>
+              )}
+            </div>
+          </div>
 
           <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50">
             <div className="flex items-center justify-between">
@@ -935,10 +1270,12 @@ function WhatsAppTab({ shipperId }) {
       {/* Bot Settings */}
       <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
         <CardContent className="p-6">
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-            <MessageSquare className="w-5 h-5 text-cyan-500" />
-            Bot Settings
-          </h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+              <Bot className="w-5 h-5 text-cyan-500" />
+              Bot Settings
+            </h3>
+          </div>
 
           <div className="space-y-4">
             <div className="flex items-center justify-between p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50">
@@ -976,26 +1313,48 @@ function WhatsAppTab({ shipperId }) {
       </Card>
 
       {/* Auto Replies */}
-      {autoReplies.length > 0 && (
-        <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
-          <CardContent className="p-6">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Auto Replies ({autoReplies.length})</h3>
+      <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+              <MessageCircle className="w-5 h-5 text-indigo-500" />
+              Auto Replies ({autoReplies.length})
+            </h3>
+          </div>
+
+          {autoReplies.length === 0 ? (
+            <div className="text-center py-6">
+              <MessageCircle className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto" />
+              <p className="mt-3 text-slate-500 dark:text-slate-400">No auto-replies configured</p>
+            </div>
+          ) : (
             <div className="space-y-3">
               {autoReplies.map((reply, index) => (
                 <div key={reply.id || index} className="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50">
                   <div className="flex items-center justify-between mb-2">
                     <p className="font-medium text-slate-900 dark:text-white">{reply.trigger || reply.keyword}</p>
-                    <span className={`px-2 py-0.5 rounded-full text-xs ${reply.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
-                      {reply.is_active ? 'Active' : 'Inactive'}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleToggleAutoReply(reply.id)}
+                        className={`px-2 py-0.5 rounded-full text-xs ${reply.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}
+                      >
+                        {reply.is_active ? 'Active' : 'Inactive'}
+                      </button>
+                      <button
+                        onClick={() => handleDeleteAutoReply(reply.id)}
+                        className="p-1 text-red-500 hover:text-red-600"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                   <p className="text-sm text-slate-600 dark:text-slate-400">{reply.response || reply.message}</p>
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
-      )}
+          )}
+        </CardContent>
+      </Card>
 
       {/* Business Profile */}
       {businessProfile && (
@@ -1109,7 +1468,7 @@ function BillingTab({ shipper }) {
   )
 }
 
-function DriverTab({ shipper }) {
+function DriverTab({ shipper, shipperId }) {
   const [driverOrders, setDriverOrders] = useState([])
   const [activeOrders, setActiveOrders] = useState([])
   const [isLoading, setIsLoading] = useState(true)
@@ -1125,7 +1484,7 @@ function DriverTab({ shipper }) {
   const fetchDriverData = async () => {
     setIsLoading(true)
     try {
-      const driverId = shipper.id || shipper.wh_account_id
+      const driverId = shipperId || shipper?.wh_account_id || shipper?.id
       const [ordersRes, activeRes] = await Promise.all([
         adminService.getDriverOrders({ driver_id: driverId }).catch(() => ({ status: 0 })),
         adminService.getDriverActiveOrders({ driver_id: driverId }).catch(() => ({ status: 0 })),
@@ -1135,7 +1494,7 @@ function DriverTab({ shipper }) {
         setDriverOrders(ordersRes.data?.orders || ordersRes.data || [])
       }
       if (activeRes.status === 1) {
-        setActiveOrders(activeRes.data || [])
+        setActiveOrders(activeRes.data?.orders || activeRes.data || [])
       }
     } catch (error) {
       console.error('Error fetching driver data:', error)
@@ -1233,7 +1592,16 @@ function DriverTab({ shipper }) {
       {/* Active Orders */}
       <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
         <CardContent className="p-6">
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Driver Orders</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Driver Orders</h3>
+            <button
+              onClick={fetchDriverData}
+              className="text-sm text-violet-600 hover:text-violet-700 flex items-center gap-1"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Refresh
+            </button>
+          </div>
 
           {activeOrders.length === 0 ? (
             <div className="text-center py-8">
@@ -1247,7 +1615,7 @@ function DriverTab({ shipper }) {
                   <div className="flex items-center justify-between">
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-semibold text-slate-900 dark:text-white">Order #{order.id}</span>
+                        <span className="font-semibold text-slate-900 dark:text-white">Order #{order.order_id || order.id}</span>
                         {getDriverStatusBadge(order.driver_order_status)}
                       </div>
                       <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
@@ -1270,31 +1638,31 @@ function AdminShipperDetailPage() {
   const { shipperId } = useParams()
   const navigate = useNavigate()
   const { selectedShipper, selectShipper, clearSelectedShipper } = useAdminStore()
-  const [shipperDetails, setShipperDetails] = useState(null)
   const [activeTab, setActiveTab] = useState('overview')
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
+
+  // Use selectedShipper from store as primary data source
+  // The shipper data comes from getAllShippersForAdmin which has all the info we need
+  const shipper = selectedShipper || {}
 
   useEffect(() => {
-    fetchShipperDetails()
-    return () => {
-      // Don't clear on unmount to keep breadcrumb working
+    // If no selectedShipper in store, try to fetch it
+    if (!selectedShipper && shipperId) {
+      fetchShipperDetails()
     }
-  }, [shipperId])
+  }, [shipperId, selectedShipper])
 
   const fetchShipperDetails = async () => {
     setIsLoading(true)
     try {
       const response = await adminService.getShipperDetails(shipperId)
-      if (response.status === 1) {
-        const details = response.data
-        setShipperDetails(details)
+      if (response.status === 1 && response.data) {
+        // Handle nested response
+        const details = response.data?.shipper || response.data?.getShipperDetails || response.data
         selectShipper(details)
-      } else {
-        toast.error('Failed to fetch shipper details')
       }
     } catch (error) {
       console.error('Error fetching shipper details:', error)
-      toast.error('Failed to fetch shipper details')
     } finally {
       setIsLoading(false)
     }
@@ -1305,7 +1673,20 @@ function AdminShipperDetailPage() {
     navigate('/admin/dashboard')
   }
 
-  const shipper = shipperDetails || selectedShipper
+  // Get shipper display name
+  const getShipperName = () => {
+    if (shipper.company) return shipper.company
+    if (shipper.store_name) return shipper.store_name
+    if (shipper.firstname || shipper.lastname) {
+      return `${shipper.firstname || ''} ${shipper.lastname || ''}`.trim()
+    }
+    return shipper.name || 'Shipper Details'
+  }
+
+  // Get shipper ID for display
+  const getDisplayId = () => {
+    return shipper.wh_account_id || shipper.id || shipperId
+  }
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: User },
@@ -1321,7 +1702,7 @@ function AdminShipperDetailPage() {
     tabs.push({ id: 'driver', label: 'Driver', icon: Truck })
   }
 
-  if (isLoading) {
+  if (isLoading && !selectedShipper) {
     return (
       <div className="flex items-center justify-center py-24">
         <RefreshCw className="w-10 h-10 text-violet-500 animate-spin" />
@@ -1341,12 +1722,19 @@ function AdminShipperDetailPage() {
         </button>
         <div className="flex-1">
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
-            {shipper?.store_name || shipper?.name || 'Shipper Details'}
+            {getShipperName()}
           </h1>
           <p className="text-slate-500 dark:text-slate-400 text-sm">
-            ID: {shipperId} | {shipper?.email}
+            ID: {getDisplayId()} | {shipper.email || 'No email'}
           </p>
         </div>
+        <button
+          onClick={fetchShipperDetails}
+          className="p-2 rounded-xl bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+          title="Refresh data"
+        >
+          <RefreshCw className="w-5 h-5" />
+        </button>
       </div>
 
       {/* Tabs */}
@@ -1372,13 +1760,13 @@ function AdminShipperDetailPage() {
 
       {/* Tab Content */}
       <div>
-        {activeTab === 'overview' && <OverviewTab shipper={shipper} shipperDetails={shipperDetails} />}
+        {activeTab === 'overview' && <OverviewTab shipper={shipper} />}
         {activeTab === 'dashboard' && <DashboardTab shipperId={shipperId} />}
         {activeTab === 'products' && <ProductsTab shipperId={shipperId} />}
         {activeTab === 'orders' && <OrdersTab shipperId={shipperId} />}
         {activeTab === 'whatsapp' && <WhatsAppTab shipperId={shipperId} />}
         {activeTab === 'billing' && <BillingTab shipper={shipper} />}
-        {activeTab === 'driver' && <DriverTab shipper={shipper} />}
+        {activeTab === 'driver' && <DriverTab shipper={shipper} shipperId={shipperId} />}
       </div>
     </div>
   )
