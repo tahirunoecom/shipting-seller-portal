@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAdminStore } from '@/store'
 import { adminService } from '@/services'
@@ -2338,7 +2338,7 @@ function AdminShipperDetailPage() {
   // Merge shipperDetails (from getShipperDetails API) with selectedShipper (from getAllShippersForAdmin)
   // getShipperDetails may not return account type fields, but getAllShippersForAdmin does
   // So we merge both, with shipperDetails taking priority except for account type fields
-  const shipper = React.useMemo(() => {
+  const shipper = useMemo(() => {
     const base = { ...selectedShipper, ...shipperDetails }
     // Preserve account type fields from selectedShipper if not present in shipperDetails
     if (selectedShipper) {
