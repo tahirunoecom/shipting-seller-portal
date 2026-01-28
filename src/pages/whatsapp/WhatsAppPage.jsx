@@ -257,11 +257,28 @@ function WhatsAppPage() {
         if (data.bot_settings) {
           setBotSettings(prev => ({ ...prev, ...data.bot_settings }))
         }
+
+        // Auto-load phone status if connected (for verification checklist)
+        if (data.is_connected) {
+          loadPhoneStatusSilent()
+        }
       }
     } catch (error) {
       console.log('No existing WhatsApp config found:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Load phone status silently (no loading indicator) - used on page load
+  const loadPhoneStatusSilent = async () => {
+    try {
+      const response = await whatsappService.getPhoneStatus(user?.wh_account_id)
+      if (response.status === 1) {
+        setPhoneStatus(response.data)
+      }
+    } catch (error) {
+      console.log('Failed to load phone status silently:', error)
     }
   }
 
@@ -1208,26 +1225,12 @@ function WhatsAppPage() {
                           )}
                         </div>
 
-                        {/* Verification Checklist - Dynamic based on phoneStatus */}
+                        {/* Verification Checklist - Dynamic based on phoneStatus (auto-loaded on page mount) */}
                         {businessVerification.status?.toLowerCase() !== 'verified' && (
                           <div className="space-y-3 mb-4">
-                            <div className="flex items-center justify-between">
-                              <p className="text-sm font-medium text-gray-700 dark:text-dark-text">
-                                Verification Checklist:
-                              </p>
-                              {!phoneStatus && (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={loadPhoneStatus}
-                                  isLoading={loadingPhoneStatus}
-                                  className="text-xs"
-                                >
-                                  <RefreshCw className="h-3 w-3" />
-                                  Refresh Status
-                                </Button>
-                              )}
-                            </div>
+                            <p className="text-sm font-medium text-gray-700 dark:text-dark-text">
+                              Verification Checklist:
+                            </p>
                             <div className="space-y-2">
                               {/* Step 1: Complete business profile - Check if verified_name exists */}
                               <div className={`flex items-start gap-3 p-2 rounded ${
