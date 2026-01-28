@@ -88,15 +88,6 @@ export const whatsappService = {
     return response.data
   },
 
-  // Get business verification status from Meta Graph API
-  // Uses GET /{business-id}?fields=verification_status
-  async getBusinessVerificationStatus(wh_account_id) {
-    const response = await api.post('/seller/whatsapp/business-verification-status', {
-      wh_account_id,
-    })
-    return response.data
-  },
-
   // ============================================
   // PHONE REGISTRATION & VERIFICATION (100% Self-Service)
   // ============================================
