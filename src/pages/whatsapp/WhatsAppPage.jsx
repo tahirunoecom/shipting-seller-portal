@@ -701,7 +701,7 @@ function WhatsAppPage() {
     if (!connectionData.businessId) {
       setBusinessVerification(prev => ({
         ...prev,
-        status: 'not_verified',
+        status: 'unknown',
         error: null,
       }))
       return
@@ -720,27 +720,35 @@ function WhatsAppPage() {
                                    response.data.businessVerificationStatus ||
                                    null
 
-        setBusinessVerification(prev => ({
-          ...prev,
-          status: verificationStatus || 'not_verified',
-          loading: false,
-          error: null,
-        }))
+        if (verificationStatus) {
+          setBusinessVerification(prev => ({
+            ...prev,
+            status: verificationStatus,
+            loading: false,
+            error: null,
+          }))
+        } else {
+          // Status not available from API - show as unknown
+          setBusinessVerification(prev => ({
+            ...prev,
+            status: 'unknown',
+            loading: false,
+            error: null,
+          }))
+        }
       } else {
-        // Default to not_verified if no data
         setBusinessVerification(prev => ({
           ...prev,
-          status: 'not_verified',
+          status: 'unknown',
           loading: false,
           error: null,
         }))
       }
     } catch (error) {
       console.log('Failed to load business verification status:', error)
-      // Default to not_verified on error
       setBusinessVerification(prev => ({
         ...prev,
-        status: 'not_verified',
+        status: 'unknown',
         loading: false,
         error: null,
       }))
@@ -749,14 +757,10 @@ function WhatsAppPage() {
 
   // Get business verification badge
   const getBusinessVerificationBadge = () => {
-    const { status, loading, error } = businessVerification
+    const { status, loading } = businessVerification
 
     if (loading) {
       return <Badge variant="default"><Clock className="h-3 w-3 mr-1 animate-spin" /> Checking...</Badge>
-    }
-
-    if (error && !status) {
-      return <Badge variant="default"><AlertCircle className="h-3 w-3 mr-1" /> Unknown</Badge>
     }
 
     switch (status?.toLowerCase()) {
@@ -768,8 +772,9 @@ function WhatsAppPage() {
         return <Badge variant="danger"><XCircle className="h-3 w-3 mr-1" /> Not Verified</Badge>
       case 'rejected':
         return <Badge variant="danger"><XCircle className="h-3 w-3 mr-1" /> Rejected</Badge>
+      case 'unknown':
       default:
-        return <Badge variant="default"><AlertCircle className="h-3 w-3 mr-1" /> {status || 'Unknown'}</Badge>
+        return <Badge variant="warning"><ExternalLink className="h-3 w-3 mr-1" /> Check in Meta</Badge>
     }
   }
 
@@ -1173,11 +1178,10 @@ function WhatsAppPage() {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={loadBusinessVerificationStatus}
-                            isLoading={businessVerification.loading}
+                            onClick={() => window.open(getMetaVerificationUrl(), '_blank')}
                           >
-                            <RefreshCw className="h-4 w-4" />
-                            Check Status
+                            <ExternalLink className="h-4 w-4" />
+                            Check in Meta
                           </Button>
                         </div>
 
@@ -1199,7 +1203,7 @@ function WhatsAppPage() {
                             </p>
                           ) : (
                             <p className="text-sm text-blue-700 dark:text-blue-300">
-                              Business verification unlocks higher messaging limits and builds trust with customers. Complete the steps below to verify your business.
+                              Business verification unlocks higher messaging limits and builds trust with customers. Click "Check in Meta" to view your verification status and complete the steps below.
                             </p>
                           )}
                         </div>
