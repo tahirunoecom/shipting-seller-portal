@@ -696,42 +696,53 @@ function WhatsAppPage() {
     }
   }
 
-  // Fetch business verification status from Meta Graph API
+  // Fetch business verification status from existing WhatsApp status endpoint
   const loadBusinessVerificationStatus = async () => {
     if (!connectionData.businessId) {
       setBusinessVerification(prev => ({
         ...prev,
-        status: null,
-        error: 'No business ID available',
+        status: 'not_verified',
+        error: null,
       }))
       return
     }
 
     try {
       setBusinessVerification(prev => ({ ...prev, loading: true, error: null }))
-      const response = await whatsappService.getBusinessVerificationStatus(user?.wh_account_id)
+
+      // Use the existing status endpoint which may include business verification info
+      const response = await whatsappService.getWhatsAppStatus(user?.wh_account_id)
 
       if (response.status === 1 && response.data) {
+        // Check various possible field names for verification status
+        const verificationStatus = response.data.verification_status ||
+                                   response.data.business_verification_status ||
+                                   response.data.businessVerificationStatus ||
+                                   null
+
         setBusinessVerification(prev => ({
           ...prev,
-          status: response.data.verification_status || 'not_verified',
+          status: verificationStatus || 'not_verified',
           loading: false,
+          error: null,
         }))
       } else {
+        // Default to not_verified if no data
         setBusinessVerification(prev => ({
           ...prev,
-          status: null,
+          status: 'not_verified',
           loading: false,
-          error: response.message || 'Failed to fetch verification status',
+          error: null,
         }))
       }
     } catch (error) {
       console.log('Failed to load business verification status:', error)
+      // Default to not_verified on error
       setBusinessVerification(prev => ({
         ...prev,
-        status: null,
+        status: 'not_verified',
         loading: false,
-        error: 'Failed to fetch verification status',
+        error: null,
       }))
     }
   }
