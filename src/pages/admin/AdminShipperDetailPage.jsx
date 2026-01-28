@@ -680,15 +680,14 @@ function ProductsTab({ shipperId }) {
     setIsLoading(true)
     setError(null)
     try {
-      // Use adminService.getShipperProducts which uses adminApi with proper token
-      // This ensures we get the selected shipper's products, not the logged-in user's products
+      // Use adminService.getShipperProducts which calls /getMasterProducts API
       console.log('=== Fetching products for shipper ===')
       console.log('Shipper ID:', id)
       const response = await adminService.getShipperProducts(id)
       console.log('Products API response:', response)
       if (response.status === 1) {
-        // Handle different response structures
-        const productsList = response.data?.products || response.data?.getSellerProducts || response.data || []
+        // API returns data.getMasterProducts array
+        const productsList = response.data?.getMasterProducts || response.data?.products || response.data || []
         console.log('Products list:', productsList.length, 'products')
         setProducts(Array.isArray(productsList) ? productsList : [])
       } else {
@@ -716,12 +715,12 @@ function ProductsTab({ shipperId }) {
 
   // Get product name
   const getProductName = (product) => {
-    return product.name || product.product_name || product.title || product.product_title || 'Unnamed Product'
+    return product.title || product.name || product.product_name || product.product_title || 'Unnamed Product'
   }
 
   // Get product image
   const getProductImage = (product) => {
-    return product.image || product.product_image || product.thumbnail || product.main_image || null
+    return product.images || product.image || product.product_image || product.thumbnail || product.main_image || null
   }
 
   // Get product price
