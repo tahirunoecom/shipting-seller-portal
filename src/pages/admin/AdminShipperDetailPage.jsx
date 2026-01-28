@@ -2335,9 +2335,25 @@ function AdminShipperDetailPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [shipperDetails, setShipperDetails] = useState(null)
 
-  // Use shipperDetails (from getShipperDetails API) as primary, fallback to selectedShipper from store
-  // getShipperDetails returns full data including scanSell, localDelivery fields
-  const shipper = shipperDetails || selectedShipper || {}
+  // Merge shipperDetails (from getShipperDetails API) with selectedShipper (from getAllShippersForAdmin)
+  // getShipperDetails may not return account type fields, but getAllShippersForAdmin does
+  // So we merge both, with shipperDetails taking priority except for account type fields
+  const shipper = React.useMemo(() => {
+    const base = { ...selectedShipper, ...shipperDetails }
+    // Preserve account type fields from selectedShipper if not present in shipperDetails
+    if (selectedShipper) {
+      if (base.scanSell === undefined && selectedShipper.scanSell !== undefined) {
+        base.scanSell = selectedShipper.scanSell
+      }
+      if (base.localDelivery === undefined && selectedShipper.localDelivery !== undefined) {
+        base.localDelivery = selectedShipper.localDelivery
+      }
+      if (base.fulfillment === undefined && selectedShipper.fulfillment !== undefined) {
+        base.fulfillment = selectedShipper.fulfillment
+      }
+    }
+    return base
+  }, [shipperDetails, selectedShipper])
 
   useEffect(() => {
     // Always fetch full details to get account type (scanSell, localDelivery)
@@ -2363,7 +2379,21 @@ function AdminShipperDetailPage() {
           fulfillment: details.fulfillment,
         })
         setShipperDetails(details)
-        selectShipper(details) // Also update store
+        // Merge with existing selectedShipper to preserve account type fields from getAllShippersForAdmin
+        const mergedData = {
+          ...selectedShipper,
+          ...details,
+          // Explicitly preserve account type if not in details
+          scanSell: details.scanSell ?? selectedShipper?.scanSell,
+          localDelivery: details.localDelivery ?? selectedShipper?.localDelivery,
+          fulfillment: details.fulfillment ?? selectedShipper?.fulfillment,
+        }
+        console.log('Merged shipper data with account types:', {
+          scanSell: mergedData.scanSell,
+          localDelivery: mergedData.localDelivery,
+          fulfillment: mergedData.fulfillment,
+        })
+        selectShipper(mergedData) // Update store with merged data
       }
     } catch (error) {
       console.error('Error fetching shipper details:', error)
