@@ -695,11 +695,16 @@ function ProductsTab({ shipperId }) {
     setIsLoading(true)
     setError(null)
     try {
-      // Use productService directly with wh_account_id
-      const response = await productService.getSellerProducts(shipperId)
+      // Use adminService.getShipperProducts which uses adminApi with proper token
+      // This ensures we get the selected shipper's products, not the logged-in user's products
+      console.log('=== Fetching products for shipper ===')
+      console.log('Shipper ID:', shipperId)
+      const response = await adminService.getShipperProducts(shipperId)
+      console.log('Products API response:', response)
       if (response.status === 1) {
         // Handle different response structures
         const productsList = response.data?.products || response.data?.getSellerProducts || response.data || []
+        console.log('Products list:', productsList.length, 'products')
         setProducts(Array.isArray(productsList) ? productsList : [])
       } else {
         setError(response.message || 'Failed to fetch products')
@@ -737,7 +742,8 @@ function ProductsTab({ shipperId }) {
   const handleToggleStatus = async (product, e) => {
     if (e) e.stopPropagation()
     try {
-      const response = await productService.toggleProductStatus({
+      // Use adminService for toggling product status
+      const response = await adminService.toggleProductStatus({
         wh_account_id: shipperId,
         product_id: product.product_id || product.id,
         status: isProductActive(product) ? 0 : 1,
@@ -2333,26 +2339,37 @@ function AdminShipperDetailPage() {
   const { selectedShipper, selectShipper, clearSelectedShipper } = useAdminStore()
   const [activeTab, setActiveTab] = useState('overview')
   const [isLoading, setIsLoading] = useState(false)
+  const [shipperDetails, setShipperDetails] = useState(null)
 
-  // Use selectedShipper from store as primary data source
-  // The shipper data comes from getAllShippersForAdmin which has all the info we need
-  const shipper = selectedShipper || {}
+  // Use shipperDetails (from getShipperDetails API) as primary, fallback to selectedShipper from store
+  // getShipperDetails returns full data including scanSell, localDelivery fields
+  const shipper = shipperDetails || selectedShipper || {}
 
   useEffect(() => {
-    // If no selectedShipper in store, try to fetch it
-    if (!selectedShipper && shipperId) {
+    // Always fetch full details to get account type (scanSell, localDelivery)
+    // getAllShippersForAdmin doesn't return these fields
+    if (shipperId) {
       fetchShipperDetails()
     }
-  }, [shipperId, selectedShipper])
+  }, [shipperId])
 
   const fetchShipperDetails = async () => {
     setIsLoading(true)
     try {
       const response = await adminService.getShipperDetails(shipperId)
+      console.log('=== getShipperDetails API Response ===')
+      console.log('Full response:', response)
       if (response.status === 1 && response.data) {
-        // Handle nested response
+        // Handle nested response - the API might return data in different structures
         const details = response.data?.shipper || response.data?.getShipperDetails || response.data
-        selectShipper(details)
+        console.log('Extracted shipper details:', details)
+        console.log('Account type fields from getShipperDetails:', {
+          scanSell: details.scanSell,
+          localDelivery: details.localDelivery,
+          fulfillment: details.fulfillment,
+        })
+        setShipperDetails(details)
+        selectShipper(details) // Also update store
       }
     } catch (error) {
       console.error('Error fetching shipper details:', error)
