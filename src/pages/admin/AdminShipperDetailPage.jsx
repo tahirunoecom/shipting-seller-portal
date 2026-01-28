@@ -676,24 +676,15 @@ function ProductsTab({ shipperId }) {
   const [searchQuery, setSearchQuery] = useState('')
   const itemsPerPage = 12 // 12 for grid (4x3)
 
-  useEffect(() => {
-    fetchProducts()
-  }, [shipperId])
-
-  // Reset to page 1 when search changes
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [searchQuery])
-
-  const fetchProducts = async () => {
+  const fetchProducts = async (id) => {
     setIsLoading(true)
     setError(null)
     try {
       // Use adminService.getShipperProducts which uses adminApi with proper token
       // This ensures we get the selected shipper's products, not the logged-in user's products
       console.log('=== Fetching products for shipper ===')
-      console.log('Shipper ID:', shipperId)
-      const response = await adminService.getShipperProducts(shipperId)
+      console.log('Shipper ID:', id)
+      const response = await adminService.getShipperProducts(id)
       console.log('Products API response:', response)
       if (response.status === 1) {
         // Handle different response structures
@@ -711,6 +702,17 @@ function ProductsTab({ shipperId }) {
       setIsLoading(false)
     }
   }
+
+  useEffect(() => {
+    if (shipperId) {
+      fetchProducts(shipperId)
+    }
+  }, [shipperId])
+
+  // Reset to page 1 when search changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery])
 
   // Get product name
   const getProductName = (product) => {
@@ -771,7 +773,7 @@ function ProductsTab({ shipperId }) {
           <AlertCircle className="w-12 h-12 text-red-400 mx-auto" />
           <p className="mt-4 text-slate-500 dark:text-slate-400">{error}</p>
           <button
-            onClick={fetchProducts}
+            onClick={() => fetchProducts(shipperId)}
             className="mt-4 px-4 py-2 bg-violet-500 text-white rounded-lg hover:bg-violet-600"
           >
             Retry
@@ -920,7 +922,7 @@ function ProductsTab({ shipperId }) {
             <Eye className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           </div>
           <button
-            onClick={fetchProducts}
+            onClick={() => fetchProducts(shipperId)}
             className="text-sm text-violet-600 hover:text-violet-700 flex items-center gap-1 whitespace-nowrap"
           >
             <RefreshCw className="w-4 h-4" />
@@ -2517,10 +2519,10 @@ function AdminShipperDetailPage() {
       {/* Tab Content */}
       <div>
         {activeTab === 'overview' && <OverviewTab shipper={shipper} />}
-        {activeTab === 'dashboard' && <DashboardTab shipperId={shipperId} />}
-        {activeTab === 'products' && <ProductsTab shipperId={shipperId} />}
-        {activeTab === 'orders' && <OrdersTab shipperId={shipperId} />}
-        {activeTab === 'whatsapp' && <WhatsAppTab shipperId={shipperId} />}
+        {activeTab === 'dashboard' && <DashboardTab key={shipperId} shipperId={shipperId} />}
+        {activeTab === 'products' && <ProductsTab key={shipperId} shipperId={shipperId} />}
+        {activeTab === 'orders' && <OrdersTab key={shipperId} shipperId={shipperId} />}
+        {activeTab === 'whatsapp' && <WhatsAppTab key={shipperId} shipperId={shipperId} />}
         {activeTab === 'billing' && <BillingTab shipper={shipper} />}
         {activeTab === 'driver' && <DriverTab shipper={shipper} shipperId={shipperId} />}
       </div>
