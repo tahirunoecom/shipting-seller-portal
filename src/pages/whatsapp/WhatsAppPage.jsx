@@ -50,6 +50,7 @@ import {
   MapPin,
   Image,
   FileText,
+  ShieldCheck,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -146,6 +147,13 @@ function WhatsAppPage() {
   const [displayNameForm, setDisplayNameForm] = useState('')
   const [showDisplayNameModal, setShowDisplayNameModal] = useState(false)
   const [updatingDisplayName, setUpdatingDisplayName] = useState(false)
+
+  // Business Verification state
+  const [businessVerification, setBusinessVerification] = useState({
+    status: null, // 'verified', 'pending', 'not_verified', 'rejected', null
+    loading: false,
+    error: null,
+  })
 
   const tabs = [
     { key: 'connection', label: 'Connection', icon: Link },
@@ -688,6 +696,81 @@ function WhatsAppPage() {
     }
   }
 
+  // Fetch business verification status from Meta Graph API
+  const loadBusinessVerificationStatus = async () => {
+    if (!connectionData.businessId) {
+      setBusinessVerification(prev => ({
+        ...prev,
+        status: null,
+        error: 'No business ID available',
+      }))
+      return
+    }
+
+    try {
+      setBusinessVerification(prev => ({ ...prev, loading: true, error: null }))
+      const response = await whatsappService.getBusinessVerificationStatus(user?.wh_account_id)
+
+      if (response.status === 1 && response.data) {
+        setBusinessVerification(prev => ({
+          ...prev,
+          status: response.data.verification_status || 'not_verified',
+          loading: false,
+        }))
+      } else {
+        setBusinessVerification(prev => ({
+          ...prev,
+          status: null,
+          loading: false,
+          error: response.message || 'Failed to fetch verification status',
+        }))
+      }
+    } catch (error) {
+      console.log('Failed to load business verification status:', error)
+      setBusinessVerification(prev => ({
+        ...prev,
+        status: null,
+        loading: false,
+        error: 'Failed to fetch verification status',
+      }))
+    }
+  }
+
+  // Get business verification badge
+  const getBusinessVerificationBadge = () => {
+    const { status, loading, error } = businessVerification
+
+    if (loading) {
+      return <Badge variant="default"><Clock className="h-3 w-3 mr-1 animate-spin" /> Checking...</Badge>
+    }
+
+    if (error && !status) {
+      return <Badge variant="default"><AlertCircle className="h-3 w-3 mr-1" /> Unknown</Badge>
+    }
+
+    switch (status?.toLowerCase()) {
+      case 'verified':
+        return <Badge variant="success"><CheckCircle className="h-3 w-3 mr-1" /> Verified</Badge>
+      case 'pending':
+        return <Badge variant="warning"><Clock className="h-3 w-3 mr-1" /> Pending</Badge>
+      case 'not_verified':
+        return <Badge variant="danger"><XCircle className="h-3 w-3 mr-1" /> Not Verified</Badge>
+      case 'rejected':
+        return <Badge variant="danger"><XCircle className="h-3 w-3 mr-1" /> Rejected</Badge>
+      default:
+        return <Badge variant="default"><AlertCircle className="h-3 w-3 mr-1" /> {status || 'Unknown'}</Badge>
+    }
+  }
+
+  // Get Meta Business Manager verification URL
+  const getMetaVerificationUrl = () => {
+    const businessId = connectionData.businessId
+    if (businessId) {
+      return `https://business.facebook.com/settings/security?business_id=${businessId}`
+    }
+    return 'https://business.facebook.com/settings/security'
+  }
+
   // Get phone status badge
   const getPhoneStatusBadge = () => {
     if (!phoneStatus) return null
@@ -1064,6 +1147,166 @@ function WhatsAppPage() {
                             </p>
                           </div>
                         )}
+                      </div>
+
+                      {/* Business Verification Section */}
+                      <div className="p-4 border rounded-lg dark:border-dark-border">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center gap-2">
+                            <ShieldCheck className="h-5 w-5 text-gray-500" />
+                            <span className="font-medium text-gray-900 dark:text-dark-text">
+                              Meta Business Verification
+                            </span>
+                            {getBusinessVerificationBadge()}
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={loadBusinessVerificationStatus}
+                            isLoading={businessVerification.loading}
+                          >
+                            <RefreshCw className="h-4 w-4" />
+                            Check Status
+                          </Button>
+                        </div>
+
+                        {/* Verification Status Info */}
+                        <div className={`p-3 rounded-lg mb-4 ${
+                          businessVerification.status?.toLowerCase() === 'verified'
+                            ? 'bg-green-50 dark:bg-green-900/20'
+                            : businessVerification.status?.toLowerCase() === 'pending'
+                              ? 'bg-amber-50 dark:bg-amber-900/20'
+                              : 'bg-blue-50 dark:bg-blue-900/20'
+                        }`}>
+                          {businessVerification.status?.toLowerCase() === 'verified' ? (
+                            <p className="text-sm text-green-700 dark:text-green-300">
+                              Your business is verified with Meta. You have access to all WhatsApp Business API features.
+                            </p>
+                          ) : businessVerification.status?.toLowerCase() === 'pending' ? (
+                            <p className="text-sm text-amber-700 dark:text-amber-300">
+                              Your verification is being reviewed by Meta. This typically takes 1-2 business days but may take up to 2 weeks.
+                            </p>
+                          ) : (
+                            <p className="text-sm text-blue-700 dark:text-blue-300">
+                              Business verification unlocks higher messaging limits and builds trust with customers. Complete the steps below to verify your business.
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Verification Checklist - Show only if not verified */}
+                        {businessVerification.status?.toLowerCase() !== 'verified' && (
+                          <div className="space-y-3 mb-4">
+                            <p className="text-sm font-medium text-gray-700 dark:text-dark-text">
+                              Verification Checklist:
+                            </p>
+                            <div className="space-y-2">
+                              <div className="flex items-start gap-3 p-2 bg-gray-50 rounded dark:bg-dark-bg">
+                                <div className="mt-0.5">
+                                  <div className="h-5 w-5 rounded-full border-2 border-gray-300 dark:border-gray-600 flex items-center justify-center text-xs text-gray-400">
+                                    1
+                                  </div>
+                                </div>
+                                <div>
+                                  <p className="text-sm font-medium text-gray-900 dark:text-dark-text">
+                                    Complete your business profile
+                                  </p>
+                                  <p className="text-xs text-gray-500">
+                                    Add your legal business name, address, and contact information
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-start gap-3 p-2 bg-gray-50 rounded dark:bg-dark-bg">
+                                <div className="mt-0.5">
+                                  <div className="h-5 w-5 rounded-full border-2 border-gray-300 dark:border-gray-600 flex items-center justify-center text-xs text-gray-400">
+                                    2
+                                  </div>
+                                </div>
+                                <div>
+                                  <p className="text-sm font-medium text-gray-900 dark:text-dark-text">
+                                    Prepare verification documents
+                                  </p>
+                                  <p className="text-xs text-gray-500">
+                                    Business registration certificate, tax documents, or utility bill showing business name and address
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-start gap-3 p-2 bg-gray-50 rounded dark:bg-dark-bg">
+                                <div className="mt-0.5">
+                                  <div className="h-5 w-5 rounded-full border-2 border-gray-300 dark:border-gray-600 flex items-center justify-center text-xs text-gray-400">
+                                    3
+                                  </div>
+                                </div>
+                                <div>
+                                  <p className="text-sm font-medium text-gray-900 dark:text-dark-text">
+                                    Submit verification in Meta Business Manager
+                                  </p>
+                                  <p className="text-xs text-gray-500">
+                                    Upload documents and complete the verification process (manual step required)
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-start gap-3 p-2 bg-gray-50 rounded dark:bg-dark-bg">
+                                <div className="mt-0.5">
+                                  <div className="h-5 w-5 rounded-full border-2 border-gray-300 dark:border-gray-600 flex items-center justify-center text-xs text-gray-400">
+                                    4
+                                  </div>
+                                </div>
+                                <div>
+                                  <p className="text-sm font-medium text-gray-900 dark:text-dark-text">
+                                    Wait for Meta review
+                                  </p>
+                                  <p className="text-xs text-gray-500">
+                                    Review typically takes 1-2 business days, but may take up to 2 weeks
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Verification Benefits */}
+                        <div className="p-3 bg-gray-50 rounded-lg dark:bg-dark-bg mb-4">
+                          <p className="text-xs font-medium text-gray-700 dark:text-dark-text uppercase tracking-wider mb-2">
+                            Verification Benefits
+                          </p>
+                          <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
+                            <li className="flex items-center gap-2">
+                              <CheckCircle className="h-3 w-3 text-green-500" />
+                              Higher messaging limits (1,000+ messages/day)
+                            </li>
+                            <li className="flex items-center gap-2">
+                              <CheckCircle className="h-3 w-3 text-green-500" />
+                              Official business checkmark badge
+                            </li>
+                            <li className="flex items-center gap-2">
+                              <CheckCircle className="h-3 w-3 text-green-500" />
+                              Access to advanced API features
+                            </li>
+                            <li className="flex items-center gap-2">
+                              <CheckCircle className="h-3 w-3 text-green-500" />
+                              Increased customer trust
+                            </li>
+                          </ul>
+                        </div>
+
+                        {/* Action Button - Deep link to Meta Business Manager */}
+                        <Button
+                          variant="outline"
+                          onClick={() => window.open(getMetaVerificationUrl(), '_blank')}
+                          className="w-full"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                          {businessVerification.status?.toLowerCase() === 'verified'
+                            ? 'View Verification in Meta Business Manager'
+                            : 'Start Verification in Meta Business Manager'
+                          }
+                        </Button>
+
+                        {/* Help Note */}
+                        <p className="text-xs text-gray-400 mt-2 text-center">
+                          Note: Business verification must be completed manually in Meta Business Manager.
+                          This cannot be automated via API.
+                        </p>
                       </div>
 
                       {/* Phone Number Status Section */}
