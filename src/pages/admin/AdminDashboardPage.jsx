@@ -40,9 +40,20 @@ function AdminDashboardPage() {
     setAuthError(false)
     try {
       const response = await adminService.getAllShippers()
+      console.log('=== getAllShippersForAdmin API Response ===')
+      console.log('Full response:', response)
       if (response.status === 1) {
         // API returns data nested in getAllShippersForAdmin
         const shippersList = response.data?.getAllShippersForAdmin || response.data || []
+        console.log('Shippers list:', shippersList)
+        if (shippersList.length > 0) {
+          console.log('First shipper full data:', shippersList[0])
+          console.log('Account type fields:', {
+            scanSell: shippersList[0].scanSell,
+            localDelivery: shippersList[0].localDelivery,
+            fulfillment: shippersList[0].fulfillment,
+          })
+        }
         setShippers(shippersList)
       } else {
         toast.error(response.message || 'Failed to fetch shippers')

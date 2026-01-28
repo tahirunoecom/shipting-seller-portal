@@ -62,20 +62,11 @@ function OverviewTab({ shipper }) {
     if (data && Object.keys(data).length > 0) {
       console.log('=== Admin Shipper Data Debug ===')
       console.log('Full shipper data:', data)
-      console.log('Account type raw values:', {
+      console.log('All available fields:', Object.keys(data))
+      console.log('Account type:', {
         scanSell: data.scanSell,
-        scan_sell: data.scan_sell,
         localDelivery: data.localDelivery,
-        local_delivery: data.local_delivery,
         fulfillment: data.fulfillment,
-      })
-      console.log('Verification fields:', {
-        is_verification_submitted: data.is_verification_submitted,
-        approved: data.approved,
-        company_icon: data.company_icon,
-        drivinglicence: data.drivinglicence,
-        zip: data.zip,
-        postcode: data.postcode,
       })
     }
   }, [data])
@@ -204,30 +195,33 @@ function OverviewTab({ shipper }) {
         </CardContent>
       </Card>
 
-      {/* Account Type - Now with raw values for debugging */}
+      {/* Account Type */}
       <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
         <CardContent className="p-6">
           <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
             <User className="w-5 h-5 text-emerald-500" />
             Account Type
           </h3>
-          <div className="space-y-0">
-            <InfoRow icon={Store} label="Seller (Scan & Sell)" value={getStatusBadge(isSeller)} isBadge />
-            <InfoRow icon={Truck} label="Driver (Local Delivery)" value={getStatusBadge(isDriver)} isBadge />
-            <InfoRow icon={Package} label="Fulfillment" value={getStatusBadge(isFulfillment)} isBadge />
-          </div>
-          {/* Debug: Show raw values */}
-          <div className="mt-4 p-3 rounded-lg bg-slate-50 dark:bg-slate-700/50">
-            <p className="text-xs text-slate-400 mb-2">Raw API Values:</p>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <span className="text-slate-500">scanSell:</span>
-              <span className="font-mono text-slate-700 dark:text-slate-300">{String(data.scanSell ?? 'undefined')}</span>
-              <span className="text-slate-500">localDelivery:</span>
-              <span className="font-mono text-slate-700 dark:text-slate-300">{String(data.localDelivery ?? 'undefined')}</span>
-              <span className="text-slate-500">fulfillment:</span>
-              <span className="font-mono text-slate-700 dark:text-slate-300">{String(data.fulfillment ?? 'undefined')}</span>
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            <div className={`p-4 rounded-xl text-center ${isSeller ? 'bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800' : 'bg-slate-50 dark:bg-slate-700/50'}`}>
+              <Store className={`w-6 h-6 mx-auto mb-2 ${isSeller ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'}`} />
+              <p className={`text-sm font-medium ${isSeller ? 'text-blue-700 dark:text-blue-300' : 'text-slate-500'}`}>Seller</p>
+              <p className="text-xs text-slate-400 mt-1">Scan & Sell</p>
+            </div>
+            <div className={`p-4 rounded-xl text-center ${isDriver ? 'bg-violet-50 dark:bg-violet-900/20 border-2 border-violet-200 dark:border-violet-800' : 'bg-slate-50 dark:bg-slate-700/50'}`}>
+              <Truck className={`w-6 h-6 mx-auto mb-2 ${isDriver ? 'text-violet-600 dark:text-violet-400' : 'text-slate-400'}`} />
+              <p className={`text-sm font-medium ${isDriver ? 'text-violet-700 dark:text-violet-300' : 'text-slate-500'}`}>Driver</p>
+              <p className="text-xs text-slate-400 mt-1">Local Delivery</p>
+            </div>
+            <div className={`p-4 rounded-xl text-center ${isFulfillment ? 'bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-200 dark:border-emerald-800' : 'bg-slate-50 dark:bg-slate-700/50'}`}>
+              <Package className={`w-6 h-6 mx-auto mb-2 ${isFulfillment ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`} />
+              <p className={`text-sm font-medium ${isFulfillment ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-500'}`}>Fulfillment</p>
+              <p className="text-xs text-slate-400 mt-1">Warehouse</p>
             </div>
           </div>
+          {!isSeller && !isDriver && !isFulfillment && (
+            <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-2">No account type set</p>
+          )}
         </CardContent>
       </Card>
 
@@ -695,11 +689,16 @@ function ProductsTab({ shipperId }) {
     setIsLoading(true)
     setError(null)
     try {
-      // Use productService directly with wh_account_id
-      const response = await productService.getSellerProducts(shipperId)
+      // Use adminService.getShipperProducts which uses adminApi with proper token
+      // This ensures we get the selected shipper's products, not the logged-in user's products
+      console.log('=== Fetching products for shipper ===')
+      console.log('Shipper ID:', shipperId)
+      const response = await adminService.getShipperProducts(shipperId)
+      console.log('Products API response:', response)
       if (response.status === 1) {
         // Handle different response structures
         const productsList = response.data?.products || response.data?.getSellerProducts || response.data || []
+        console.log('Products list:', productsList.length, 'products')
         setProducts(Array.isArray(productsList) ? productsList : [])
       } else {
         setError(response.message || 'Failed to fetch products')
@@ -737,7 +736,8 @@ function ProductsTab({ shipperId }) {
   const handleToggleStatus = async (product, e) => {
     if (e) e.stopPropagation()
     try {
-      const response = await productService.toggleProductStatus({
+      // Use adminService for toggling product status
+      const response = await adminService.toggleProductStatus({
         wh_account_id: shipperId,
         product_id: product.product_id || product.id,
         status: isProductActive(product) ? 0 : 1,
@@ -2333,26 +2333,37 @@ function AdminShipperDetailPage() {
   const { selectedShipper, selectShipper, clearSelectedShipper } = useAdminStore()
   const [activeTab, setActiveTab] = useState('overview')
   const [isLoading, setIsLoading] = useState(false)
+  const [shipperDetails, setShipperDetails] = useState(null)
 
-  // Use selectedShipper from store as primary data source
-  // The shipper data comes from getAllShippersForAdmin which has all the info we need
-  const shipper = selectedShipper || {}
+  // Use shipperDetails (from getShipperDetails API) as primary, fallback to selectedShipper from store
+  // getShipperDetails returns full data including scanSell, localDelivery fields
+  const shipper = shipperDetails || selectedShipper || {}
 
   useEffect(() => {
-    // If no selectedShipper in store, try to fetch it
-    if (!selectedShipper && shipperId) {
+    // Always fetch full details to get account type (scanSell, localDelivery)
+    // getAllShippersForAdmin doesn't return these fields
+    if (shipperId) {
       fetchShipperDetails()
     }
-  }, [shipperId, selectedShipper])
+  }, [shipperId])
 
   const fetchShipperDetails = async () => {
     setIsLoading(true)
     try {
       const response = await adminService.getShipperDetails(shipperId)
+      console.log('=== getShipperDetails API Response ===')
+      console.log('Full response:', response)
       if (response.status === 1 && response.data) {
-        // Handle nested response
+        // Handle nested response - the API might return data in different structures
         const details = response.data?.shipper || response.data?.getShipperDetails || response.data
-        selectShipper(details)
+        console.log('Extracted shipper details:', details)
+        console.log('Account type fields from getShipperDetails:', {
+          scanSell: details.scanSell,
+          localDelivery: details.localDelivery,
+          fulfillment: details.fulfillment,
+        })
+        setShipperDetails(details)
+        selectShipper(details) // Also update store
       }
     } catch (error) {
       console.error('Error fetching shipper details:', error)
