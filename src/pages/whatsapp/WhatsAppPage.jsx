@@ -1208,28 +1208,62 @@ function WhatsAppPage() {
                           )}
                         </div>
 
-                        {/* Verification Checklist - Show only if not verified */}
+                        {/* Verification Checklist - Dynamic based on phoneStatus */}
                         {businessVerification.status?.toLowerCase() !== 'verified' && (
                           <div className="space-y-3 mb-4">
-                            <p className="text-sm font-medium text-gray-700 dark:text-dark-text">
-                              Verification Checklist:
-                            </p>
+                            <div className="flex items-center justify-between">
+                              <p className="text-sm font-medium text-gray-700 dark:text-dark-text">
+                                Verification Checklist:
+                              </p>
+                              {!phoneStatus && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={loadPhoneStatus}
+                                  isLoading={loadingPhoneStatus}
+                                  className="text-xs"
+                                >
+                                  <RefreshCw className="h-3 w-3" />
+                                  Refresh Status
+                                </Button>
+                              )}
+                            </div>
                             <div className="space-y-2">
-                              <div className="flex items-start gap-3 p-2 bg-gray-50 rounded dark:bg-dark-bg">
+                              {/* Step 1: Complete business profile - Check if verified_name exists */}
+                              <div className={`flex items-start gap-3 p-2 rounded ${
+                                phoneStatus?.verified_name
+                                  ? 'bg-green-50 dark:bg-green-900/20'
+                                  : 'bg-gray-50 dark:bg-dark-bg'
+                              }`}>
                                 <div className="mt-0.5">
-                                  <div className="h-5 w-5 rounded-full border-2 border-gray-300 dark:border-gray-600 flex items-center justify-center text-xs text-gray-400">
-                                    1
-                                  </div>
+                                  {phoneStatus?.verified_name ? (
+                                    <div className="h-5 w-5 rounded-full bg-green-500 flex items-center justify-center">
+                                      <CheckCircle className="h-3 w-3 text-white" />
+                                    </div>
+                                  ) : (
+                                    <div className="h-5 w-5 rounded-full border-2 border-gray-300 dark:border-gray-600 flex items-center justify-center text-xs text-gray-400">
+                                      1
+                                    </div>
+                                  )}
                                 </div>
                                 <div>
-                                  <p className="text-sm font-medium text-gray-900 dark:text-dark-text">
+                                  <p className={`text-sm font-medium ${
+                                    phoneStatus?.verified_name
+                                      ? 'text-green-700 dark:text-green-300'
+                                      : 'text-gray-900 dark:text-dark-text'
+                                  }`}>
                                     Complete your business profile
+                                    {phoneStatus?.verified_name && (
+                                      <span className="ml-2 text-xs font-normal">({phoneStatus.verified_name})</span>
+                                    )}
                                   </p>
                                   <p className="text-xs text-gray-500">
                                     Add your legal business name, address, and contact information
                                   </p>
                                 </div>
                               </div>
+
+                              {/* Step 2: Prepare documents - Manual step, can't verify automatically */}
                               <div className="flex items-start gap-3 p-2 bg-gray-50 rounded dark:bg-dark-bg">
                                 <div className="mt-0.5">
                                   <div className="h-5 w-5 rounded-full border-2 border-gray-300 dark:border-gray-600 flex items-center justify-center text-xs text-gray-400">
@@ -1245,33 +1279,82 @@ function WhatsAppPage() {
                                   </p>
                                 </div>
                               </div>
-                              <div className="flex items-start gap-3 p-2 bg-gray-50 rounded dark:bg-dark-bg">
+
+                              {/* Step 3: Submit verification - Check if registration_status is CONNECTED */}
+                              <div className={`flex items-start gap-3 p-2 rounded ${
+                                phoneStatus?.registration_status === 'CONNECTED'
+                                  ? 'bg-green-50 dark:bg-green-900/20'
+                                  : 'bg-gray-50 dark:bg-dark-bg'
+                              }`}>
                                 <div className="mt-0.5">
-                                  <div className="h-5 w-5 rounded-full border-2 border-gray-300 dark:border-gray-600 flex items-center justify-center text-xs text-gray-400">
-                                    3
-                                  </div>
+                                  {phoneStatus?.registration_status === 'CONNECTED' ? (
+                                    <div className="h-5 w-5 rounded-full bg-green-500 flex items-center justify-center">
+                                      <CheckCircle className="h-3 w-3 text-white" />
+                                    </div>
+                                  ) : (
+                                    <div className="h-5 w-5 rounded-full border-2 border-gray-300 dark:border-gray-600 flex items-center justify-center text-xs text-gray-400">
+                                      3
+                                    </div>
+                                  )}
                                 </div>
                                 <div>
-                                  <p className="text-sm font-medium text-gray-900 dark:text-dark-text">
-                                    Submit verification in Meta Business Manager
+                                  <p className={`text-sm font-medium ${
+                                    phoneStatus?.registration_status === 'CONNECTED'
+                                      ? 'text-green-700 dark:text-green-300'
+                                      : 'text-gray-900 dark:text-dark-text'
+                                  }`}>
+                                    Phone number registered
+                                    {phoneStatus?.registration_status && (
+                                      <span className="ml-2 text-xs font-normal">({phoneStatus.registration_status})</span>
+                                    )}
                                   </p>
                                   <p className="text-xs text-gray-500">
-                                    Upload documents and complete the verification process (manual step required)
+                                    WhatsApp Business phone number is registered and active
                                   </p>
                                 </div>
                               </div>
-                              <div className="flex items-start gap-3 p-2 bg-gray-50 rounded dark:bg-dark-bg">
+
+                              {/* Step 4: Meta review - Check name_status */}
+                              <div className={`flex items-start gap-3 p-2 rounded ${
+                                phoneStatus?.name_status === 'APPROVED' || phoneStatus?.name_status === 'AVAILABLE_WITHOUT_REVIEW'
+                                  ? 'bg-green-50 dark:bg-green-900/20'
+                                  : phoneStatus?.name_status === 'PENDING_REVIEW'
+                                    ? 'bg-amber-50 dark:bg-amber-900/20'
+                                    : 'bg-gray-50 dark:bg-dark-bg'
+                              }`}>
                                 <div className="mt-0.5">
-                                  <div className="h-5 w-5 rounded-full border-2 border-gray-300 dark:border-gray-600 flex items-center justify-center text-xs text-gray-400">
-                                    4
-                                  </div>
+                                  {phoneStatus?.name_status === 'APPROVED' || phoneStatus?.name_status === 'AVAILABLE_WITHOUT_REVIEW' ? (
+                                    <div className="h-5 w-5 rounded-full bg-green-500 flex items-center justify-center">
+                                      <CheckCircle className="h-3 w-3 text-white" />
+                                    </div>
+                                  ) : phoneStatus?.name_status === 'PENDING_REVIEW' ? (
+                                    <div className="h-5 w-5 rounded-full bg-amber-500 flex items-center justify-center">
+                                      <Clock className="h-3 w-3 text-white" />
+                                    </div>
+                                  ) : (
+                                    <div className="h-5 w-5 rounded-full border-2 border-gray-300 dark:border-gray-600 flex items-center justify-center text-xs text-gray-400">
+                                      4
+                                    </div>
+                                  )}
                                 </div>
                                 <div>
-                                  <p className="text-sm font-medium text-gray-900 dark:text-dark-text">
-                                    Wait for Meta review
+                                  <p className={`text-sm font-medium ${
+                                    phoneStatus?.name_status === 'APPROVED' || phoneStatus?.name_status === 'AVAILABLE_WITHOUT_REVIEW'
+                                      ? 'text-green-700 dark:text-green-300'
+                                      : phoneStatus?.name_status === 'PENDING_REVIEW'
+                                        ? 'text-amber-700 dark:text-amber-300'
+                                        : 'text-gray-900 dark:text-dark-text'
+                                  }`}>
+                                    Display name review
+                                    {phoneStatus?.name_status && (
+                                      <span className="ml-2 text-xs font-normal">({phoneStatus.name_status.replace(/_/g, ' ')})</span>
+                                    )}
                                   </p>
                                   <p className="text-xs text-gray-500">
-                                    Review typically takes 1-2 business days, but may take up to 2 weeks
+                                    {phoneStatus?.name_status === 'PENDING_REVIEW'
+                                      ? 'Your display name is under review by Meta'
+                                      : 'Meta reviews your business display name for compliance'
+                                    }
                                   </p>
                                 </div>
                               </div>
