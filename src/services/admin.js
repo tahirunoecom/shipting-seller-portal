@@ -161,13 +161,21 @@ export const adminService = {
   /**
    * Get shipper products
    * @param {string|number} wh_account_id - Shipper ID
-   * @param {Object} params - Additional params
+   * @param {Object} params - Additional params (page, items, search_string)
    * @returns {Promise} Products list
    */
   async getShipperProducts(wh_account_id, params = {}) {
-    const response = await adminApi.post('/getSellerProducts', {
-      wh_account_id,
-      ...params,
+    const response = await adminApi.post('/getMasterProducts', {
+      wh_account_id: String(wh_account_id),
+      upc: params.upc || '',
+      ai_category_id: params.ai_category_id || '',
+      ai_product_id: params.ai_product_id || '',
+      product_id: params.product_id || '',
+      search_string: params.search_string || '',
+      zipcode: params.zipcode || '',
+      user_id: params.user_id || '',
+      page: params.page || '1',
+      items: params.items || '222',
     })
     return response.data
   },
