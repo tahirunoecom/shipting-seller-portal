@@ -57,6 +57,7 @@ import {
   Download,
   KeyRound,
   Smartphone,
+  AlertTriangle,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -1680,6 +1681,18 @@ function WhatsAppTab({ shipperId }) {
     }
   }
 
+  // Check if phone number is a Meta test number
+  const isTestPhoneNumber = (phoneNumber) => {
+    if (!phoneNumber) return false
+    const cleanNumber = phoneNumber.replace(/[^0-9]/g, '')
+    // Meta test numbers typically start with 1555 (US) or other test prefixes
+    // +15558520220 format - 555 area code is reserved for fictional use
+    return cleanNumber.startsWith('1555') ||
+           cleanNumber.startsWith('15550') ||
+           cleanNumber.includes('5558') ||
+           /^1555\d{7}$/.test(cleanNumber)
+  }
+
   // Generate WhatsApp link for catalog
   const getWhatsAppLink = () => {
     const phoneNumber = whatsappStatus?.phone_number?.replace(/[^0-9]/g, '') || ''
@@ -1884,6 +1897,49 @@ function WhatsAppTab({ shipperId }) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Test Phone Number Warning */}
+      {isConnected && isTestPhoneNumber(whatsappStatus?.phone_number) && (
+        <Card className="bg-red-50 dark:bg-red-900/20 border-2 border-red-300 dark:border-red-700 shadow-sm">
+          <CardContent className="p-6">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-6 h-6 text-red-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <h4 className="font-semibold text-red-700 dark:text-red-300 text-lg">
+                  ⚠️ Test Phone Number Detected!
+                </h4>
+                <p className="text-sm text-red-600 dark:text-red-400 mt-1">
+                  This shipper is using a <strong>Meta Test Phone Number</strong> ({whatsappStatus?.phone_number}).
+                  This number is for <strong>testing only</strong> and:
+                </p>
+                <ul className="text-sm text-red-600 dark:text-red-400 mt-2 list-disc list-inside space-y-1">
+                  <li>Cannot receive real WhatsApp messages from customers</li>
+                  <li>Cannot be verified (OTP won't work)</li>
+                  <li>Should NOT be used in production</li>
+                </ul>
+                <div className="mt-3 p-3 bg-red-100 dark:bg-red-900/40 rounded-lg">
+                  <p className="text-sm font-medium text-red-800 dark:text-red-200">
+                    How to fix this:
+                  </p>
+                  <ol className="text-sm text-red-700 dark:text-red-300 mt-1 list-decimal list-inside space-y-1">
+                    <li>Tell the shipper to disconnect WhatsApp from their portal</li>
+                    <li>Reconnect using "Login with Facebook"</li>
+                    <li>When prompted, select <strong>"Add your own phone number"</strong></li>
+                    <li>Enter their REAL business phone number</li>
+                  </ol>
+                </div>
+                <button
+                  onClick={() => window.open('https://business.facebook.com/wa/manage/phone-numbers/', '_blank')}
+                  className="mt-3 px-4 py-2 text-sm border border-red-300 dark:border-red-600 text-red-700 dark:text-red-300 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 flex items-center gap-2"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  Manage Phone Numbers in Meta
+                </button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Phone Number Status */}
       {isConnected && (

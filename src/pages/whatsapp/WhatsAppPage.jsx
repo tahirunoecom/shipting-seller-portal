@@ -51,6 +51,7 @@ import {
   Image,
   FileText,
   ShieldCheck,
+  AlertTriangle,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -827,6 +828,18 @@ function WhatsAppPage() {
     }
   }
 
+  // Check if phone number is a Meta test number
+  const isTestPhoneNumber = (phoneNumber) => {
+    if (!phoneNumber) return false
+    const cleanNumber = phoneNumber.replace(/[^0-9]/g, '')
+    // Meta test numbers typically start with 1555 (US) or other test prefixes
+    // +15558520220 format - 555 area code is reserved for fictional use
+    return cleanNumber.startsWith('1555') ||
+           cleanNumber.startsWith('15550') ||
+           cleanNumber.includes('5558') ||
+           /^1555\d{7}$/.test(cleanNumber)
+  }
+
   // Generate WhatsApp link for catalog
   const getWhatsAppLink = () => {
     // Format phone number (remove + and spaces)
@@ -1157,6 +1170,49 @@ function WhatsAppPage() {
                           <MessageSquare className="h-10 w-10 text-green-500" />
                         </div>
                       </div>
+
+                      {/* Test Phone Number Warning */}
+                      {isTestPhoneNumber(connectionData.phoneNumber) && (
+                        <div className="p-4 bg-red-50 border-2 border-red-300 rounded-lg dark:bg-red-900/20 dark:border-red-700">
+                          <div className="flex items-start gap-3">
+                            <AlertTriangle className="h-6 w-6 text-red-500 flex-shrink-0 mt-0.5" />
+                            <div>
+                              <h4 className="font-semibold text-red-700 dark:text-red-300">
+                                ⚠️ Test Phone Number Detected!
+                              </h4>
+                              <p className="text-sm text-red-600 dark:text-red-400 mt-1">
+                                You are using a <strong>Meta Test Phone Number</strong> ({connectionData.phoneNumber}).
+                                This number is for <strong>testing only</strong> and:
+                              </p>
+                              <ul className="text-sm text-red-600 dark:text-red-400 mt-2 list-disc list-inside space-y-1">
+                                <li>Cannot receive real WhatsApp messages from customers</li>
+                                <li>Cannot be verified (OTP won't work)</li>
+                                <li>Should NOT be used in production</li>
+                              </ul>
+                              <div className="mt-3 p-3 bg-red-100 dark:bg-red-900/40 rounded-lg">
+                                <p className="text-sm font-medium text-red-800 dark:text-red-200">
+                                  How to fix this:
+                                </p>
+                                <ol className="text-sm text-red-700 dark:text-red-300 mt-1 list-decimal list-inside space-y-1">
+                                  <li>Click "Disconnect" above to disconnect the test number</li>
+                                  <li>Click "Login with Facebook" again to restart setup</li>
+                                  <li>When prompted, select <strong>"Add your own phone number"</strong></li>
+                                  <li>Enter your REAL business phone number</li>
+                                </ol>
+                              </div>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="mt-3 border-red-300 text-red-700 hover:bg-red-100 dark:border-red-600 dark:text-red-300"
+                                onClick={() => window.open('https://business.facebook.com/wa/manage/phone-numbers/', '_blank')}
+                              >
+                                <ExternalLink className="h-4 w-4" />
+                                Manage Phone Numbers in Meta
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Connection Details */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
