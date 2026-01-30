@@ -1,12 +1,13 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAdminStore } from '@/store'
 import { adminService } from '@/services'
 import { whatsappService } from '@/services/whatsapp'
+import { QRCodeSVG } from 'qrcode.react'
 import { productService } from '@/services/products'
 import { orderService } from '@/services/orders'
 import { DRIVER_STATUS_LABELS } from '@/services/driver'
-import { Card, CardContent } from '@/components/ui'
+import { Card, CardContent, Modal, Button } from '@/components/ui'
 import {
   ArrowLeft,
   User,
@@ -50,6 +51,10 @@ import {
   MessageCircle,
   Bot,
   ShieldCheck,
+  QrCode,
+  Share2,
+  Copy,
+  Download,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -1477,6 +1482,8 @@ function WhatsAppTab({ shipperId }) {
   const [isSyncing, setIsSyncing] = useState(false)
   const [isCheckingStatus, setIsCheckingStatus] = useState(false)
   const [isLoadingCatalogs, setIsLoadingCatalogs] = useState(false)
+  const [showQRModal, setShowQRModal] = useState(false)
+  const qrCodeRef = useRef(null)
 
   useEffect(() => {
     fetchWhatsAppData()
@@ -1663,6 +1670,78 @@ function WhatsAppTab({ shipperId }) {
     }
   }
 
+  // Generate WhatsApp link for catalog
+  const getWhatsAppLink = () => {
+    const phoneNumber = whatsappStatus?.phone_number?.replace(/[^0-9]/g, '') || ''
+    if (!phoneNumber) return null
+    return `https://wa.me/${phoneNumber}?text=Hi!%20I%27d%20like%20to%20browse%20your%20catalog`
+  }
+
+  // Get direct WhatsApp chat link
+  const getWhatsAppChatLink = () => {
+    const phoneNumber = whatsappStatus?.phone_number?.replace(/[^0-9]/g, '') || ''
+    if (!phoneNumber) return null
+    return `https://wa.me/${phoneNumber}`
+  }
+
+  // Copy link to clipboard
+  const copyLinkToClipboard = () => {
+    const link = getWhatsAppLink()
+    if (link) {
+      navigator.clipboard.writeText(link)
+      toast.success('Link copied to clipboard!')
+    }
+  }
+
+  // Download QR code as image
+  const downloadQRCode = () => {
+    const svg = qrCodeRef.current?.querySelector('svg')
+    if (!svg) return
+
+    const svgData = new XMLSerializer().serializeToString(svg)
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+    const img = new Image()
+
+    img.onload = () => {
+      canvas.width = img.width
+      canvas.height = img.height
+      ctx.fillStyle = 'white'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+      ctx.drawImage(img, 0, 0)
+
+      const link = document.createElement('a')
+      link.download = `whatsapp-qr-${whatsappStatus?.phone_number || 'store'}.png`
+      link.href = canvas.toDataURL('image/png')
+      link.click()
+      toast.success('QR Code downloaded!')
+    }
+
+    img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)))
+  }
+
+  // Share via Web Share API (mobile)
+  const shareLink = async () => {
+    const link = getWhatsAppLink()
+    if (!link) return
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Chat with us on WhatsApp',
+          text: 'Click to browse our catalog on WhatsApp',
+          url: link,
+        })
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          copyLinkToClipboard()
+        }
+      }
+    } else {
+      copyLinkToClipboard()
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -1775,6 +1854,72 @@ function WhatsAppTab({ shipperId }) {
                   {phoneStatus?.is_verified || whatsappStatus?.verified_name ? 'Yes' : 'No'}
                 </p>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Share WhatsApp Link & QR Code Section */}
+      {isConnected && whatsappStatus?.phone_number && (
+        <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                <Share2 className="w-5 h-5 text-violet-500" />
+                Share WhatsApp
+              </h3>
+            </div>
+
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+              Share this link or QR code with customers so they can easily reach this shipper on WhatsApp and browse their catalog.
+            </p>
+
+            {/* WhatsApp Link */}
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50 mb-4">
+              <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">WhatsApp Link</p>
+              <div className="flex items-center gap-2">
+                <p className="font-mono text-sm text-slate-900 dark:text-white truncate flex-1">
+                  {getWhatsAppLink()}
+                </p>
+                <button
+                  onClick={copyLinkToClipboard}
+                  className="px-3 py-1.5 text-sm bg-slate-200 dark:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-500 flex items-center gap-1"
+                >
+                  <Copy className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <button
+                onClick={() => setShowQRModal(true)}
+                className="px-3 py-2 text-sm bg-violet-500 text-white rounded-lg hover:bg-violet-600 flex items-center justify-center gap-2"
+              >
+                <QrCode className="w-4 h-4" />
+                Show QR
+              </button>
+              <button
+                onClick={shareLink}
+                className="px-3 py-2 text-sm bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 flex items-center justify-center gap-2"
+              >
+                <Share2 className="w-4 h-4" />
+                Share
+              </button>
+              <button
+                onClick={() => window.open(getWhatsAppChatLink(), '_blank')}
+                className="px-3 py-2 text-sm bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center justify-center gap-2"
+              >
+                <ExternalLink className="w-4 h-4" />
+                Open
+              </button>
+              <button
+                onClick={copyLinkToClipboard}
+                className="px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center justify-center gap-2"
+              >
+                <Copy className="w-4 h-4" />
+                Copy
+              </button>
             </div>
           </CardContent>
         </Card>
@@ -2302,6 +2447,72 @@ function WhatsAppTab({ shipperId }) {
           </CardContent>
         </Card>
       )}
+
+      {/* QR Code Modal */}
+      <Modal isOpen={showQRModal} onClose={() => setShowQRModal(false)} title="WhatsApp QR Code">
+        <div className="flex flex-col items-center space-y-4">
+          <p className="text-sm text-slate-600 dark:text-slate-400 text-center">
+            Scan this QR code to start a WhatsApp chat with this shipper
+          </p>
+
+          {/* QR Code */}
+          <div ref={qrCodeRef} className="p-4 bg-white rounded-lg shadow-inner">
+            {getWhatsAppLink() && (
+              <QRCodeSVG
+                value={getWhatsAppLink()}
+                size={200}
+                level="H"
+                includeMargin={true}
+                bgColor="#ffffff"
+                fgColor="#25D366"
+              />
+            )}
+          </div>
+
+          {/* Phone Number */}
+          <div className="text-center">
+            <p className="text-lg font-semibold text-slate-900 dark:text-white">
+              {whatsappStatus?.phone_number}
+            </p>
+            <p className="text-sm text-slate-500">WhatsApp Business</p>
+          </div>
+
+          {/* Link */}
+          <div className="w-full p-3 bg-slate-50 rounded-lg dark:bg-slate-700/50">
+            <p className="text-xs text-slate-500 uppercase tracking-wider mb-1 text-center">Link</p>
+            <p className="font-mono text-xs text-slate-700 dark:text-slate-300 text-center break-all">
+              {getWhatsAppLink()}
+            </p>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-3 w-full">
+            <Button
+              variant="outline"
+              onClick={downloadQRCode}
+              className="flex-1"
+            >
+              <Download className="h-4 w-4" />
+              Download QR
+            </Button>
+            <Button
+              variant="outline"
+              onClick={copyLinkToClipboard}
+              className="flex-1"
+            >
+              <Copy className="h-4 w-4" />
+              Copy Link
+            </Button>
+          </div>
+
+          <Button
+            onClick={() => setShowQRModal(false)}
+            className="w-full bg-green-500 hover:bg-green-600"
+          >
+            Done
+          </Button>
+        </div>
+      </Modal>
     </div>
   )
 }
