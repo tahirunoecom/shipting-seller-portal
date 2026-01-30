@@ -49,6 +49,7 @@ import {
   Image,
   MessageCircle,
   Bot,
+  ShieldCheck,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -1775,6 +1776,217 @@ function WhatsAppTab({ shipperId }) {
                 </p>
               </div>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Meta Business Verification Section */}
+      {isConnected && (
+        <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-amber-500" />
+                Meta Business Verification
+              </h3>
+              <div className="flex items-center gap-2">
+                <span className="px-3 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                  Check in Meta
+                </span>
+                <button
+                  onClick={() => window.open(`https://business.facebook.com/settings/security?business_id=${whatsappStatus?.business_id}`, '_blank')}
+                  className="px-3 py-1.5 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-1"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  Check in Meta
+                </button>
+              </div>
+            </div>
+
+            {/* Info Box */}
+            <div className="p-3 rounded-lg mb-4 bg-blue-50 dark:bg-blue-900/20">
+              <p className="text-sm text-blue-700 dark:text-blue-300">
+                Business verification unlocks higher messaging limits and builds trust with customers. Click "Check in Meta" to view verification status and complete the steps below.
+              </p>
+            </div>
+
+            {/* Verification Checklist */}
+            <div className="space-y-3 mb-4">
+              <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                Verification Checklist:
+              </p>
+              <div className="space-y-2">
+                {/* Step 1: Complete business profile */}
+                <div className={`flex items-start gap-3 p-3 rounded-lg ${
+                  phoneStatus?.verified_name
+                    ? 'bg-emerald-50 dark:bg-emerald-900/20'
+                    : 'bg-slate-50 dark:bg-slate-700/50'
+                }`}>
+                  <div className="mt-0.5">
+                    {phoneStatus?.verified_name ? (
+                      <div className="h-5 w-5 rounded-full bg-emerald-500 flex items-center justify-center">
+                        <CheckCircle className="h-3 w-3 text-white" />
+                      </div>
+                    ) : (
+                      <div className="h-5 w-5 rounded-full border-2 border-slate-300 dark:border-slate-600 flex items-center justify-center text-xs text-slate-400">
+                        1
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <p className={`text-sm font-medium ${
+                      phoneStatus?.verified_name
+                        ? 'text-emerald-700 dark:text-emerald-300'
+                        : 'text-slate-900 dark:text-white'
+                    }`}>
+                      Complete business profile
+                      {phoneStatus?.verified_name && (
+                        <span className="ml-2 text-xs font-normal">({phoneStatus.verified_name})</span>
+                      )}
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Add legal business name, address, and contact information
+                    </p>
+                  </div>
+                </div>
+
+                {/* Step 2: Prepare documents */}
+                <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg dark:bg-slate-700/50">
+                  <div className="mt-0.5">
+                    <div className="h-5 w-5 rounded-full border-2 border-slate-300 dark:border-slate-600 flex items-center justify-center text-xs text-slate-400">
+                      2
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-slate-900 dark:text-white">
+                      Prepare verification documents
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Business registration certificate, tax documents, or utility bill showing business name and address
+                    </p>
+                  </div>
+                </div>
+
+                {/* Step 3: Phone registered */}
+                <div className={`flex items-start gap-3 p-3 rounded-lg ${
+                  phoneStatus?.registration_status === 'CONNECTED'
+                    ? 'bg-emerald-50 dark:bg-emerald-900/20'
+                    : 'bg-slate-50 dark:bg-slate-700/50'
+                }`}>
+                  <div className="mt-0.5">
+                    {phoneStatus?.registration_status === 'CONNECTED' ? (
+                      <div className="h-5 w-5 rounded-full bg-emerald-500 flex items-center justify-center">
+                        <CheckCircle className="h-3 w-3 text-white" />
+                      </div>
+                    ) : (
+                      <div className="h-5 w-5 rounded-full border-2 border-slate-300 dark:border-slate-600 flex items-center justify-center text-xs text-slate-400">
+                        3
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <p className={`text-sm font-medium ${
+                      phoneStatus?.registration_status === 'CONNECTED'
+                        ? 'text-emerald-700 dark:text-emerald-300'
+                        : 'text-slate-900 dark:text-white'
+                    }`}>
+                      Phone number registered
+                      {phoneStatus?.registration_status && (
+                        <span className="ml-2 text-xs font-normal">({phoneStatus.registration_status})</span>
+                      )}
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      WhatsApp Business phone number is registered and active
+                    </p>
+                  </div>
+                </div>
+
+                {/* Step 4: Display name review */}
+                <div className={`flex items-start gap-3 p-3 rounded-lg ${
+                  phoneStatus?.name_status === 'APPROVED' || phoneStatus?.name_status === 'AVAILABLE_WITHOUT_REVIEW'
+                    ? 'bg-emerald-50 dark:bg-emerald-900/20'
+                    : phoneStatus?.name_status === 'PENDING_REVIEW'
+                      ? 'bg-amber-50 dark:bg-amber-900/20'
+                      : 'bg-slate-50 dark:bg-slate-700/50'
+                }`}>
+                  <div className="mt-0.5">
+                    {phoneStatus?.name_status === 'APPROVED' || phoneStatus?.name_status === 'AVAILABLE_WITHOUT_REVIEW' ? (
+                      <div className="h-5 w-5 rounded-full bg-emerald-500 flex items-center justify-center">
+                        <CheckCircle className="h-3 w-3 text-white" />
+                      </div>
+                    ) : phoneStatus?.name_status === 'PENDING_REVIEW' ? (
+                      <div className="h-5 w-5 rounded-full bg-amber-500 flex items-center justify-center">
+                        <Clock className="h-3 w-3 text-white" />
+                      </div>
+                    ) : (
+                      <div className="h-5 w-5 rounded-full border-2 border-slate-300 dark:border-slate-600 flex items-center justify-center text-xs text-slate-400">
+                        4
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <p className={`text-sm font-medium ${
+                      phoneStatus?.name_status === 'APPROVED' || phoneStatus?.name_status === 'AVAILABLE_WITHOUT_REVIEW'
+                        ? 'text-emerald-700 dark:text-emerald-300'
+                        : phoneStatus?.name_status === 'PENDING_REVIEW'
+                          ? 'text-amber-700 dark:text-amber-300'
+                          : 'text-slate-900 dark:text-white'
+                    }`}>
+                      Display name review
+                      {phoneStatus?.name_status && (
+                        <span className="ml-2 text-xs font-normal">({phoneStatus.name_status.replace(/_/g, ' ')})</span>
+                      )}
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {phoneStatus?.name_status === 'PENDING_REVIEW'
+                        ? 'Display name is under review by Meta'
+                        : 'Meta reviews business display name for compliance'
+                      }
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Verification Benefits */}
+            <div className="p-3 bg-slate-50 rounded-lg dark:bg-slate-700/50 mb-4">
+              <p className="text-xs font-medium text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
+                Verification Benefits
+              </p>
+              <ul className="text-xs text-slate-600 dark:text-slate-400 space-y-1">
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="h-3 w-3 text-emerald-500" />
+                  Higher messaging limits (1,000+ messages/day)
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="h-3 w-3 text-emerald-500" />
+                  Official business checkmark badge
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="h-3 w-3 text-emerald-500" />
+                  Access to advanced API features
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="h-3 w-3 text-emerald-500" />
+                  Increased customer trust
+                </li>
+              </ul>
+            </div>
+
+            {/* Action Button */}
+            <button
+              onClick={() => window.open(`https://business.facebook.com/settings/security?business_id=${whatsappStatus?.business_id}`, '_blank')}
+              className="w-full px-4 py-2 text-sm border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center justify-center gap-2"
+            >
+              <ExternalLink className="w-4 h-4" />
+              Start Verification in Meta Business Manager
+            </button>
+
+            {/* Help Note */}
+            <p className="text-xs text-slate-400 mt-2 text-center">
+              Note: Business verification must be completed manually in Meta Business Manager.
+              This cannot be automated via API.
+            </p>
           </CardContent>
         </Card>
       )}
