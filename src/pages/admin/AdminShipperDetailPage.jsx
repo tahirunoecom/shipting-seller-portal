@@ -7,7 +7,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import { productService } from '@/services/products'
 import { orderService } from '@/services/orders'
 import { DRIVER_STATUS_LABELS } from '@/services/driver'
-import { Card, CardContent, Modal, Button } from '@/components/ui'
+import { Card, CardContent, Modal, Button, Input } from '@/components/ui'
 import {
   ArrowLeft,
   User,
@@ -55,6 +55,8 @@ import {
   Share2,
   Copy,
   Download,
+  KeyRound,
+  Smartphone,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -1485,6 +1487,14 @@ function WhatsAppTab({ shipperId }) {
   const [showQRModal, setShowQRModal] = useState(false)
   const qrCodeRef = useRef(null)
 
+  // Phone verification states
+  const [showOtpModal, setShowOtpModal] = useState(false)
+  const [otpCode, setOtpCode] = useState('')
+  const [otpMethod, setOtpMethod] = useState('SMS')
+  const [requestingOtp, setRequestingOtp] = useState(false)
+  const [verifyingOtp, setVerifyingOtp] = useState(false)
+  const [registeringPhone, setRegisteringPhone] = useState(false)
+
   useEffect(() => {
     fetchWhatsAppData()
   }, [shipperId])
@@ -1742,6 +1752,70 @@ function WhatsAppTab({ shipperId }) {
     }
   }
 
+  // Request OTP code for phone verification
+  const handleRequestOtp = async () => {
+    try {
+      setRequestingOtp(true)
+      const response = await whatsappService.requestVerificationCode(shipperId, otpMethod)
+
+      if (response.status === 1) {
+        toast.success(response.message || `Verification code sent via ${otpMethod}`)
+        setShowOtpModal(true)
+      } else {
+        toast.error(response.message || 'Failed to send verification code')
+      }
+    } catch (error) {
+      toast.error('Failed to request verification code')
+    } finally {
+      setRequestingOtp(false)
+    }
+  }
+
+  // Verify OTP code
+  const handleVerifyOtp = async () => {
+    if (!otpCode || otpCode.length < 6) {
+      toast.error('Please enter a valid 6-digit code')
+      return
+    }
+
+    try {
+      setVerifyingOtp(true)
+      const response = await whatsappService.verifyCode(shipperId, otpCode)
+
+      if (response.status === 1) {
+        toast.success('Phone number verified successfully!')
+        setShowOtpModal(false)
+        setOtpCode('')
+        fetchWhatsAppData()
+      } else {
+        toast.error(response.message || 'Invalid verification code')
+      }
+    } catch (error) {
+      toast.error('Failed to verify code')
+    } finally {
+      setVerifyingOtp(false)
+    }
+  }
+
+  // Register phone with WhatsApp
+  const handleRegisterPhone = async () => {
+    try {
+      setRegisteringPhone(true)
+      const response = await whatsappService.registerPhone(shipperId)
+
+      if (response.status === 1) {
+        toast.success('Phone number registered with WhatsApp!')
+        fetchWhatsAppData()
+      } else {
+        toast.error(response.message || 'Failed to register phone')
+      }
+    } catch (error) {
+      toast.error('Failed to register phone')
+    } finally {
+      setRegisteringPhone(false)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -1855,6 +1929,52 @@ function WhatsAppTab({ shipperId }) {
                 </p>
               </div>
             </div>
+
+            {/* Phone Registration Actions - Show when status is pending */}
+            {phoneStatus && (
+              phoneStatus.registration_status === 'PENDING' ||
+              phoneStatus.overall_status === 'PENDING_REGISTRATION' ||
+              phoneStatus.overall_status === 'PENDING' ||
+              phoneStatus.registration_status === 'PENDING_REGISTRATION'
+            ) && (
+              <div className="mt-4 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800">
+                <h4 className="font-medium text-amber-800 dark:text-amber-200 mb-2 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4" />
+                  Complete Phone Registration
+                </h4>
+                <p className="text-sm text-amber-700 dark:text-amber-300 mb-4">
+                  This phone number is pending registration. You can verify it manually using an OTP code.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={otpMethod}
+                      onChange={(e) => setOtpMethod(e.target.value)}
+                      className="px-3 py-2 text-sm border rounded-lg bg-white dark:bg-slate-700 dark:border-slate-600 dark:text-white"
+                    >
+                      <option value="SMS">SMS</option>
+                      <option value="VOICE">Voice Call</option>
+                    </select>
+                    <button
+                      onClick={handleRequestOtp}
+                      disabled={requestingOtp}
+                      className="px-3 py-2 text-sm bg-amber-500 text-white rounded-lg hover:bg-amber-600 flex items-center gap-1 disabled:opacity-50"
+                    >
+                      <KeyRound className="w-4 h-4" />
+                      {requestingOtp ? 'Sending...' : 'Request Code'}
+                    </button>
+                  </div>
+                  <button
+                    onClick={handleRegisterPhone}
+                    disabled={registeringPhone}
+                    className="px-3 py-2 text-sm border border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/30 flex items-center gap-1 disabled:opacity-50"
+                  >
+                    <Smartphone className="w-4 h-4" />
+                    {registeringPhone ? 'Registering...' : 'Try Register'}
+                  </button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -2447,6 +2567,51 @@ function WhatsAppTab({ shipperId }) {
           </CardContent>
         </Card>
       )}
+
+      {/* OTP Verification Modal */}
+      <Modal isOpen={showOtpModal} onClose={() => setShowOtpModal(false)} title="Enter Verification Code">
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            Enter the 6-digit verification code sent to the phone number via {otpMethod}.
+          </p>
+          <Input
+            label="Verification Code"
+            placeholder="Enter 6-digit code"
+            value={otpCode}
+            onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            maxLength={6}
+          />
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowOtpModal(false)
+                setOtpCode('')
+              }}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleVerifyOtp}
+              disabled={otpCode.length < 6 || verifyingOtp}
+              className="flex-1 bg-emerald-500 hover:bg-emerald-600"
+            >
+              {verifyingOtp ? 'Verifying...' : 'Verify Code'}
+            </Button>
+          </div>
+          <p className="text-xs text-slate-400 text-center">
+            Didn't receive the code?{' '}
+            <button
+              onClick={handleRequestOtp}
+              disabled={requestingOtp}
+              className="text-violet-500 hover:text-violet-600"
+            >
+              {requestingOtp ? 'Sending...' : 'Resend'}
+            </button>
+          </p>
+        </div>
+      </Modal>
 
       {/* QR Code Modal */}
       <Modal isOpen={showQRModal} onClose={() => setShowQRModal(false)} title="WhatsApp QR Code">

@@ -1528,7 +1528,12 @@ function WhatsAppPage() {
                         )}
 
                         {/* Phone Registration Actions - Show when status is pending */}
-                        {phoneStatus && phoneStatus.registration_status === 'PENDING' && (
+                        {phoneStatus && (
+                          phoneStatus.registration_status === 'PENDING' ||
+                          phoneStatus.overall_status === 'PENDING_REGISTRATION' ||
+                          phoneStatus.overall_status === 'PENDING' ||
+                          phoneStatus.registration_status === 'PENDING_REGISTRATION'
+                        ) && (
                           <div className="mt-4 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
                             <h4 className="font-medium text-amber-800 dark:text-amber-200 mb-2 flex items-center gap-2">
                               <AlertCircle className="h-4 w-4" />
