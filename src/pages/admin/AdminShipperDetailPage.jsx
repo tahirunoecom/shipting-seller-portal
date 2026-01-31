@@ -2047,6 +2047,147 @@ function WhatsAppTab({ shipperId }) {
         </Card>
       )}
 
+      {/* Phone Number Options - Show when no phone, test phone, or has Twilio number */}
+      {((!whatsappStatus?.phone_number && !twilioState.hasNumber) ||
+        isTestPhoneNumber(whatsappStatus?.phone_number) ||
+        twilioState.hasNumber) && (
+        <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                <Smartphone className="w-5 h-5 text-emerald-500" />
+                {twilioState.hasNumber ? 'Your Provisioned Number' : 'Phone Number Required'}
+              </h3>
+              {twilioState.hasNumber && (
+                <Button size="sm" variant="outline" onClick={loadTwilioNumber} disabled={twilioState.loading}>
+                  <RefreshCw className={`w-4 h-4 ${twilioState.loading ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
+              )}
+            </div>
+
+            {/* If already has Twilio number - show it */}
+            {twilioState.hasNumber ? (
+              <div className="space-y-4">
+                <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl border border-emerald-200 dark:border-emerald-800">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-slate-500 uppercase tracking-wider">Assigned Number</p>
+                      <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 font-mono">{twilioState.number}</p>
+                      <p className="text-xs text-slate-500 mt-1">Use this number for WhatsApp Business verification</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={() => { loadTwilioInbox(); setShowTwilioInbox(true); }}>
+                        <Inbox className="w-4 h-4" />
+                        SMS Inbox
+                      </Button>
+                      <Button size="sm" variant="ghost" className="text-red-500 hover:bg-red-50" onClick={handleReleaseTwilioNumber}>
+                        <Trash2 className="w-4 h-4" />
+                        Release
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-500">
+                  <DollarSign className="w-3 h-3 inline" /> Cost: ~$1.15/month. Currently absorbed by platform.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Benefits of Own Number */}
+                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
+                  <h4 className="font-medium text-blue-800 dark:text-blue-200 mb-2 flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4" />
+                    Recommended: Use Your Own Business Number
+                  </h4>
+                  <p className="text-sm text-blue-700 dark:text-blue-300 mb-3">
+                    For the best experience, sellers should use their own business phone number. Benefits include:
+                  </p>
+                  <ul className="text-sm text-blue-600 dark:text-blue-400 space-y-1 ml-4">
+                    <li className="flex items-center gap-2"><CheckCircle className="w-3 h-3" /> Customers recognize your business number</li>
+                    <li className="flex items-center gap-2"><CheckCircle className="w-3 h-3" /> Full control over your WhatsApp identity</li>
+                    <li className="flex items-center gap-2"><CheckCircle className="w-3 h-3" /> Can transfer number to any platform later</li>
+                    <li className="flex items-center gap-2"><CheckCircle className="w-3 h-3" /> No monthly fees for the number</li>
+                  </ul>
+                  <div className="mt-3 p-2 bg-blue-100 dark:bg-blue-900/40 rounded-lg">
+                    <p className="text-xs text-blue-800 dark:text-blue-200">
+                      <strong>Tip:</strong> Any US mobile or landline number works. If you have a business number, use that!
+                    </p>
+                  </div>
+                </div>
+
+                {/* Twilio Option - Last Resort */}
+                <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-200 dark:border-slate-600">
+                  <h4 className="font-medium text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-2">
+                    <Phone className="w-4 h-4" />
+                    Don't Have a Business Number?
+                  </h4>
+                  <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
+                    If this seller doesn't have a phone number available, we can provision a US number for them.
+                  </p>
+
+                  {!showTwilioSection ? (
+                    <Button onClick={() => setShowTwilioSection(true)} variant="outline" className="border-violet-300 text-violet-600 hover:bg-violet-50">
+                      <ShoppingBag className="w-4 h-4" />
+                      Provision a Number ($1.15/mo)
+                    </Button>
+                  ) : (
+                    <div className="space-y-3 mt-3 p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600">
+                      <p className="text-sm text-slate-600 dark:text-slate-400">
+                        Search for available US phone numbers:
+                      </p>
+                      <div className="flex flex-wrap gap-2 items-end">
+                        <div>
+                          <label className="text-xs text-slate-500 mb-1 block">Area Code</label>
+                          <Input
+                            placeholder="e.g., 415"
+                            value={twilioAreaCode}
+                            onChange={(e) => setTwilioAreaCode(e.target.value.replace(/\D/g, '').slice(0, 3))}
+                            className="w-24"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-slate-500 mb-1 block">Contains</label>
+                          <Input
+                            placeholder="e.g., 2024"
+                            value={twilioContains}
+                            onChange={(e) => setTwilioContains(e.target.value.slice(0, 10))}
+                            className="w-28"
+                          />
+                        </div>
+                        <Button onClick={handleSearchTwilioNumbers} disabled={twilioSearching} size="sm" className="bg-emerald-600 hover:bg-emerald-700">
+                          <Search className="w-4 h-4" />
+                          {twilioSearching ? 'Searching...' : 'Search'}
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => { setShowTwilioSection(false); setTwilioAvailableNumbers([]); setTwilioAreaCode(''); setTwilioContains(''); }}>
+                          Cancel
+                        </Button>
+                      </div>
+
+                      {twilioAvailableNumbers.length > 0 && (
+                        <div className="space-y-2 max-h-40 overflow-y-auto mt-2">
+                          {twilioAvailableNumbers.map((num, i) => (
+                            <div key={i} className="flex items-center justify-between p-2 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                              <div>
+                                <p className="font-mono font-semibold text-sm">{num.phone_number || num.phoneNumber}</p>
+                                <p className="text-xs text-slate-500">{num.locality || num.region || 'USA'}</p>
+                              </div>
+                              <Button size="sm" onClick={() => handleBuyTwilioNumber(num.phone_number || num.phoneNumber)} disabled={twilioBuying}>
+                                {twilioBuying ? '...' : 'Get'}
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Phone Number Status */}
       {isConnected && (
         <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
@@ -2714,109 +2855,6 @@ function WhatsAppTab({ shipperId }) {
           </CardContent>
         </Card>
       )}
-
-      {/* Twilio Phone Number Management (Admin) */}
-      <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-              <Phone className="w-5 h-5 text-violet-500" />
-              Provisioned Phone Number
-            </h3>
-            <Button size="sm" variant="outline" onClick={loadTwilioNumber} disabled={twilioState.loading}>
-              <RefreshCw className={`w-4 h-4 ${twilioState.loading ? 'animate-spin' : ''}`} />
-              Check
-            </Button>
-          </div>
-
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-            Provision a US phone number for this seller if they don't have their own business number.
-          </p>
-
-          {twilioState.hasNumber ? (
-            <div className="p-4 bg-violet-50 dark:bg-violet-900/20 rounded-xl border border-violet-200 dark:border-violet-800">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-slate-500 uppercase tracking-wider">Assigned Number</p>
-                  <p className="text-2xl font-bold text-violet-600 dark:text-violet-400 font-mono">{twilioState.number}</p>
-                </div>
-                <div className="flex gap-2">
-                  <Button size="sm" variant="outline" onClick={() => { loadTwilioInbox(); setShowTwilioInbox(true); }}>
-                    <Inbox className="w-4 h-4" />
-                    Inbox
-                  </Button>
-                  <Button size="sm" variant="ghost" className="text-red-500 hover:bg-red-50" onClick={handleReleaseTwilioNumber}>
-                    <Trash2 className="w-4 h-4" />
-                    Release
-                  </Button>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <>
-              {!showTwilioSection ? (
-                <Button onClick={() => setShowTwilioSection(true)} className="bg-violet-600 hover:bg-violet-700 text-white">
-                  <ShoppingBag className="w-4 h-4" />
-                  Provision a Number
-                </Button>
-              ) : (
-                <div className="space-y-4">
-                  <p className="text-sm text-slate-600 dark:text-slate-400">
-                    Search for available US phone numbers. All fields are optional.
-                  </p>
-                  <div className="flex flex-wrap gap-2 items-end">
-                    <div>
-                      <label className="text-xs text-slate-500 mb-1 block">Area Code</label>
-                      <Input
-                        placeholder="e.g., 415"
-                        value={twilioAreaCode}
-                        onChange={(e) => setTwilioAreaCode(e.target.value.replace(/\D/g, '').slice(0, 3))}
-                        className="w-24"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-slate-500 mb-1 block">Contains (digits/pattern)</label>
-                      <Input
-                        placeholder="e.g., 2024 or CAFE"
-                        value={twilioContains}
-                        onChange={(e) => setTwilioContains(e.target.value.slice(0, 10))}
-                        className="w-36"
-                      />
-                    </div>
-                    <Button onClick={handleSearchTwilioNumbers} disabled={twilioSearching} className="bg-emerald-600 hover:bg-emerald-700">
-                      <Search className="w-4 h-4" />
-                      {twilioSearching ? 'Searching...' : 'Search'}
-                    </Button>
-                    <Button variant="ghost" onClick={() => { setShowTwilioSection(false); setTwilioAvailableNumbers([]); setTwilioAreaCode(''); setTwilioContains(''); }}>
-                      Cancel
-                    </Button>
-                  </div>
-
-                  {twilioAvailableNumbers.length > 0 && (
-                    <div className="space-y-2 max-h-48 overflow-y-auto">
-                      {twilioAvailableNumbers.map((num, i) => (
-                        <div key={i} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
-                          <div>
-                            <p className="font-mono font-semibold">{num.phone_number || num.phoneNumber}</p>
-                            <p className="text-xs text-slate-500">{num.locality || num.region || 'USA'}</p>
-                          </div>
-                          <Button size="sm" onClick={() => handleBuyTwilioNumber(num.phone_number || num.phoneNumber)} disabled={twilioBuying}>
-                            {twilioBuying ? 'Provisioning...' : 'Provision'}
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </>
-          )}
-
-          <p className="text-xs text-slate-400 mt-4">
-            <DollarSign className="w-3 h-3 inline" /> Cost: ~$1.15/month per number. Currently absorbed by platform.
-          </p>
-        </CardContent>
-      </Card>
 
       {/* Not Connected State */}
       {!isConnected && (
