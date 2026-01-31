@@ -1515,6 +1515,7 @@ function WhatsAppTab({ shipperId }) {
 
   useEffect(() => {
     fetchWhatsAppData()
+    loadTwilioNumber()
   }, [shipperId])
 
   const fetchWhatsAppData = async () => {

@@ -252,6 +252,7 @@ function WhatsAppPage() {
   // Load WhatsApp config on mount
   useEffect(() => {
     loadWhatsAppConfig()
+    loadTwilioNumber()
   }, [])
 
   const loadWhatsAppConfig = async () => {
