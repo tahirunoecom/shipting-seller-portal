@@ -172,6 +172,7 @@ function WhatsAppPage() {
   const [twilioSearching, setTwilioSearching] = useState(false)
   const [twilioAvailableNumbers, setTwilioAvailableNumbers] = useState([])
   const [twilioAreaCode, setTwilioAreaCode] = useState('')
+  const [twilioContains, setTwilioContains] = useState('')
   const [twilioBuying, setTwilioBuying] = useState(false)
   const [showTwilioInbox, setShowTwilioInbox] = useState(false)
   const [twilioInbox, setTwilioInbox] = useState([])
@@ -517,12 +518,13 @@ function WhatsAppPage() {
       setTwilioAvailableNumbers([])
       const response = await twilioService.searchAvailableNumbers(user?.wh_account_id, {
         area_code: twilioAreaCode || null,
+        contains: twilioContains || null,
         limit: 10,
       })
       if (response.status === 1) {
         setTwilioAvailableNumbers(response.data || [])
         if (response.data?.length === 0) {
-          toast.info('No numbers found. Try a different area code.')
+          toast.info('No numbers found. Try different search criteria.')
         }
       } else {
         toast.error(response.message || 'Failed to search numbers')
@@ -1373,19 +1375,33 @@ function WhatsAppPage() {
                                   ) : (
                                     <div className="space-y-4">
                                       {/* Search Box */}
-                                      <div className="flex gap-2">
-                                        <div className="flex-1">
+                                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                                        Search for available US phone numbers. All fields are optional.
+                                      </p>
+                                      <div className="flex flex-wrap gap-2 items-end">
+                                        <div>
+                                          <label className="text-xs text-gray-500 mb-1 block">Area Code</label>
                                           <Input
-                                            placeholder="Area code (optional, e.g., 415)"
+                                            placeholder="e.g., 415"
                                             value={twilioAreaCode}
                                             onChange={(e) => setTwilioAreaCode(e.target.value.replace(/\D/g, '').slice(0, 3))}
-                                            className="w-full"
+                                            className="w-24"
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="text-xs text-gray-500 mb-1 block">Contains (digits/pattern)</label>
+                                          <Input
+                                            placeholder="e.g., 2024"
+                                            value={twilioContains}
+                                            onChange={(e) => setTwilioContains(e.target.value.slice(0, 10))}
+                                            className="w-32"
                                           />
                                         </div>
                                         <Button
                                           onClick={handleSearchTwilioNumbers}
                                           disabled={twilioSearching}
                                           isLoading={twilioSearching}
+                                          className="bg-emerald-600 hover:bg-emerald-700"
                                         >
                                           <Search className="h-4 w-4" />
                                           Search
@@ -1396,6 +1412,7 @@ function WhatsAppPage() {
                                             setShowTwilioSection(false)
                                             setTwilioAvailableNumbers([])
                                             setTwilioAreaCode('')
+                                            setTwilioContains('')
                                           }}
                                         >
                                           Cancel
