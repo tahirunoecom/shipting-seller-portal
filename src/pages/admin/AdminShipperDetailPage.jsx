@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useAdminStore } from '@/store'
 import { adminService } from '@/services'
 import { whatsappService } from '@/services/whatsapp'
+import { twilioService } from '@/services/twilio'
 import { QRCodeSVG } from 'qrcode.react'
 import { productService } from '@/services/products'
 import { orderService } from '@/services/orders'
@@ -58,6 +59,11 @@ import {
   KeyRound,
   Smartphone,
   AlertTriangle,
+  Search,
+  Inbox,
+  ShoppingBag,
+  DollarSign,
+  Hash,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -1496,6 +1502,17 @@ function WhatsAppTab({ shipperId }) {
   const [verifyingOtp, setVerifyingOtp] = useState(false)
   const [registeringPhone, setRegisteringPhone] = useState(false)
 
+  // Twilio states for admin
+  const [twilioState, setTwilioState] = useState({ hasNumber: false, number: null, loading: false })
+  const [twilioSearching, setTwilioSearching] = useState(false)
+  const [twilioAvailableNumbers, setTwilioAvailableNumbers] = useState([])
+  const [twilioAreaCode, setTwilioAreaCode] = useState('')
+  const [twilioBuying, setTwilioBuying] = useState(false)
+  const [showTwilioInbox, setShowTwilioInbox] = useState(false)
+  const [twilioInbox, setTwilioInbox] = useState([])
+  const [loadingInbox, setLoadingInbox] = useState(false)
+  const [showTwilioSection, setShowTwilioSection] = useState(false)
+
   useEffect(() => {
     fetchWhatsAppData()
   }, [shipperId])
@@ -1826,6 +1843,90 @@ function WhatsAppTab({ shipperId }) {
       toast.error('Failed to register phone')
     } finally {
       setRegisteringPhone(false)
+    }
+  }
+
+  // ============================================
+  // Admin Twilio Handlers
+  // ============================================
+
+  const loadTwilioNumber = async () => {
+    try {
+      setTwilioState(prev => ({ ...prev, loading: true }))
+      const response = await twilioService.adminGetSellerNumber(shipperId)
+      if (response.status === 1 && response.data) {
+        setTwilioState({ hasNumber: true, number: response.data.phone_number, loading: false })
+      } else {
+        setTwilioState(prev => ({ ...prev, hasNumber: false, loading: false }))
+      }
+    } catch (error) {
+      setTwilioState(prev => ({ ...prev, loading: false }))
+    }
+  }
+
+  const handleSearchTwilioNumbers = async () => {
+    try {
+      setTwilioSearching(true)
+      const response = await twilioService.adminSearchNumbers({ area_code: twilioAreaCode || null, limit: 10 })
+      if (response.status === 1) {
+        setTwilioAvailableNumbers(response.data || [])
+      } else {
+        toast.error(response.message || 'Failed to search numbers')
+      }
+    } catch (error) {
+      toast.error('Failed to search available numbers')
+    } finally {
+      setTwilioSearching(false)
+    }
+  }
+
+  const handleBuyTwilioNumber = async (phoneNumber) => {
+    if (!confirm(`Provision this number for the seller?\n\n${phoneNumber}`)) return
+    try {
+      setTwilioBuying(true)
+      const response = await twilioService.adminBuyNumberForSeller(shipperId, phoneNumber)
+      if (response.status === 1) {
+        toast.success('Phone number provisioned!')
+        setTwilioState({ hasNumber: true, number: phoneNumber, loading: false })
+        setTwilioAvailableNumbers([])
+        setShowTwilioSection(false)
+      } else {
+        toast.error(response.message || 'Failed to provision number')
+      }
+    } catch (error) {
+      toast.error('Failed to provision number')
+    } finally {
+      setTwilioBuying(false)
+    }
+  }
+
+  const handleReleaseTwilioNumber = async () => {
+    if (!confirm('Release this seller\'s number? They will lose access to it.')) return
+    try {
+      setTwilioState(prev => ({ ...prev, loading: true }))
+      const response = await twilioService.adminReleaseNumber(shipperId)
+      if (response.status === 1) {
+        toast.success('Number released')
+        setTwilioState({ hasNumber: false, number: null, loading: false })
+      } else {
+        toast.error(response.message || 'Failed to release')
+        setTwilioState(prev => ({ ...prev, loading: false }))
+      }
+    } catch (error) {
+      toast.error('Failed to release number')
+      setTwilioState(prev => ({ ...prev, loading: false }))
+    }
+  }
+
+  const loadTwilioInbox = async () => {
+    try {
+      setLoadingInbox(true)
+      const response = await twilioService.adminGetSmsInbox(shipperId, 20)
+      if (response.status === 1) setTwilioInbox(response.data || [])
+    } catch (error) {
+      toast.error('Failed to load inbox')
+    } finally {
+      setLoadingInbox(false)
     }
   }
 
@@ -2609,6 +2710,94 @@ function WhatsAppTab({ shipperId }) {
         </Card>
       )}
 
+      {/* Twilio Phone Number Management (Admin) */}
+      <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+              <Phone className="w-5 h-5 text-violet-500" />
+              Provisioned Phone Number
+            </h3>
+            <Button size="sm" variant="outline" onClick={loadTwilioNumber} disabled={twilioState.loading}>
+              <RefreshCw className={`w-4 h-4 ${twilioState.loading ? 'animate-spin' : ''}`} />
+              Check
+            </Button>
+          </div>
+
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+            Provision a US phone number for this seller if they don't have their own business number.
+          </p>
+
+          {twilioState.hasNumber ? (
+            <div className="p-4 bg-violet-50 dark:bg-violet-900/20 rounded-xl border border-violet-200 dark:border-violet-800">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-slate-500 uppercase tracking-wider">Assigned Number</p>
+                  <p className="text-2xl font-bold text-violet-600 dark:text-violet-400 font-mono">{twilioState.number}</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => { loadTwilioInbox(); setShowTwilioInbox(true); }}>
+                    <Inbox className="w-4 h-4" />
+                    Inbox
+                  </Button>
+                  <Button size="sm" variant="ghost" className="text-red-500 hover:bg-red-50" onClick={handleReleaseTwilioNumber}>
+                    <Trash2 className="w-4 h-4" />
+                    Release
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              {!showTwilioSection ? (
+                <Button onClick={() => setShowTwilioSection(true)} className="bg-violet-600 hover:bg-violet-700 text-white">
+                  <ShoppingBag className="w-4 h-4" />
+                  Provision a Number
+                </Button>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Area code (e.g., 415)"
+                      value={twilioAreaCode}
+                      onChange={(e) => setTwilioAreaCode(e.target.value.replace(/\D/g, '').slice(0, 3))}
+                      className="w-32"
+                    />
+                    <Button onClick={handleSearchTwilioNumbers} disabled={twilioSearching}>
+                      <Search className="w-4 h-4" />
+                      {twilioSearching ? 'Searching...' : 'Search'}
+                    </Button>
+                    <Button variant="ghost" onClick={() => { setShowTwilioSection(false); setTwilioAvailableNumbers([]); }}>
+                      Cancel
+                    </Button>
+                  </div>
+
+                  {twilioAvailableNumbers.length > 0 && (
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {twilioAvailableNumbers.map((num, i) => (
+                        <div key={i} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                          <div>
+                            <p className="font-mono font-semibold">{num.phone_number || num.phoneNumber}</p>
+                            <p className="text-xs text-slate-500">{num.locality || num.region || 'USA'}</p>
+                          </div>
+                          <Button size="sm" onClick={() => handleBuyTwilioNumber(num.phone_number || num.phoneNumber)} disabled={twilioBuying}>
+                            {twilioBuying ? 'Provisioning...' : 'Provision'}
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+
+          <p className="text-xs text-slate-400 mt-4">
+            <DollarSign className="w-3 h-3 inline" /> Cost: ~$1.15/month per number. Currently absorbed by platform.
+          </p>
+        </CardContent>
+      </Card>
+
       {/* Not Connected State */}
       {!isConnected && (
         <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
@@ -2623,6 +2812,45 @@ function WhatsAppTab({ shipperId }) {
           </CardContent>
         </Card>
       )}
+
+      {/* Twilio SMS Inbox Modal (Admin) */}
+      <Modal isOpen={showTwilioInbox} onClose={() => setShowTwilioInbox(false)} title="SMS Inbox">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-slate-600">Messages for <span className="font-mono font-semibold text-violet-600">{twilioState.number}</span></p>
+            <Button size="sm" variant="outline" onClick={loadTwilioInbox} disabled={loadingInbox}>
+              <RefreshCw className={`w-4 h-4 ${loadingInbox ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </div>
+
+          {loadingInbox ? (
+            <div className="text-center py-8"><RefreshCw className="w-6 h-6 animate-spin mx-auto" /></div>
+          ) : twilioInbox.length > 0 ? (
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {twilioInbox.map((msg, i) => (
+                <div key={i} className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                  <p className="text-xs text-slate-500">From: {msg.from_number || msg.from}</p>
+                  <p className="text-sm text-slate-900 dark:text-white mt-1">{msg.body}</p>
+                  {/\b\d{6}\b/.test(msg.body) && (
+                    <span className="inline-block mt-1 px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded">Contains OTP</span>
+                  )}
+                  <p className="text-xs text-slate-400 mt-1">{msg.created_at || msg.date_created}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-slate-500">
+              <Inbox className="w-12 h-12 mx-auto mb-2 opacity-50" />
+              <p>No messages yet</p>
+            </div>
+          )}
+
+          <div className="flex justify-end pt-4 border-t">
+            <Button variant="outline" onClick={() => setShowTwilioInbox(false)}>Close</Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* OTP Verification Modal */}
       <Modal isOpen={showOtpModal} onClose={() => setShowOtpModal(false)} title="Enter Verification Code">
