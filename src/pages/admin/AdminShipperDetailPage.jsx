@@ -62,7 +62,6 @@ import {
   Search,
   Inbox,
   ShoppingBag,
-  DollarSign,
   Hash,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
