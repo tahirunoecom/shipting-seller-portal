@@ -119,10 +119,12 @@ export const twilioService = {
 
   /**
    * [ADMIN] Search available numbers
+   * @param {string} wh_account_id - Seller's account ID (for context)
    * @param {object} options - Search options
    */
-  async adminSearchNumbers(options = {}) {
+  async adminSearchNumbers(wh_account_id, options = {}) {
     const response = await api.post('/admin/twilio/search-numbers', {
+      wh_account_id,
       country: 'US',
       area_code: options.area_code || null,
       contains: options.contains || null,

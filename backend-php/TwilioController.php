@@ -26,19 +26,20 @@ class TwilioController extends Controller
     /**
      * Search available US phone numbers
      * POST /seller/twilio/search-numbers
+     * POST /admin/twilio/search-numbers
+     *
+     * Note: wh_account_id is optional for search - we're just searching Twilio's inventory
      */
     public function searchNumbers(Request $request)
     {
-        $wh_account_id = $request->wh_account_id;
+        $wh_account_id = $request->wh_account_id; // Optional - for logging/context
         $area_code = $request->area_code;
         $contains = $request->contains;
         $limit = $request->limit ?? 10;
 
-        if (!$wh_account_id) {
-            return response()->json([
-                'status' => 0,
-                'message' => 'Account ID is required'
-            ]);
+        // Log the search for analytics (optional)
+        if ($wh_account_id) {
+            Log::info('Twilio number search by account: ' . $wh_account_id);
         }
 
         try {
