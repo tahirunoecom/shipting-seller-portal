@@ -1506,6 +1506,7 @@ function WhatsAppTab({ shipperId }) {
   const [twilioSearching, setTwilioSearching] = useState(false)
   const [twilioAvailableNumbers, setTwilioAvailableNumbers] = useState([])
   const [twilioAreaCode, setTwilioAreaCode] = useState('')
+  const [twilioContains, setTwilioContains] = useState('')
   const [twilioBuying, setTwilioBuying] = useState(false)
   const [showTwilioInbox, setShowTwilioInbox] = useState(false)
   const [twilioInbox, setTwilioInbox] = useState([])
@@ -1866,7 +1867,11 @@ function WhatsAppTab({ shipperId }) {
   const handleSearchTwilioNumbers = async () => {
     try {
       setTwilioSearching(true)
-      const response = await twilioService.adminSearchNumbers({ area_code: twilioAreaCode || null, limit: 10 })
+      const response = await twilioService.adminSearchNumbers(shipperId, {
+        area_code: twilioAreaCode || null,
+        contains: twilioContains || null,
+        limit: 10
+      })
       if (response.status === 1) {
         setTwilioAvailableNumbers(response.data || [])
       } else {
@@ -2755,18 +2760,33 @@ function WhatsAppTab({ shipperId }) {
                 </Button>
               ) : (
                 <div className="space-y-4">
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Area code (e.g., 415)"
-                      value={twilioAreaCode}
-                      onChange={(e) => setTwilioAreaCode(e.target.value.replace(/\D/g, '').slice(0, 3))}
-                      className="w-32"
-                    />
-                    <Button onClick={handleSearchTwilioNumbers} disabled={twilioSearching}>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">
+                    Search for available US phone numbers. All fields are optional.
+                  </p>
+                  <div className="flex flex-wrap gap-2 items-end">
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block">Area Code</label>
+                      <Input
+                        placeholder="e.g., 415"
+                        value={twilioAreaCode}
+                        onChange={(e) => setTwilioAreaCode(e.target.value.replace(/\D/g, '').slice(0, 3))}
+                        className="w-24"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block">Contains (digits/pattern)</label>
+                      <Input
+                        placeholder="e.g., 2024 or CAFE"
+                        value={twilioContains}
+                        onChange={(e) => setTwilioContains(e.target.value.slice(0, 10))}
+                        className="w-36"
+                      />
+                    </div>
+                    <Button onClick={handleSearchTwilioNumbers} disabled={twilioSearching} className="bg-emerald-600 hover:bg-emerald-700">
                       <Search className="w-4 h-4" />
                       {twilioSearching ? 'Searching...' : 'Search'}
                     </Button>
-                    <Button variant="ghost" onClick={() => { setShowTwilioSection(false); setTwilioAvailableNumbers([]); }}>
+                    <Button variant="ghost" onClick={() => { setShowTwilioSection(false); setTwilioAvailableNumbers([]); setTwilioAreaCode(''); setTwilioContains(''); }}>
                       Cancel
                     </Button>
                   </div>
