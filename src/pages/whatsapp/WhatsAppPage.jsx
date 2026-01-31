@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useAuthStore } from '@/store'
-import { whatsappService } from '@/services'
+import { whatsappService, twilioService } from '@/services'
 import { QRCodeSVG } from 'qrcode.react'
 import {
   Card,
@@ -52,6 +52,11 @@ import {
   FileText,
   ShieldCheck,
   AlertTriangle,
+  Search,
+  Inbox,
+  ShoppingBag,
+  DollarSign,
+  Hash,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -155,6 +160,23 @@ function WhatsAppPage() {
     loading: false,
     error: null,
   })
+
+  // Twilio Number state (for users without their own phone number)
+  const [twilioState, setTwilioState] = useState({
+    hasNumber: false,
+    number: null,
+    numberSid: null,
+    purchasedAt: null,
+    loading: false,
+  })
+  const [twilioSearching, setTwilioSearching] = useState(false)
+  const [twilioAvailableNumbers, setTwilioAvailableNumbers] = useState([])
+  const [twilioAreaCode, setTwilioAreaCode] = useState('')
+  const [twilioBuying, setTwilioBuying] = useState(false)
+  const [showTwilioInbox, setShowTwilioInbox] = useState(false)
+  const [twilioInbox, setTwilioInbox] = useState([])
+  const [loadingInbox, setLoadingInbox] = useState(false)
+  const [showTwilioSection, setShowTwilioSection] = useState(false)
 
   const tabs = [
     { key: 'connection', label: 'Connection', icon: Link },
@@ -460,6 +482,143 @@ function WhatsAppPage() {
       toast.error('Failed to disconnect WhatsApp')
     } finally {
       setSaving(false)
+    }
+  }
+
+  // ============================================
+  // Twilio Number Handlers
+  // ============================================
+
+  // Load user's Twilio number (if any)
+  const loadTwilioNumber = async () => {
+    try {
+      setTwilioState(prev => ({ ...prev, loading: true }))
+      const response = await twilioService.getMyNumber(user?.wh_account_id)
+      if (response.status === 1 && response.data) {
+        setTwilioState({
+          hasNumber: true,
+          number: response.data.phone_number,
+          numberSid: response.data.sid,
+          purchasedAt: response.data.purchased_at,
+          loading: false,
+        })
+      } else {
+        setTwilioState(prev => ({ ...prev, hasNumber: false, loading: false }))
+      }
+    } catch (error) {
+      setTwilioState(prev => ({ ...prev, loading: false }))
+    }
+  }
+
+  // Search available Twilio numbers
+  const handleSearchTwilioNumbers = async () => {
+    try {
+      setTwilioSearching(true)
+      setTwilioAvailableNumbers([])
+      const response = await twilioService.searchAvailableNumbers(user?.wh_account_id, {
+        area_code: twilioAreaCode || null,
+        limit: 10,
+      })
+      if (response.status === 1) {
+        setTwilioAvailableNumbers(response.data || [])
+        if (response.data?.length === 0) {
+          toast.info('No numbers found. Try a different area code.')
+        }
+      } else {
+        toast.error(response.message || 'Failed to search numbers')
+      }
+    } catch (error) {
+      toast.error('Failed to search available numbers')
+    } finally {
+      setTwilioSearching(false)
+    }
+  }
+
+  // Buy a Twilio number
+  const handleBuyTwilioNumber = async (phoneNumber) => {
+    if (!confirm(`Are you sure you want to get this number?\n\n${phoneNumber}\n\nThis number will be used for your WhatsApp Business verification.`)) {
+      return
+    }
+
+    try {
+      setTwilioBuying(true)
+      const response = await twilioService.buyNumber(user?.wh_account_id, phoneNumber)
+      if (response.status === 1) {
+        toast.success('Phone number acquired successfully!')
+        setTwilioState({
+          hasNumber: true,
+          number: phoneNumber,
+          numberSid: response.data?.sid,
+          purchasedAt: new Date().toISOString(),
+          loading: false,
+        })
+        setTwilioAvailableNumbers([])
+        setShowTwilioSection(false)
+      } else {
+        toast.error(response.message || 'Failed to acquire number')
+      }
+    } catch (error) {
+      toast.error('Failed to acquire phone number')
+    } finally {
+      setTwilioBuying(false)
+    }
+  }
+
+  // Release Twilio number
+  const handleReleaseTwilioNumber = async () => {
+    if (!confirm('Are you sure you want to release this number?\n\nYou will lose this phone number and any messages sent to it.')) {
+      return
+    }
+
+    try {
+      setTwilioState(prev => ({ ...prev, loading: true }))
+      const response = await twilioService.releaseNumber(user?.wh_account_id)
+      if (response.status === 1) {
+        toast.success('Phone number released')
+        setTwilioState({
+          hasNumber: false,
+          number: null,
+          numberSid: null,
+          purchasedAt: null,
+          loading: false,
+        })
+      } else {
+        toast.error(response.message || 'Failed to release number')
+        setTwilioState(prev => ({ ...prev, loading: false }))
+      }
+    } catch (error) {
+      toast.error('Failed to release phone number')
+      setTwilioState(prev => ({ ...prev, loading: false }))
+    }
+  }
+
+  // Load SMS inbox
+  const loadTwilioInbox = async () => {
+    try {
+      setLoadingInbox(true)
+      const response = await twilioService.getSmsInbox(user?.wh_account_id, 20)
+      if (response.status === 1) {
+        setTwilioInbox(response.data || [])
+      }
+    } catch (error) {
+      toast.error('Failed to load SMS inbox')
+    } finally {
+      setLoadingInbox(false)
+    }
+  }
+
+  // Get latest OTP from inbox
+  const handleGetLatestOtp = async () => {
+    try {
+      const response = await twilioService.getLatestOtp(user?.wh_account_id)
+      if (response.status === 1 && response.data?.otp) {
+        setOtpCode(response.data.otp)
+        toast.success(`OTP found: ${response.data.otp}`)
+      } else {
+        toast.info('No OTP found in recent messages')
+      }
+    } catch (error) {
+      toast.error('Failed to fetch OTP')
     }
   }
 
@@ -1134,6 +1293,163 @@ function WhatsAppPage() {
                           {!fbSDKLoaded && (
                             <p className="text-xs text-amber-600 mt-2">Loading Facebook SDK...</p>
                           )}
+                        </div>
+
+                        {/* Divider */}
+                        <div className="relative">
+                          <div className="absolute inset-0 flex items-center">
+                            <div className="w-full border-t border-gray-200 dark:border-gray-700"></div>
+                          </div>
+                          <div className="relative flex justify-center text-sm">
+                            <span className="px-4 bg-white dark:bg-dark-card text-gray-500">
+                              Don't have a business phone number?
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Twilio Number Option */}
+                        <div className="p-6 border-2 border-dashed border-violet-300 rounded-xl dark:border-violet-700 bg-violet-50/50 dark:bg-violet-900/10">
+                          <div className="flex items-start gap-4">
+                            <div className="w-12 h-12 rounded-xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center flex-shrink-0">
+                              <Phone className="h-6 w-6 text-violet-600 dark:text-violet-400" />
+                            </div>
+                            <div className="flex-1">
+                              <h3 className="text-lg font-semibold text-gray-900 dark:text-dark-text mb-1">
+                                Get a US Business Number
+                              </h3>
+                              <p className="text-sm text-gray-500 dark:text-dark-muted mb-3">
+                                We can provide you a dedicated US phone number for WhatsApp Business.
+                                You'll be able to see all SMS/OTP messages directly in this portal.
+                              </p>
+
+                              {/* If user already has a Twilio number */}
+                              {twilioState.hasNumber ? (
+                                <div className="p-4 bg-white dark:bg-dark-card rounded-lg border border-violet-200 dark:border-violet-800">
+                                  <div className="flex items-center justify-between">
+                                    <div>
+                                      <p className="text-xs text-gray-500 uppercase tracking-wider">Your Business Number</p>
+                                      <p className="text-xl font-bold text-violet-600 dark:text-violet-400 mt-1">
+                                        {twilioState.number}
+                                      </p>
+                                      <p className="text-xs text-gray-400 mt-1">
+                                        Use this number when setting up WhatsApp Business
+                                      </p>
+                                    </div>
+                                    <div className="flex flex-col gap-2">
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                          loadTwilioInbox()
+                                          setShowTwilioInbox(true)
+                                        }}
+                                      >
+                                        <Inbox className="h-4 w-4" />
+                                        View Inbox
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                                        onClick={handleReleaseTwilioNumber}
+                                        disabled={twilioState.loading}
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                        Release
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (
+                                <>
+                                  {!showTwilioSection ? (
+                                    <Button
+                                      onClick={() => setShowTwilioSection(true)}
+                                      className="bg-violet-600 hover:bg-violet-700 text-white"
+                                    >
+                                      <ShoppingBag className="h-4 w-4" />
+                                      Get a Phone Number
+                                    </Button>
+                                  ) : (
+                                    <div className="space-y-4">
+                                      {/* Search Box */}
+                                      <div className="flex gap-2">
+                                        <div className="flex-1">
+                                          <Input
+                                            placeholder="Area code (optional, e.g., 415)"
+                                            value={twilioAreaCode}
+                                            onChange={(e) => setTwilioAreaCode(e.target.value.replace(/\D/g, '').slice(0, 3))}
+                                            className="w-full"
+                                          />
+                                        </div>
+                                        <Button
+                                          onClick={handleSearchTwilioNumbers}
+                                          disabled={twilioSearching}
+                                          isLoading={twilioSearching}
+                                        >
+                                          <Search className="h-4 w-4" />
+                                          Search
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          onClick={() => {
+                                            setShowTwilioSection(false)
+                                            setTwilioAvailableNumbers([])
+                                            setTwilioAreaCode('')
+                                          }}
+                                        >
+                                          Cancel
+                                        </Button>
+                                      </div>
+
+                                      {/* Available Numbers */}
+                                      {twilioAvailableNumbers.length > 0 && (
+                                        <div className="space-y-2 max-h-64 overflow-y-auto">
+                                          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                            Available Numbers ({twilioAvailableNumbers.length})
+                                          </p>
+                                          {twilioAvailableNumbers.map((num, index) => (
+                                            <div
+                                              key={index}
+                                              className="flex items-center justify-between p-3 bg-white dark:bg-dark-card rounded-lg border border-gray-200 dark:border-gray-700 hover:border-violet-300 dark:hover:border-violet-700 transition-colors"
+                                            >
+                                              <div>
+                                                <p className="font-mono font-semibold text-gray-900 dark:text-white">
+                                                  {num.phone_number || num.phoneNumber}
+                                                </p>
+                                                <p className="text-xs text-gray-500">
+                                                  {num.locality || num.region || 'USA'} • {num.capabilities?.sms ? 'SMS' : ''} {num.capabilities?.voice ? '• Voice' : ''}
+                                                </p>
+                                              </div>
+                                              <Button
+                                                size="sm"
+                                                onClick={() => handleBuyTwilioNumber(num.phone_number || num.phoneNumber)}
+                                                disabled={twilioBuying}
+                                                className="bg-violet-600 hover:bg-violet-700 text-white"
+                                              >
+                                                {twilioBuying ? 'Getting...' : 'Get This'}
+                                              </Button>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+
+                                      {twilioSearching && (
+                                        <div className="flex items-center justify-center py-8">
+                                          <Spinner />
+                                          <span className="ml-2 text-gray-500">Searching available numbers...</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </>
+                              )}
+
+                              <p className="text-xs text-gray-400 mt-3">
+                                <DollarSign className="h-3 w-3 inline" /> Currently free during beta. May be charged to your account later.
+                              </p>
+                            </div>
+                          </div>
                         </div>
 
                         <div className="text-center">
@@ -2327,6 +2643,106 @@ function WhatsAppPage() {
                 Verify
               </Button>
             </div>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Twilio SMS Inbox Modal */}
+      <Modal isOpen={showTwilioInbox} onClose={() => setShowTwilioInbox(false)} title="SMS Inbox" size="lg">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600 dark:text-dark-muted">
+                Messages received at <span className="font-mono font-semibold text-violet-600">{twilioState.number}</span>
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={loadTwilioInbox}
+                isLoading={loadingInbox}
+              >
+                <RefreshCw className="h-4 w-4" />
+                Refresh
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleGetLatestOtp}
+                className="bg-violet-600 hover:bg-violet-700 text-white"
+              >
+                <Hash className="h-4 w-4" />
+                Get Latest OTP
+              </Button>
+            </div>
+          </div>
+
+          {/* OTP Display */}
+          {otpCode && (
+            <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+              <p className="text-sm text-green-700 dark:text-green-300">Latest OTP Code:</p>
+              <p className="text-3xl font-mono font-bold text-green-600 dark:text-green-400 tracking-widest">{otpCode}</p>
+              <Button
+                size="sm"
+                variant="outline"
+                className="mt-2"
+                onClick={() => {
+                  navigator.clipboard.writeText(otpCode)
+                  toast.success('OTP copied!')
+                }}
+              >
+                <Copy className="h-4 w-4" />
+                Copy OTP
+              </Button>
+            </div>
+          )}
+
+          {/* Messages List */}
+          {loadingInbox ? (
+            <div className="flex justify-center py-8">
+              <Spinner />
+            </div>
+          ) : twilioInbox.length > 0 ? (
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {twilioInbox.map((msg, index) => (
+                <div
+                  key={msg.id || index}
+                  className="p-3 bg-gray-50 dark:bg-dark-bg rounded-lg border border-gray-200 dark:border-gray-700"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <p className="text-xs text-gray-500">
+                        From: <span className="font-mono">{msg.from}</span>
+                      </p>
+                      <p className="text-sm text-gray-900 dark:text-white mt-1 whitespace-pre-wrap">
+                        {msg.body}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-2">
+                        {msg.date_created || msg.created_at}
+                      </p>
+                    </div>
+                    {/* Highlight if contains OTP-like number */}
+                    {/\b\d{6}\b/.test(msg.body) && (
+                      <Badge variant="success" className="ml-2">
+                        Contains OTP
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <Inbox className="h-12 w-12 mx-auto mb-2 opacity-50" />
+              <p>No messages yet</p>
+              <p className="text-sm">Messages sent to your number will appear here</p>
+            </div>
+          )}
+
+          <div className="flex justify-end pt-4 border-t">
+            <Button variant="outline" onClick={() => setShowTwilioInbox(false)}>
+              Close
+            </Button>
           </div>
         </div>
       </Modal>
