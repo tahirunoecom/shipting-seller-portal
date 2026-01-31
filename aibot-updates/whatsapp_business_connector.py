@@ -20,7 +20,7 @@ from rasa.core.channels.channel import InputChannel, UserMessage, OutputChannel
 from dotenv import load_dotenv
 
 # Import multi-tenant store configuration
-from actions.store_config import get_seller_by_phone_number_id, get_store_from_phone
+from actions.store_config import get_store_from_phone, get_seller_by_phone_number_id
 
 load_dotenv()
 
@@ -59,10 +59,24 @@ class WhatsAppBusinessOutput(OutputChannel):
         """
         self.seller_config = seller_config or {}
         self.phone_number_id = phone_number_id or self.seller_config.get("phone_number_id") or DEFAULT_PHONE_NUMBER_ID
-        self.access_token = access_token or self.seller_config.get("access_token") or DEFAULT_ACCESS_TOKEN
         self.catalog_id = self.seller_config.get("catalog_id")
         self.store_id = self.seller_config.get("store_id")
         self.store_name = self.seller_config.get("store_name")
+
+        # Determine access token with clear source tracking
+        token_source = "unknown"
+        if access_token:
+            self.access_token = access_token
+            token_source = "passed_param"
+        elif self.seller_config.get("access_token"):
+            self.access_token = self.seller_config.get("access_token")
+            token_source = "seller_config"
+        elif DEFAULT_ACCESS_TOKEN:
+            self.access_token = DEFAULT_ACCESS_TOKEN
+            token_source = "env_default"
+        else:
+            self.access_token = None
+            token_source = "NONE_AVAILABLE"
 
         self.api_base = f"https://graph.facebook.com/{API_VERSION}/{self.phone_number_id}"
         self.headers = {
@@ -70,7 +84,9 @@ class WhatsAppBusinessOutput(OutputChannel):
             "Content-Type": "application/json"
         }
 
-        logger.info(f"WhatsAppBusinessOutput initialized for store: {self.store_name} (ID: {self.store_id})")
+        # Log token availability (not the actual token for security)
+        token_status = "SET" if self.access_token else "MISSING"
+        logger.info(f"WhatsAppBusinessOutput initialized for store: {self.store_name} (ID: {self.store_id}), token_source: {token_source}, token: {token_status}")
 
     def _send_request(self, endpoint: Text, payload: Dict[Text, Any]) -> Dict[Text, Any]:
         """Send request to WhatsApp Business API"""
@@ -454,25 +470,30 @@ class WhatsAppBusinessInput(InputChannel):
                 logger.info(f"Incoming phone_number_id: {incoming_phone_number_id}")
                 logger.info(f"Display phone number: {display_phone_number}")
 
-                # Look up seller by phone_number_id
-                seller_config = get_seller_by_phone_number_id(incoming_phone_number_id)
+                # ============================================
+                # MULTI-TENANT: Try multiple lookup methods
+                # ============================================
+                store_info = None
 
-                if seller_config:
-                    logger.info(f"MULTI-TENANT: Found seller '{seller_config.get('store_name')}' (ID: {seller_config.get('store_id')})")
-                else:
-                    # Fallback to display phone lookup
-                    logger.warning(f"No seller found for phone_number_id: {incoming_phone_number_id}")
-                    store_info = get_store_from_phone(display_phone_number)
+                # Method 1: Try lookup by phone_number_id first (Meta's ID)
+                if incoming_phone_number_id:
+                    store_info = get_seller_by_phone_number_id(incoming_phone_number_id)
                     if store_info:
-                        seller_config = {
-                            "store_id": store_info.get("store_id"),
-                            "store_name": store_info.get("store_name"),
-                            "phone_number_id": incoming_phone_number_id,
-                            "access_token": self.access_token  # Use default
-                        }
-                    else:
-                        logger.warning("MARKETPLACE MODE: No seller mapping found")
-                        seller_config = None
+                        logger.info(f"MULTI-TENANT: Found by phone_number_id: '{store_info.get('store_name')}' (ID: {store_info.get('store_id')}), has_token: {bool(store_info.get('access_token'))}")
+
+                # Method 2: Try display phone number lookup if:
+                # - Method 1 failed completely, OR
+                # - Method 1 returned store_info but without access_token (fallback/incomplete data)
+                if display_phone_number and (not store_info or not store_info.get('access_token')):
+                    store_info_by_phone = get_store_from_phone(display_phone_number)
+                    if store_info_by_phone:
+                        logger.info(f"MULTI-TENANT: Found by display_phone: '{store_info_by_phone.get('store_name')}' (ID: {store_info_by_phone.get('store_id')}), has_token: {bool(store_info_by_phone.get('access_token'))}")
+                        # Use this if it has token OR if method 1 returned nothing
+                        if store_info_by_phone.get('access_token') or not store_info:
+                            store_info = store_info_by_phone
+
+                if not store_info:
+                    logger.warning("MARKETPLACE MODE: No seller mapping found")
 
                 # Extract message content
                 message_text = ""
@@ -520,6 +541,10 @@ class WhatsAppBusinessInput(InputChannel):
                             address_id = button_id.replace("select_address_", "")
                             message_text = f"/select_delivery_address{{{address_id}}}"
                             metadata["selected_address_id"] = address_id
+                        elif button_id.startswith("/"):
+                            # Button payload is already an intent - use directly
+                            message_text = button_id
+                            logger.info(f"Using button payload directly as intent: {button_id}")
                         else:
                             message_text = button_mapping.get(button_id, button_title)
 
@@ -554,6 +579,10 @@ class WhatsAppBusinessInput(InputChannel):
                             coupon_code = list_item_id.replace("apply_coupon_", "")
                             message_text = f'/apply_coupon{{"coupon_code": "{coupon_code}"}}'
                             metadata["coupon_code"] = coupon_code
+                        elif list_item_id.startswith("/"):
+                            # List item ID is already an intent - use directly
+                            message_text = list_item_id
+                            logger.info(f"Using list item ID directly as intent: {list_item_id}")
                         else:
                             message_text = list_mapping.get(list_item_id, list_item_title)
 
@@ -602,23 +631,27 @@ class WhatsAppBusinessInput(InputChannel):
                 # ============================================
                 # MULTI-TENANT: Create output with seller's credentials
                 # ============================================
-                if seller_config:
+                if store_info and store_info.get("phone_number_id"):
+                    # Use store's credentials - pass full seller_config for metadata
+                    # WhatsAppBusinessOutput will fallback to DEFAULT_ACCESS_TOKEN if token is None
                     out_channel = WhatsAppBusinessOutput(
-                        phone_number_id=seller_config.get("phone_number_id") or incoming_phone_number_id,
-                        access_token=seller_config.get("access_token"),
-                        seller_config=seller_config
+                        phone_number_id=store_info.get("phone_number_id"),
+                        access_token=store_info.get("access_token"),  # Can be None, will fallback
+                        seller_config=store_info  # Pass full config for store_name, store_id, catalog_id
                     )
-                    metadata["store_id"] = seller_config.get("store_id")
-                    metadata["store_name"] = seller_config.get("store_name")
-                    metadata["catalog_id"] = seller_config.get("catalog_id")
+                    metadata["store_id"] = store_info.get("store_id")
+                    metadata["store_name"] = store_info.get("store_name")
+                    metadata["catalog_id"] = store_info.get("catalog_id")
                     metadata["is_dedicated_bot"] = True
+                    logger.info(f"Using credentials for {store_info.get('store_name')} (ID: {store_info.get('store_id')})")
                 else:
-                    # Fallback to default credentials
+                    # Fallback to default credentials (marketplace mode)
                     out_channel = WhatsAppBusinessOutput(
                         phone_number_id=incoming_phone_number_id or self.phone_number_id,
                         access_token=self.access_token
                     )
                     metadata["is_dedicated_bot"] = False
+                    logger.info("Using static credentials (marketplace mode)")
 
                 metadata["bot_phone_number"] = display_phone_number
                 metadata["phone_number_id"] = incoming_phone_number_id
