@@ -128,13 +128,30 @@ class TwilioController extends Controller
             ]);
         }
 
+        // Get seller info for friendly name
+        $seller = DB::table('wh_warehouse_user')
+            ->where('wh_account_id', $wh_account_id)
+            ->orWhere('id', $wh_account_id)
+            ->first();
+
+        $friendlyName = 'Shipting-' . $wh_account_id;
+        if ($seller) {
+            if (!empty($seller->locationname)) {
+                $friendlyName = $seller->locationname;
+            } elseif (!empty($seller->firstname)) {
+                $friendlyName = trim($seller->firstname . ' ' . ($seller->lastname ?? ''));
+            }
+        }
+
+        $purchased = null;
+
         try {
             // Purchase the number via Twilio API
             $purchased = $this->twilio->incomingPhoneNumbers->create([
                 'phoneNumber' => $phone_number,
                 'smsUrl' => config('services.twilio.webhook_url'),
                 'smsMethod' => 'POST',
-                'friendlyName' => 'Shipting-' . $wh_account_id,
+                'friendlyName' => $friendlyName,
             ]);
 
             // Save to database
@@ -155,11 +172,29 @@ class TwilioController extends Controller
                 'data' => [
                     'phone_number' => $purchased->phoneNumber,
                     'sid' => $purchased->sid,
+                    'friendly_name' => $purchased->friendlyName,
                 ]
             ]);
 
         } catch (\Exception $e) {
             Log::error('Twilio buy error: ' . $e->getMessage());
+
+            // IMPORTANT: If Twilio purchase succeeded but DB failed, release the number
+            if ($purchased && $purchased->sid) {
+                try {
+                    Log::warning('Rolling back Twilio purchase due to DB error: ' . $purchased->sid);
+                    $this->twilio->incomingPhoneNumbers($purchased->sid)->delete();
+                    Log::info('Successfully released number after DB failure: ' . $purchased->phoneNumber);
+                } catch (\Exception $releaseError) {
+                    Log::error('Failed to release number after DB error: ' . $releaseError->getMessage());
+                    // Alert: Manual intervention needed
+                    return response()->json([
+                        'status' => 0,
+                        'message' => 'Database error occurred. Number was purchased but could not be saved or released. Please contact support. Number: ' . $purchased->phoneNumber
+                    ]);
+                }
+            }
+
             return response()->json([
                 'status' => 0,
                 'message' => 'Failed to purchase number: ' . $e->getMessage()
