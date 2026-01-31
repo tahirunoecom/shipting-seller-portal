@@ -1298,174 +1298,196 @@ function WhatsAppPage() {
                           )}
                         </div>
 
-                        {/* Divider */}
-                        <div className="relative">
-                          <div className="absolute inset-0 flex items-center">
-                            <div className="w-full border-t border-gray-200 dark:border-gray-700"></div>
-                          </div>
-                          <div className="relative flex justify-center text-sm">
-                            <span className="px-4 bg-white dark:bg-dark-card text-gray-500">
-                              Don't have a business phone number?
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Twilio Number Option */}
-                        <div className="p-6 border-2 border-dashed border-violet-300 rounded-xl dark:border-violet-700 bg-violet-50/50 dark:bg-violet-900/10">
-                          <div className="flex items-start gap-4">
-                            <div className="w-12 h-12 rounded-xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center flex-shrink-0">
-                              <Phone className="h-6 w-6 text-violet-600 dark:text-violet-400" />
-                            </div>
-                            <div className="flex-1">
-                              <h3 className="text-lg font-semibold text-gray-900 dark:text-dark-text mb-1">
-                                Get a US Business Number
-                              </h3>
-                              <p className="text-sm text-gray-500 dark:text-dark-muted mb-3">
-                                We can provide you a dedicated US phone number for WhatsApp Business.
-                                You'll be able to see all SMS/OTP messages directly in this portal.
+                        {/* Phone Number Options */}
+                        <div className="space-y-4">
+                          {/* Benefits of Using Own Number */}
+                          <div className="p-5 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
+                            <h4 className="font-semibold text-blue-800 dark:text-blue-200 mb-2 flex items-center gap-2">
+                              <CheckCircle className="h-5 w-5" />
+                              Recommended: Use Your Own Business Number
+                            </h4>
+                            <p className="text-sm text-blue-700 dark:text-blue-300 mb-3">
+                              For the best experience, we recommend using your own business phone number. Benefits include:
+                            </p>
+                            <ul className="text-sm text-blue-600 dark:text-blue-400 space-y-1.5 ml-2">
+                              <li className="flex items-center gap-2"><CheckCircle className="h-3 w-3 flex-shrink-0" /> Customers will recognize your business number</li>
+                              <li className="flex items-center gap-2"><CheckCircle className="h-3 w-3 flex-shrink-0" /> Full control over your WhatsApp identity</li>
+                              <li className="flex items-center gap-2"><CheckCircle className="h-3 w-3 flex-shrink-0" /> Can transfer number to any platform later</li>
+                              <li className="flex items-center gap-2"><CheckCircle className="h-3 w-3 flex-shrink-0" /> No monthly fees for the number</li>
+                            </ul>
+                            <div className="mt-3 p-2 bg-blue-100 dark:bg-blue-900/40 rounded-lg">
+                              <p className="text-xs text-blue-800 dark:text-blue-200">
+                                <strong>Tip:</strong> Any US mobile or landline number works! Click "Login with Facebook" above and enter your own number during setup.
                               </p>
+                            </div>
+                          </div>
 
-                              {/* If user already has a Twilio number */}
-                              {twilioState.hasNumber ? (
-                                <div className="p-4 bg-white dark:bg-dark-card rounded-lg border border-violet-200 dark:border-violet-800">
-                                  <div className="flex items-center justify-between">
-                                    <div>
-                                      <p className="text-xs text-gray-500 uppercase tracking-wider">Your Business Number</p>
-                                      <p className="text-xl font-bold text-violet-600 dark:text-violet-400 mt-1">
-                                        {twilioState.number}
-                                      </p>
-                                      <p className="text-xs text-gray-400 mt-1">
-                                        Use this number when setting up WhatsApp Business
-                                      </p>
-                                    </div>
-                                    <div className="flex flex-col gap-2">
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => {
-                                          loadTwilioInbox()
-                                          setShowTwilioInbox(true)
-                                        }}
-                                      >
-                                        <Inbox className="h-4 w-4" />
-                                        View Inbox
-                                      </Button>
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        className="text-red-500 hover:text-red-600 hover:bg-red-50"
-                                        onClick={handleReleaseTwilioNumber}
-                                        disabled={twilioState.loading}
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                        Release
-                                      </Button>
-                                    </div>
-                                  </div>
-                                </div>
-                              ) : (
-                                <>
-                                  {!showTwilioSection ? (
-                                    <Button
-                                      onClick={() => setShowTwilioSection(true)}
-                                      className="bg-violet-600 hover:bg-violet-700 text-white"
-                                    >
-                                      <ShoppingBag className="h-4 w-4" />
-                                      Get a Phone Number
-                                    </Button>
-                                  ) : (
-                                    <div className="space-y-4">
-                                      {/* Search Box */}
-                                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                                        Search for available US phone numbers. All fields are optional.
-                                      </p>
-                                      <div className="flex flex-wrap gap-2 items-end">
-                                        <div>
-                                          <label className="text-xs text-gray-500 mb-1 block">Area Code</label>
-                                          <Input
-                                            placeholder="e.g., 415"
-                                            value={twilioAreaCode}
-                                            onChange={(e) => setTwilioAreaCode(e.target.value.replace(/\D/g, '').slice(0, 3))}
-                                            className="w-24"
-                                          />
-                                        </div>
-                                        <div>
-                                          <label className="text-xs text-gray-500 mb-1 block">Contains (digits/pattern)</label>
-                                          <Input
-                                            placeholder="e.g., 2024"
-                                            value={twilioContains}
-                                            onChange={(e) => setTwilioContains(e.target.value.slice(0, 10))}
-                                            className="w-32"
-                                          />
-                                        </div>
+                          {/* Divider */}
+                          <div className="relative">
+                            <div className="absolute inset-0 flex items-center">
+                              <div className="w-full border-t border-gray-200 dark:border-gray-700"></div>
+                            </div>
+                            <div className="relative flex justify-center text-sm">
+                              <span className="px-4 bg-white dark:bg-dark-card text-gray-500">
+                                Don't have a business phone number?
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Twilio Option - Last Resort */}
+                          <div className="p-5 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700">
+                            <div className="flex items-start gap-4">
+                              <div className="w-10 h-10 rounded-lg bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center flex-shrink-0">
+                                <Phone className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+                              </div>
+                              <div className="flex-1">
+                                <h4 className="font-medium text-gray-800 dark:text-gray-200 mb-1">
+                                  Need a Phone Number?
+                                </h4>
+                                <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+                                  If you don't have a phone number available, we can provide a US number for you.
+                                </p>
+
+                                {/* If user already has a Twilio number */}
+                                {twilioState.hasNumber ? (
+                                  <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                                    <div className="flex items-center justify-between flex-wrap gap-3">
+                                      <div>
+                                        <p className="text-xs text-gray-500 uppercase tracking-wider">Your Assigned Number</p>
+                                        <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400 font-mono mt-1">
+                                          {twilioState.number}
+                                        </p>
+                                        <p className="text-xs text-gray-500 mt-1">
+                                          Use this when clicking "Login with Facebook" above
+                                        </p>
+                                      </div>
+                                      <div className="flex gap-2">
                                         <Button
-                                          onClick={handleSearchTwilioNumbers}
-                                          disabled={twilioSearching}
-                                          isLoading={twilioSearching}
-                                          className="bg-emerald-600 hover:bg-emerald-700"
-                                        >
-                                          <Search className="h-4 w-4" />
-                                          Search
-                                        </Button>
-                                        <Button
-                                          variant="ghost"
+                                          size="sm"
+                                          variant="outline"
                                           onClick={() => {
-                                            setShowTwilioSection(false)
-                                            setTwilioAvailableNumbers([])
-                                            setTwilioAreaCode('')
-                                            setTwilioContains('')
+                                            loadTwilioInbox()
+                                            setShowTwilioInbox(true)
                                           }}
                                         >
-                                          Cancel
+                                          <Inbox className="h-4 w-4" />
+                                          SMS Inbox
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                                          onClick={handleReleaseTwilioNumber}
+                                          disabled={twilioState.loading}
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                          Release
                                         </Button>
                                       </div>
-
-                                      {/* Available Numbers */}
-                                      {twilioAvailableNumbers.length > 0 && (
-                                        <div className="space-y-2 max-h-64 overflow-y-auto">
-                                          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                            Available Numbers ({twilioAvailableNumbers.length})
-                                          </p>
-                                          {twilioAvailableNumbers.map((num, index) => (
-                                            <div
-                                              key={index}
-                                              className="flex items-center justify-between p-3 bg-white dark:bg-dark-card rounded-lg border border-gray-200 dark:border-gray-700 hover:border-violet-300 dark:hover:border-violet-700 transition-colors"
-                                            >
-                                              <div>
-                                                <p className="font-mono font-semibold text-gray-900 dark:text-white">
-                                                  {num.phone_number || num.phoneNumber}
-                                                </p>
-                                                <p className="text-xs text-gray-500">
-                                                  {num.locality || num.region || 'USA'} • {num.capabilities?.sms ? 'SMS' : ''} {num.capabilities?.voice ? '• Voice' : ''}
-                                                </p>
-                                              </div>
-                                              <Button
-                                                size="sm"
-                                                onClick={() => handleBuyTwilioNumber(num.phone_number || num.phoneNumber)}
-                                                disabled={twilioBuying}
-                                                className="bg-violet-600 hover:bg-violet-700 text-white"
-                                              >
-                                                {twilioBuying ? 'Getting...' : 'Get This'}
-                                              </Button>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      )}
-
-                                      {twilioSearching && (
-                                        <div className="flex items-center justify-center py-8">
-                                          <Spinner />
-                                          <span className="ml-2 text-gray-500">Searching available numbers...</span>
-                                        </div>
-                                      )}
                                     </div>
-                                  )}
-                                </>
-                              )}
+                                  </div>
+                                ) : (
+                                  <>
+                                    {!showTwilioSection ? (
+                                      <Button
+                                        onClick={() => setShowTwilioSection(true)}
+                                        variant="outline"
+                                        className="border-violet-300 text-violet-600 hover:bg-violet-50"
+                                      >
+                                        <ShoppingBag className="h-4 w-4" />
+                                        Get a Phone Number ($1.15/mo)
+                                      </Button>
+                                    ) : (
+                                      <div className="space-y-3 mt-2 p-3 bg-white dark:bg-dark-card rounded-lg border border-gray-200 dark:border-gray-600">
+                                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                                          Search for available US phone numbers:
+                                        </p>
+                                        <div className="flex flex-wrap gap-2 items-end">
+                                          <div>
+                                            <label className="text-xs text-gray-500 mb-1 block">Area Code</label>
+                                            <Input
+                                              placeholder="e.g., 415"
+                                              value={twilioAreaCode}
+                                              onChange={(e) => setTwilioAreaCode(e.target.value.replace(/\D/g, '').slice(0, 3))}
+                                              className="w-24"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="text-xs text-gray-500 mb-1 block">Contains</label>
+                                            <Input
+                                              placeholder="e.g., 2024"
+                                              value={twilioContains}
+                                              onChange={(e) => setTwilioContains(e.target.value.slice(0, 10))}
+                                              className="w-28"
+                                            />
+                                          </div>
+                                          <Button
+                                            onClick={handleSearchTwilioNumbers}
+                                            disabled={twilioSearching}
+                                            isLoading={twilioSearching}
+                                            size="sm"
+                                            className="bg-emerald-600 hover:bg-emerald-700"
+                                          >
+                                            <Search className="h-4 w-4" />
+                                            Search
+                                          </Button>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => {
+                                              setShowTwilioSection(false)
+                                              setTwilioAvailableNumbers([])
+                                              setTwilioAreaCode('')
+                                              setTwilioContains('')
+                                            }}
+                                          >
+                                            Cancel
+                                          </Button>
+                                        </div>
 
-                              <p className="text-xs text-gray-400 mt-3">
-                                <DollarSign className="h-3 w-3 inline" /> Currently free during beta. May be charged to your account later.
-                              </p>
+                                        {/* Available Numbers */}
+                                        {twilioAvailableNumbers.length > 0 && (
+                                          <div className="space-y-2 max-h-48 overflow-y-auto mt-2">
+                                            {twilioAvailableNumbers.map((num, index) => (
+                                              <div
+                                                key={index}
+                                                className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
+                                              >
+                                                <div>
+                                                  <p className="font-mono font-semibold text-sm text-gray-900 dark:text-white">
+                                                    {num.phone_number || num.phoneNumber}
+                                                  </p>
+                                                  <p className="text-xs text-gray-500">
+                                                    {num.locality || num.region || 'USA'}
+                                                  </p>
+                                                </div>
+                                                <Button
+                                                  size="sm"
+                                                  onClick={() => handleBuyTwilioNumber(num.phone_number || num.phoneNumber)}
+                                                  disabled={twilioBuying}
+                                                >
+                                                  {twilioBuying ? '...' : 'Get'}
+                                                </Button>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
+
+                                        {twilioSearching && (
+                                          <div className="flex items-center justify-center py-4">
+                                            <Spinner />
+                                            <span className="ml-2 text-sm text-gray-500">Searching...</span>
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+
+                                <p className="text-xs text-gray-400 mt-3">
+                                  <DollarSign className="h-3 w-3 inline" /> Cost: ~$1.15/month. Currently absorbed by platform.
+                                </p>
+                              </div>
                             </div>
                           </div>
                         </div>
