@@ -6638,8 +6638,7 @@ class ScanSellc extends Controller
 		$data['message'] = $message;
 		$data['user_id'] = $getOrderDetail->user_id;
 		$data['order_id'] = $order_id;
-		$data['androidDeviceToken'] = 'cu736WX1RDGOlRf5u4yj0K:APA91bGpTuYPItR_Yx0uhk4yqCK26jX2PPavswntFulDNPYZjyTD1E5st7z_UObJlmYEel71tU08YrQzoE39NLlCIVhORWUfYviIWA6JQl9sxiAARcAF6V-a-_ZFs8xdZBvgBJ1hTbYf'; //$getOrderDetail->androidDeviceToken;
-		$data['iOSdeviceToken'] = $getOrderDetail->iosDeviceToken;
+		 $data['iOSdeviceToken'] = $getOrderDetail->iosDeviceToken;
 
 		//echo "<pre>"; print_r($data); die;
 		if ($app == "anything") {
@@ -6702,14 +6701,7 @@ class ScanSellc extends Controller
 	public function AndroidNotify($token, $user_id, $title, $message, $order_id, $app)
 	{
 
-		if ($app == 'shipting') {
-
-			$API_ACCESS_KEY = 'AAAAzuRal-0:APA91bEsPBoqdP61L73igH1ZYtiz1I5lCYWl7WKJRaSde0en_Na0lmz55SNWWQMJzBYxL6sDcletDHOXDnw9d14xJMTr1aXYqDwjbO2AIHy8koU8zrnYVSXk5YnDiASjNLuH6hoDpybC';
-		} else if ($app == 'anything') {
-
-			$API_ACCESS_KEY = 'AAAAO5yC63Q:APA91bGAU5VoC9vMkelDXlvQRctBt2Nb6S8AOxoYIu6w0XpwncHka4QCpZgsG_dUdz5O9qFqULAjTBXSywAaGFvNmy9nXEe8DSwVcpZpYQFsVLuAu_FmvbrCW8XwsKeewy9iHIpghoMk';
-		}
-
+		 
 		$fcmUrl = 'https://fcm.googleapis.com/fcm/send';
 
 		$extraNotificationData = [
@@ -6726,7 +6718,7 @@ class ScanSellc extends Controller
 		];
 
 		$headers = [
-			'Authorization: key=' . $API_ACCESS_KEY,
+		 
 			'Content-Type: application/json'
 		];
 
@@ -7842,12 +7834,8 @@ class ScanSellc extends Controller
 	}
 
 	function get_coordinates($city, $street, $province)
-	{
-
-		// $url = "https://maps.google.com/maps/api/geocode/json?address=$address&sensor=false&region=Poland&key=AIzaSyC3xxlVQ8tP2jQBN9SG7chLjAhXJsyiuiU";
-
-		$address = urlencode($city . ',' . $street . ',' . $province);
-		$url = "https://maps.google.com/maps/api/geocode/json?address=$address&sensor=false&key=AIzaSyC3xxlVQ8tP2jQBN9SG7chLjAhXJsyiuiU";
+	{ 
+ 
 		$ch = curl_init();
 		curl_setopt($ch, CURLOPT_URL, $url);
 		curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
@@ -7875,11 +7863,9 @@ class ScanSellc extends Controller
 	function GetDrivingDistance($lat1, $lat2, $long1, $long2)
 	{
 
-		//units=metric if you want result in Kilometers. units = imperial if you want result in Miles.
-		//  $url = "https://maps.googleapis.com/maps/api/distancematrix/json?origins=".$lat1.",".$long1."&destinations=".$lat2.",".$long2."&mode=driving&language=pl-PL&key=AIzaSyC3xxlVQ8tP2jQBN9SG7chLjAhXJsyiuiU";
+	 
 
-		$url = "https://maps.googleapis.com/maps/api/distancematrix/json?units=imperial&origins=" . $lat1 . "," . $long1 . "&destinations=" . $lat2 . "," . $long2 . "&mode=driving&key=AIzaSyC3xxlVQ8tP2jQBN9SG7chLjAhXJsyiuiU";
-		$ch = curl_init();
+$ch = curl_init();
 		curl_setopt($ch, CURLOPT_URL, $url);
 		curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
 		curl_setopt($ch, CURLOPT_PROXYPORT, 3128);
@@ -8110,7 +8096,7 @@ class ScanSellc extends Controller
 				'from' => $from_arr['email'],
 				'fromName' => $from_arr['name'],
 				'to' => $to_array[0],
-				'apikey' => '20310f96-2833-4932-86f6-e838a4508537',
+		 
 				'subject' => html_entity_decode($subject),
 				'bodyHtml' => html_entity_decode($mail_message),
 				'bodyText' => '',

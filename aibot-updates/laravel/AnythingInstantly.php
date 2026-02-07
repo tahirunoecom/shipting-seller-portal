@@ -3064,7 +3064,7 @@ class AnythingInstantly extends Controller
             $post = array('from' => $from_arr['email'],
                           'fromName' => $from_arr['name'],
                           'to' => $to_array[0],
-                          'apikey' => '20310f96-2833-4932-86f6-e838a4508537',
+    
                           'subject' => html_entity_decode($subject),
                           'bodyHtml' => html_entity_decode($message),
                           'bodyText' => '',
@@ -3920,8 +3920,7 @@ class AnythingInstantly extends Controller
 			  CURLOPT_CUSTOMREQUEST => "POST",
 			  CURLOPT_POSTFIELDS => "",
 			  CURLOPT_HTTPHEADER => array(
-				// "api-key: TO5jik7c3UvpVPvQWF0LAqGVL2bFTqgjd9vEUdjR1AY" ,
-				"api-key: TEST_42h6x2vU9SvpIf9FW0x3VHGTFacbkHOMXHorFvrOFvU" ,
+ 
 				'Content-Type: application/json' . "\r\n"
 				. 'Content-Length: ' . strlen($data_string) . "\r\n",
 				'content' => $data_string,
@@ -4438,8 +4437,7 @@ public function create_shipengine_label_new(Request $request)
 			  CURLOPT_CUSTOMREQUEST => "POST",
 			  CURLOPT_POSTFIELDS => "",
 			  CURLOPT_HTTPHEADER => array(
-				// "api-key: TO5jik7c3UvpVPvQWF0LAqGVL2bFTqgjd9vEUdjR1AY" ,
-				 "api-key: TEST_42h6x2vU9SvpIf9FW0x3VHGTFacbkHOMXHorFvrOFvU" ,
+		 
 				'Content-Type: application/json' . "\r\n"
 				. 'Content-Length: ' . strlen($data_string) . "\r\n",
 				'content' => $data_string,
