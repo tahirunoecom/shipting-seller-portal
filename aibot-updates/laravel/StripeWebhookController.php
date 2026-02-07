@@ -89,6 +89,7 @@ class StripeWebhookController extends Controller
             Log::info('[STRIPE WEBHOOK] Event verified', ['type' => $event->type, 'id' => $event->id]);
             
             switch ($event->type) {
+                // Customer payment events (existing)
                 case 'checkout.session.completed':
                     $this->handleCheckoutSessionCompleted($event->data->object);
                     break;
@@ -98,6 +99,41 @@ class StripeWebhookController extends Controller
                 case 'payment_intent.payment_failed':
                     $this->handlePaymentIntentFailed($event->data->object);
                     break;
+
+                // ✅ NEW: Stripe Connect events
+                case 'account.updated':
+                    $this->handleAccountUpdated($event->data->object);
+                    break;
+                case 'account.application.authorized':
+                    $this->handleAccountAuthorized($event->data->object);
+                    break;
+                case 'account.application.deauthorized':
+                    $this->handleAccountDeauthorized($event->data->object);
+                    break;
+                case 'payout.created':
+                case 'payout.updated':
+                    $this->handlePayoutCreated($event->data->object);
+                    break;
+                case 'payout.paid':
+                    $this->handlePayoutPaid($event->data->object);
+                    break;
+                case 'payout.failed':
+                case 'payout.canceled':
+                    $this->handlePayoutFailed($event->data->object);
+                    break;
+                case 'transfer.created':
+                    $this->handleTransferCreated($event->data->object);
+                    break;
+                case 'transfer.updated':
+                    $this->handleTransferUpdated($event->data->object);
+                    break;
+                case 'transfer.reversed':
+                    $this->handleTransferReversed($event->data->object);
+                    break;
+                case 'charge.refunded':
+                    $this->handleChargeRefunded($event->data->object);
+                    break;
+
                 default:
                     Log::info('[STRIPE WEBHOOK] Unhandled event type', ['type' => $event->type]);
             }
@@ -687,4 +723,523 @@ class StripeWebhookController extends Controller
 			]);
 		}
 	}
+
+    // ============================================
+    // STRIPE CONNECT EVENT HANDLERS (NEW)
+    // ============================================
+
+    /**
+     * Handle account.updated event - When seller completes onboarding
+     */
+    private function handleAccountUpdated($account)
+    {
+        Log::info('[STRIPE CONNECT] ========== ACCOUNT UPDATED ==========');
+        Log::info('[STRIPE CONNECT] Account ID: ' . $account->id);
+
+        try {
+            // Find seller by Stripe account ID
+            $seller = \DB::table('wh_warehouse_user')
+                ->where('stripe_connect_id', $account->id)
+                ->first();
+
+            if (!$seller) {
+                Log::warning('[STRIPE CONNECT] Seller not found for account', ['account_id' => $account->id]);
+                return;
+            }
+
+            Log::info('[STRIPE CONNECT] Updating seller', [
+                'wh_account_id' => $seller->id,
+                'charges_enabled' => $account->charges_enabled,
+                'payouts_enabled' => $account->payouts_enabled,
+                'details_submitted' => $account->details_submitted
+            ]);
+
+            // Update seller status
+            \DB::table('wh_warehouse_user')
+                ->where('id', $seller->id)
+                ->update([
+                    'stripe_connect' => ($account->charges_enabled && $account->payouts_enabled) ? 1 : 0,
+                    'stripe_onboarding_completed' => $account->details_submitted ? 1 : 0,
+                    'stripe_charges_enabled' => $account->charges_enabled ? 1 : 0,
+                    'stripe_payouts_enabled' => $account->payouts_enabled ? 1 : 0,
+                    'stripe_details_submitted' => $account->details_submitted ? 1 : 0,
+                    'stripe_currently_due' => json_encode($account->requirements->currently_due ?? []),
+                    'stripe_last_sync' => now(),
+                    'updated_at' => now()
+                ]);
+
+            // Update cache table
+            \DB::table('stripe_connect_accounts')->updateOrInsert(
+                ['wh_account_id' => $seller->id],
+                [
+                    'stripe_account_id' => $account->id,
+                    'account_type' => $account->type,
+                    'charges_enabled' => $account->charges_enabled,
+                    'payouts_enabled' => $account->payouts_enabled,
+                    'details_submitted' => $account->details_submitted,
+                    'currently_due' => json_encode($account->requirements->currently_due ?? []),
+                    'eventually_due' => json_encode($account->requirements->eventually_due ?? []),
+                    'past_due' => json_encode($account->requirements->past_due ?? []),
+                    'disabled_reason' => $account->requirements->disabled_reason ?? null,
+                    'full_stripe_response' => json_encode($account),
+                    'last_synced_at' => now(),
+                    'updated_at' => now()
+                ]
+            );
+
+            // Log webhook event
+            \DB::table('stripe_webhook_logs')->insert([
+                'event_id' => 'account.updated_' . time(),
+                'event_type' => 'account.updated',
+                'wh_account_id' => $seller->id,
+                'stripe_connect_account_id' => $account->id,
+                'payload' => json_encode($account),
+                'processed' => 1,
+                'processed_at' => now(),
+                'created_at' => now(),
+                'updated_at' => now()
+            ]);
+
+            Log::info('[STRIPE CONNECT] ✅ Account updated successfully');
+
+        } catch (Exception $e) {
+            Log::error('[STRIPE CONNECT] Error handling account.updated', [
+                'error' => $e->getMessage(),
+                'account_id' => $account->id
+            ]);
+
+            // Log error
+            \DB::table('stripe_webhook_logs')->insert([
+                'event_id' => 'account.updated_error_' . time(),
+                'event_type' => 'account.updated',
+                'stripe_connect_account_id' => $account->id,
+                'payload' => json_encode($account),
+                'processed' => 0,
+                'error_message' => $e->getMessage(),
+                'created_at' => now(),
+                'updated_at' => now()
+            ]);
+        }
+
+        Log::info('[STRIPE CONNECT] ========== END ACCOUNT UPDATED ==========');
+    }
+
+    /**
+     * Handle account.application.authorized - When account is first created
+     */
+    private function handleAccountAuthorized($account)
+    {
+        Log::info('[STRIPE CONNECT] Account authorized', ['account_id' => $account->id]);
+        // Same as account.updated
+        $this->handleAccountUpdated($account);
+    }
+
+    /**
+     * Handle account.application.deauthorized - When seller disconnects
+     */
+    private function handleAccountDeauthorized($account)
+    {
+        Log::info('[STRIPE CONNECT] ========== ACCOUNT DEAUTHORIZED ==========');
+        Log::info('[STRIPE CONNECT] Account ID: ' . $account->id);
+
+        try {
+            // Find seller
+            $seller = \DB::table('wh_warehouse_user')
+                ->where('stripe_connect_id', $account->id)
+                ->first();
+
+            if (!$seller) {
+                Log::warning('[STRIPE CONNECT] Seller not found', ['account_id' => $account->id]);
+                return;
+            }
+
+            // Mark as disconnected
+            \DB::table('wh_warehouse_user')
+                ->where('id', $seller->id)
+                ->update([
+                    'stripe_connect' => 0,
+                    'stripe_onboarding_completed' => 0,
+                    'stripe_charges_enabled' => 0,
+                    'stripe_payouts_enabled' => 0,
+                    'updated_at' => now()
+                ]);
+
+            // Remove from cache
+            \DB::table('stripe_connect_accounts')
+                ->where('wh_account_id', $seller->id)
+                ->delete();
+
+            Log::info('[STRIPE CONNECT] ✅ Account deauthorized', ['wh_account_id' => $seller->id]);
+
+        } catch (Exception $e) {
+            Log::error('[STRIPE CONNECT] Error handling deauthorization', [
+                'error' => $e->getMessage(),
+                'account_id' => $account->id
+            ]);
+        }
+
+        Log::info('[STRIPE CONNECT] ========== END ACCOUNT DEAUTHORIZED ==========');
+    }
+
+    /**
+     * Handle payout.created - When payout is initiated
+     */
+    private function handlePayoutCreated($payout)
+    {
+        Log::info('[STRIPE CONNECT] Payout created', [
+            'payout_id' => $payout->id,
+            'amount' => $payout->amount / 100,
+            'status' => $payout->status
+        ]);
+
+        try {
+            $wh_account_id = $payout->metadata->wh_account_id ?? null;
+
+            if (!$wh_account_id) {
+                // Try to find by Stripe account
+                $account = $payout->destination ?? null;
+                if ($account) {
+                    $seller = \DB::table('wh_warehouse_user')
+                        ->where('stripe_connect_id', $account)
+                        ->first();
+                    $wh_account_id = $seller->id ?? null;
+                }
+            }
+
+            if (!$wh_account_id) {
+                Log::warning('[STRIPE CONNECT] Cannot find seller for payout', ['payout_id' => $payout->id]);
+                return;
+            }
+
+            // Check if already exists
+            $exists = \DB::table('stripe_payouts')
+                ->where('stripe_payout_id', $payout->id)
+                ->exists();
+
+            if (!$exists) {
+                \DB::table('stripe_payouts')->insert([
+                    'wh_account_id' => $wh_account_id,
+                    'stripe_payout_id' => $payout->id,
+                    'stripe_connect_account_id' => $payout->destination ?? '',
+                    'amount' => $payout->amount / 100,
+                    'currency' => strtoupper($payout->currency),
+                    'status' => $payout->status,
+                    'payout_type' => 'automatic',
+                    'method' => $payout->method ?? 'standard',
+                    'arrival_date' => isset($payout->arrival_date) ? date('Y-m-d', $payout->arrival_date) : null,
+                    'stripe_response' => json_encode($payout),
+                    'created_by' => 'system',
+                    'created_at' => now(),
+                    'updated_at' => now()
+                ]);
+
+                Log::info('[STRIPE CONNECT] ✅ Payout recorded', ['payout_id' => $payout->id]);
+            }
+
+        } catch (Exception $e) {
+            Log::error('[STRIPE CONNECT] Error handling payout.created', [
+                'error' => $e->getMessage(),
+                'payout_id' => $payout->id
+            ]);
+        }
+    }
+
+    /**
+     * Handle payout.paid - When payout succeeds
+     */
+    private function handlePayoutPaid($payout)
+    {
+        Log::info('[STRIPE CONNECT] ========== PAYOUT PAID ==========');
+        Log::info('[STRIPE CONNECT] Payout ID: ' . $payout->id);
+
+        try {
+            // Update payout status
+            \DB::table('stripe_payouts')
+                ->where('stripe_payout_id', $payout->id)
+                ->update([
+                    'status' => 'paid',
+                    'arrived_at' => now(),
+                    'stripe_response' => json_encode($payout),
+                    'updated_at' => now()
+                ]);
+
+            // Get payout record to find seller
+            $payoutRecord = \DB::table('stripe_payouts')
+                ->where('stripe_payout_id', $payout->id)
+                ->first();
+
+            if ($payoutRecord) {
+                // Update seller's paid earnings
+                \DB::table('wh_warehouse_user')
+                    ->where('id', $payoutRecord->wh_account_id)
+                    ->update([
+                        'paid_shipper_earnings' => \DB::raw("paid_shipper_earnings + {$payoutRecord->amount}"),
+                        'updated_at' => now()
+                    ]);
+
+                Log::info('[STRIPE CONNECT] ✅ Payout marked as paid', [
+                    'payout_id' => $payout->id,
+                    'wh_account_id' => $payoutRecord->wh_account_id,
+                    'amount' => $payoutRecord->amount
+                ]);
+            }
+
+        } catch (Exception $e) {
+            Log::error('[STRIPE CONNECT] Error handling payout.paid', [
+                'error' => $e->getMessage(),
+                'payout_id' => $payout->id
+            ]);
+        }
+
+        Log::info('[STRIPE CONNECT] ========== END PAYOUT PAID ==========');
+    }
+
+    /**
+     * Handle payout.failed - When payout fails
+     */
+    private function handlePayoutFailed($payout)
+    {
+        Log::error('[STRIPE CONNECT] ========== PAYOUT FAILED ==========');
+        Log::error('[STRIPE CONNECT] Payout ID: ' . $payout->id);
+        Log::error('[STRIPE CONNECT] Failure code: ' . ($payout->failure_code ?? 'unknown'));
+        Log::error('[STRIPE CONNECT] Failure message: ' . ($payout->failure_message ?? 'No message'));
+
+        try {
+            // Update payout status
+            \DB::table('stripe_payouts')
+                ->where('stripe_payout_id', $payout->id)
+                ->update([
+                    'status' => 'failed',
+                    'failure_code' => $payout->failure_code ?? null,
+                    'failure_message' => $payout->failure_message ?? null,
+                    'stripe_response' => json_encode($payout),
+                    'updated_at' => now()
+                ]);
+
+            // Get payout record
+            $payoutRecord = \DB::table('stripe_payouts')
+                ->where('stripe_payout_id', $payout->id)
+                ->first();
+
+            if ($payoutRecord) {
+                // Return money to seller's balance
+                \DB::table('wh_warehouse_user')
+                    ->where('id', $payoutRecord->wh_account_id)
+                    ->update([
+                        'Shipper_earnings' => \DB::raw("Shipper_earnings + {$payoutRecord->amount}"),
+                        'updated_at' => now()
+                    ]);
+
+                Log::error('[STRIPE CONNECT] ❌ Payout failed, funds returned to balance', [
+                    'payout_id' => $payout->id,
+                    'wh_account_id' => $payoutRecord->wh_account_id,
+                    'amount' => $payoutRecord->amount
+                ]);
+            }
+
+        } catch (Exception $e) {
+            Log::error('[STRIPE CONNECT] Error handling payout.failed', [
+                'error' => $e->getMessage(),
+                'payout_id' => $payout->id
+            ]);
+        }
+
+        Log::error('[STRIPE CONNECT] ========== END PAYOUT FAILED ==========');
+    }
+
+    /**
+     * Handle transfer.created - When platform transfers to seller
+     */
+    private function handleTransferCreated($transfer)
+    {
+        Log::info('[STRIPE CONNECT] Transfer created', [
+            'transfer_id' => $transfer->id,
+            'amount' => $transfer->amount / 100,
+            'destination' => $transfer->destination
+        ]);
+
+        try {
+            $wh_account_id = $transfer->metadata->wh_account_id ?? null;
+            $order_id = $transfer->metadata->order_id ?? null;
+
+            if (!$wh_account_id && $transfer->destination) {
+                // Find seller by Stripe account
+                $seller = \DB::table('wh_warehouse_user')
+                    ->where('stripe_connect_id', $transfer->destination)
+                    ->first();
+                $wh_account_id = $seller->id ?? null;
+            }
+
+            if (!$wh_account_id) {
+                Log::warning('[STRIPE CONNECT] Cannot find seller for transfer', ['transfer_id' => $transfer->id]);
+                return;
+            }
+
+            // Record transaction
+            \DB::table('stripe_transactions')->insert([
+                'wh_account_id' => $wh_account_id,
+                'order_id' => $order_id,
+                'stripe_transfer_id' => $transfer->id,
+                'transaction_type' => 'transfer',
+                'payment_model' => 'destination', // or from metadata
+                'amount' => $transfer->amount / 100,
+                'currency' => strtoupper($transfer->currency),
+                'seller_earnings' => $transfer->amount / 100,
+                'status' => 'succeeded',
+                'description' => $transfer->description ?? 'Transfer to seller',
+                'metadata' => json_encode($transfer->metadata ?? []),
+                'stripe_response' => json_encode($transfer),
+                'processed_at' => now(),
+                'created_at' => now(),
+                'updated_at' => now()
+            ]);
+
+            Log::info('[STRIPE CONNECT] ✅ Transfer recorded', ['transfer_id' => $transfer->id]);
+
+        } catch (Exception $e) {
+            Log::error('[STRIPE CONNECT] Error handling transfer.created', [
+                'error' => $e->getMessage(),
+                'transfer_id' => $transfer->id
+            ]);
+        }
+    }
+
+    /**
+     * Handle transfer.updated - When transfer status changes
+     */
+    private function handleTransferUpdated($transfer)
+    {
+        Log::info('[STRIPE CONNECT] Transfer updated', [
+            'transfer_id' => $transfer->id,
+            'status' => $transfer->status ?? 'unknown'
+        ]);
+
+        try {
+            \DB::table('stripe_transactions')
+                ->where('stripe_transfer_id', $transfer->id)
+                ->update([
+                    'stripe_response' => json_encode($transfer),
+                    'updated_at' => now()
+                ]);
+
+        } catch (Exception $e) {
+            Log::error('[STRIPE CONNECT] Error updating transfer', [
+                'error' => $e->getMessage(),
+                'transfer_id' => $transfer->id
+            ]);
+        }
+    }
+
+    /**
+     * Handle transfer.reversed - When transfer is cancelled/reversed
+     */
+    private function handleTransferReversed($transfer)
+    {
+        Log::warning('[STRIPE CONNECT] ========== TRANSFER REVERSED ==========');
+        Log::warning('[STRIPE CONNECT] Transfer ID: ' . $transfer->id);
+
+        try {
+            // Mark transaction as reversed
+            \DB::table('stripe_transactions')
+                ->where('stripe_transfer_id', $transfer->id)
+                ->update([
+                    'status' => 'cancelled',
+                    'stripe_response' => json_encode($transfer),
+                    'updated_at' => now()
+                ]);
+
+            // Get transaction to find seller
+            $transaction = \DB::table('stripe_transactions')
+                ->where('stripe_transfer_id', $transfer->id)
+                ->first();
+
+            if ($transaction) {
+                // Return funds to seller balance
+                \DB::table('wh_warehouse_user')
+                    ->where('id', $transaction->wh_account_id)
+                    ->update([
+                        'Shipper_earnings' => \DB::raw("Shipper_earnings + {$transaction->seller_earnings}"),
+                        'updated_at' => now()
+                    ]);
+
+                Log::warning('[STRIPE CONNECT] ⚠️ Transfer reversed, funds returned', [
+                    'transfer_id' => $transfer->id,
+                    'wh_account_id' => $transaction->wh_account_id,
+                    'amount' => $transaction->seller_earnings
+                ]);
+            }
+
+        } catch (Exception $e) {
+            Log::error('[STRIPE CONNECT] Error handling transfer.reversed', [
+                'error' => $e->getMessage(),
+                'transfer_id' => $transfer->id
+            ]);
+        }
+
+        Log::warning('[STRIPE CONNECT] ========== END TRANSFER REVERSED ==========');
+    }
+
+    /**
+     * Handle charge.refunded - When payment is refunded
+     */
+    private function handleChargeRefunded($charge)
+    {
+        Log::info('[STRIPE CONNECT] ========== CHARGE REFUNDED ==========');
+        Log::info('[STRIPE CONNECT] Charge ID: ' . $charge->id);
+
+        try {
+            $refunds = $charge->refunds->data ?? [];
+            $totalRefunded = 0;
+
+            foreach ($refunds as $refund) {
+                $totalRefunded += $refund->amount;
+            }
+
+            $refundAmount = $totalRefunded / 100;
+
+            Log::info('[STRIPE CONNECT] Refund amount: $' . $refundAmount);
+
+            // Find transaction by charge ID
+            $transaction = \DB::table('stripe_transactions')
+                ->where('stripe_charge_id', $charge->id)
+                ->first();
+
+            if ($transaction) {
+                // Update transaction
+                \DB::table('stripe_transactions')
+                    ->where('id', $transaction->id)
+                    ->update([
+                        'status' => 'refunded',
+                        'refunded_amount' => $refundAmount,
+                        'stripe_response' => json_encode($charge),
+                        'updated_at' => now()
+                    ]);
+
+                // Return refunded earnings to seller
+                $refundedEarnings = ($refundAmount / $transaction->amount) * $transaction->seller_earnings;
+
+                \DB::table('wh_warehouse_user')
+                    ->where('id', $transaction->wh_account_id)
+                    ->update([
+                        'Shipper_earnings' => \DB::raw("Shipper_earnings - {$refundedEarnings}"),
+                        'updated_at' => now()
+                    ]);
+
+                Log::info('[STRIPE CONNECT] ✅ Refund processed', [
+                    'charge_id' => $charge->id,
+                    'wh_account_id' => $transaction->wh_account_id,
+                    'refund_amount' => $refundAmount,
+                    'seller_deduction' => $refundedEarnings
+                ]);
+            }
+
+        } catch (Exception $e) {
+            Log::error('[STRIPE CONNECT] Error handling refund', [
+                'error' => $e->getMessage(),
+                'charge_id' => $charge->id
+            ]);
+        }
+
+        Log::info('[STRIPE CONNECT] ========== END CHARGE REFUNDED ==========');
+    }
 }
