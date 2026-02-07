@@ -44,7 +44,7 @@ class StripeConnectController extends Controller
         try {
             // Get seller details
             $seller = DB::table('wh_warehouse_user')
-                ->where('id', $wh_account_id)
+                ->where('wh_account_id', $wh_account_id)
                 ->first();
 
             if (!$seller) {
@@ -105,7 +105,7 @@ class StripeConnectController extends Controller
 
             // Update database
             DB::table('wh_warehouse_user')
-                ->where('id', $wh_account_id)
+                ->where('wh_account_id', $wh_account_id)
                 ->update([
                     'stripe_connect_id' => $account->id,
                     'stripe_account_type' => $account->type,
@@ -182,7 +182,7 @@ class StripeConnectController extends Controller
 
         try {
             $seller = DB::table('wh_warehouse_user')
-                ->where('id', $wh_account_id)
+                ->where('wh_account_id', $wh_account_id)
                 ->first();
 
             if (!$seller || !$seller->stripe_connect_id) {
@@ -246,7 +246,7 @@ class StripeConnectController extends Controller
 
         try {
             $seller = DB::table('wh_warehouse_user')
-                ->where('id', $wh_account_id)
+                ->where('wh_account_id', $wh_account_id)
                 ->first();
 
             if (!$seller) {
@@ -336,7 +336,7 @@ class StripeConnectController extends Controller
 
         try {
             $seller = DB::table('wh_warehouse_user')
-                ->where('id', $wh_account_id)
+                ->where('wh_account_id', $wh_account_id)
                 ->first();
 
             if (!$seller || !$seller->stripe_connect_id) {
@@ -398,7 +398,7 @@ class StripeConnectController extends Controller
 
         try {
             $seller = DB::table('wh_warehouse_user')
-                ->where('id', $wh_account_id)
+                ->where('wh_account_id', $wh_account_id)
                 ->first();
 
             if (!$seller) {
@@ -599,7 +599,7 @@ class StripeConnectController extends Controller
 
         try {
             $seller = DB::table('wh_warehouse_user')
-                ->where('id', $wh_account_id)
+                ->where('wh_account_id', $wh_account_id)
                 ->first();
 
             if (!$seller) {
@@ -660,7 +660,7 @@ class StripeConnectController extends Controller
 
                 // Update seller balance
                 DB::table('wh_warehouse_user')
-                    ->where('id', $wh_account_id)
+                    ->where('wh_account_id', $wh_account_id)
                     ->update([
                         'Shipper_earnings' => DB::raw("Shipper_earnings - $payoutAmount"),
                         'updated_at' => now()
@@ -722,7 +722,7 @@ class StripeConnectController extends Controller
 
         try {
             $seller = DB::table('wh_warehouse_user')
-                ->where('id', $wh_account_id)
+                ->where('wh_account_id', $wh_account_id)
                 ->first();
 
             if (!$seller || !$seller->stripe_connect_id) {
@@ -754,7 +754,7 @@ class StripeConnectController extends Controller
 
             // Update database
             DB::table('wh_warehouse_user')
-                ->where('id', $wh_account_id)
+                ->where('wh_account_id', $wh_account_id)
                 ->update([
                     'stripe_connect' => 0,
                     'stripe_connect_id' => null,
@@ -809,7 +809,7 @@ class StripeConnectController extends Controller
         try {
             $query = DB::table('wh_warehouse_user')
                 ->select(
-                    'id as wh_account_id',
+                    'wh_account_id',
                     'locationname as store_name',
                     'firstname',
                     'lastname',
@@ -953,7 +953,7 @@ class StripeConnectController extends Controller
             $updates['updated_at'] = now();
 
             DB::table('wh_warehouse_user')
-                ->where('id', $wh_account_id)
+                ->where('wh_account_id', $wh_account_id)
                 ->update($updates);
 
             Log::info('[STRIPE CONNECT ADMIN] Config updated', [
@@ -1080,7 +1080,7 @@ class StripeConnectController extends Controller
         try {
             // Update wh_warehouse_user
             DB::table('wh_warehouse_user')
-                ->where('id', $wh_account_id)
+                ->where('wh_account_id', $wh_account_id)
                 ->update([
                     'stripe_connect' => $account->charges_enabled && $account->payouts_enabled ? 1 : 0,
                     'stripe_onboarding_completed' => $account->details_submitted ? 1 : 0,
