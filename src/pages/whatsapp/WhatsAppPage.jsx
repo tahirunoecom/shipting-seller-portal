@@ -1346,12 +1346,20 @@ function WhatsAppPage() {
                                 </div>
                               </div>
 
-                              {/* Step 4 */}
-                              <div className="flex items-start gap-3 bg-white/60 dark:bg-gray-800/40 p-3 rounded-lg">
-                                <span className="flex items-center justify-center w-6 h-6 bg-green-500 text-white text-sm font-bold rounded-full flex-shrink-0">4</span>
+                              {/* Step 4 - IMPORTANT */}
+                              <div className="flex items-start gap-3 bg-blue-100/80 dark:bg-blue-900/30 p-3 rounded-lg border border-blue-300 dark:border-blue-700">
+                                <span className="flex items-center justify-center w-6 h-6 bg-blue-500 text-white text-sm font-bold rounded-full flex-shrink-0">4</span>
                                 <div>
-                                  <p className="font-medium text-gray-800 dark:text-gray-200">Add Your Phone Number</p>
-                                  <p className="text-sm text-gray-600 dark:text-gray-400">Enter your business phone number. This will be your WhatsApp Business number that customers will message.</p>
+                                  <p className="font-medium text-blue-800 dark:text-blue-200 flex items-center gap-2">
+                                    <Phone className="h-4 w-4" />
+                                    Add Your Phone Number
+                                  </p>
+                                  <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                                    <strong>Required:</strong> Select <span className="font-bold bg-blue-200 dark:bg-blue-800 px-1.5 py-0.5 rounded">"Use a new or existing WhatsApp number"</span> option.
+                                  </p>
+                                  <p className="text-xs text-blue-600 dark:text-blue-400 mt-2 italic">
+                                    Do NOT select "Display name only" or "Add later" - the bot needs a real phone number to receive customer messages.
+                                  </p>
                                 </div>
                               </div>
 
