@@ -4,7 +4,7 @@ import { useAuthStore } from '@/store'
 import { stripeConnectService } from '@/services'
 import { Card, CardContent, Button } from '@/components/ui'
 import { CheckCircle, XCircle, Loader2 } from 'lucide-react'
-import { toast } from 'sonner'
+import toast from 'react-hot-toast'
 
 /**
  * Stripe Connect Return Page
