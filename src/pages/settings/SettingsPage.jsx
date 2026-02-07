@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuthStore } from '@/store'
-import { authService } from '@/services'
+import { authService, stripeConnectService } from '@/services'
 import {
   Card,
   CardContent,
@@ -57,6 +57,9 @@ function SettingsPage() {
     driver: user?.localDelivery === '1' || user?.localDelivery === 1,
   })
   const [savingAccountType, setSavingAccountType] = useState(false)
+
+  // Stripe Connect State
+  const [connectingStripe, setConnectingStripe] = useState(false)
 
   // Verification State
   const [verificationData, setVerificationData] = useState({
@@ -291,6 +294,31 @@ function SettingsPage() {
       toast.error('Failed to update verification details')
     } finally {
       setSavingVerification(false)
+    }
+  }
+
+  // Stripe Connect Handler
+  const handleConnectStripe = async () => {
+    if (!user?.wh_account_id) {
+      toast.error('Account ID not found')
+      return
+    }
+
+    setConnectingStripe(true)
+    try {
+      const response = await stripeConnectService.createConnectAccount(user.wh_account_id)
+
+      if (response.data?.status === 1 && response.data?.data?.onboarding_url) {
+        // Redirect to Stripe Connect onboarding page
+        window.location.href = response.data.data.onboarding_url
+      } else {
+        toast.error(response.data?.message || 'Failed to get onboarding URL')
+      }
+    } catch (error) {
+      console.error('Stripe Connect Error:', error)
+      toast.error(error.response?.data?.message || 'Failed to connect Stripe account')
+    } finally {
+      setConnectingStripe(false)
     }
   }
 
@@ -875,7 +903,19 @@ function SettingsPage() {
                         Active
                       </span>
                     ) : (
-                      <Button>Connect Stripe</Button>
+                      <Button
+                        onClick={handleConnectStripe}
+                        disabled={connectingStripe}
+                      >
+                        {connectingStripe ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Connecting...
+                          </>
+                        ) : (
+                          'Connect Stripe'
+                        )}
+                      </Button>
                     )}
                   </div>
                 </div>
