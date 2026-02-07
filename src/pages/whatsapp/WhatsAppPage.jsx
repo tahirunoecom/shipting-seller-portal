@@ -1360,6 +1360,12 @@ function WhatsAppPage() {
                                   <p className="text-xs text-blue-600 dark:text-blue-400 mt-2 italic">
                                     Do NOT select "Display name only" or "Add later" - the bot needs a real phone number to receive customer messages.
                                   </p>
+                                  <div className="mt-2 p-2 bg-red-50 dark:bg-red-900/30 rounded border border-red-200 dark:border-red-800">
+                                    <p className="text-xs text-red-700 dark:text-red-300">
+                                      <strong>If you see an error:</strong> "To use this phone number, you'll need to delete an existing one from WhatsApp Manager" -
+                                      this means the number is already registered. Visit <span className="font-semibold">WhatsApp Manager</span> to remove it first, or use a different number.
+                                    </p>
+                                  </div>
                                 </div>
                               </div>
 
