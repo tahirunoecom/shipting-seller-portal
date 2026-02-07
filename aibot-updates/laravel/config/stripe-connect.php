@@ -41,6 +41,12 @@ return [
     // Options: 'express', 'standard', 'custom'
     'account_type' => env('STRIPE_CONNECT_ACCOUNT_TYPE', 'express'),
 
+    // Business branding for Connect onboarding page
+    'business_name' => env('STRIPE_BUSINESS_NAME', 'Shipting'),
+    'business_logo_url' => env('STRIPE_BUSINESS_LOGO_URL', null),
+    'business_icon_url' => env('STRIPE_BUSINESS_ICON_URL', null),
+    'business_primary_color' => env('STRIPE_BUSINESS_COLOR', null),
+
     // Refresh URL after onboarding completion
     'refresh_url' => env('APP_URL') . '/earnings/stripe-connect',
 

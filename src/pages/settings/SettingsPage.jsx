@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuthStore } from '@/store'
-import { authService, stripeConnectService } from '@/services'
+import { authService } from '@/services'
 import {
   Card,
   CardContent,
@@ -58,9 +58,6 @@ function SettingsPage() {
   })
   const [savingAccountType, setSavingAccountType] = useState(false)
 
-  // Stripe Connect State
-  const [connectingStripe, setConnectingStripe] = useState(false)
-
   // Verification State
   const [verificationData, setVerificationData] = useState({
     address1: userDetails?.address_1 || '',
@@ -95,7 +92,6 @@ function SettingsPage() {
     { key: 'store', label: 'Store', icon: MapPin },
     { key: 'notifications', label: 'Notifications', icon: Bell },
     { key: 'security', label: 'Security', icon: Shield },
-    { key: 'billing', label: 'Billing', icon: CreditCard },
   ]
 
   const handleProfileChange = (e) => {
@@ -294,31 +290,6 @@ function SettingsPage() {
       toast.error('Failed to update verification details')
     } finally {
       setSavingVerification(false)
-    }
-  }
-
-  // Stripe Connect Handler
-  const handleConnectStripe = async () => {
-    if (!user?.wh_account_id) {
-      toast.error('Account ID not found')
-      return
-    }
-
-    setConnectingStripe(true)
-    try {
-      const response = await stripeConnectService.createConnectAccount(user.wh_account_id)
-
-      if (response.data?.status === 1 && response.data?.data?.onboarding_url) {
-        // Redirect to Stripe Connect onboarding page
-        window.location.href = response.data.data.onboarding_url
-      } else {
-        toast.error(response.data?.message || 'Failed to get onboarding URL')
-      }
-    } catch (error) {
-      console.error('Stripe Connect Error:', error)
-      toast.error(error.response?.data?.message || 'Failed to connect Stripe account')
-    } finally {
-      setConnectingStripe(false)
     }
   }
 
@@ -874,70 +845,6 @@ function SettingsPage() {
                     Add an extra layer of security to your account
                   </p>
                   <Button variant="outline">Enable 2FA</Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Billing Tab */}
-          {activeTab === 'billing' && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Billing & Payments</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="p-4 bg-gray-50 rounded-lg dark:bg-dark-bg">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-gray-900 dark:text-dark-text">
-                        Stripe Connect Status
-                      </p>
-                      <p className="text-sm text-gray-500 dark:text-dark-muted">
-                        {user?.stripe_connect_id
-                          ? 'Connected'
-                          : 'Not connected'}
-                      </p>
-                    </div>
-                    {user?.stripe_connect_id ? (
-                      <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">
-                        Active
-                      </span>
-                    ) : (
-                      <Button
-                        onClick={handleConnectStripe}
-                        disabled={connectingStripe}
-                      >
-                        {connectingStripe ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Connecting...
-                          </>
-                        ) : (
-                          'Connect Stripe'
-                        )}
-                      </Button>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <h4 className="font-medium text-gray-900 dark:text-dark-text mb-4">
-                    Earnings Summary
-                  </h4>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="p-4 bg-primary-50 rounded-lg dark:bg-primary-900/20">
-                      <p className="text-sm text-primary-600">Total Earnings</p>
-                      <p className="text-2xl font-bold text-primary-600">
-                        ${user?.Shipper_earnings || '0.00'}
-                      </p>
-                    </div>
-                    <div className="p-4 bg-gray-50 rounded-lg dark:bg-dark-bg">
-                      <p className="text-sm text-gray-500">Paid Out</p>
-                      <p className="text-2xl font-bold text-gray-900 dark:text-dark-text">
-                        ${user?.paid_shipper_earnings || '0.00'}
-                      </p>
-                    </div>
-                  </div>
                 </div>
               </CardContent>
             </Card>
