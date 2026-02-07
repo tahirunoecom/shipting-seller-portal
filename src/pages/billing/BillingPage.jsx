@@ -18,7 +18,7 @@ import {
   CheckCircle,
   AlertCircle,
 } from 'lucide-react'
-import { toast } from 'sonner'
+import toast from 'react-hot-toast'
 
 /**
  * Billing & Payments Page
