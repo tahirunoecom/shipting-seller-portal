@@ -19,7 +19,7 @@ class WhatsAppController extends Controller
     private $metaAppId = '1559645705059315';
     private $metaAppSecret = '54ff9c006e930cff8e2af6a0ee530646';
     private $metaBusinessId = '1856101791959161';
-    private $metaConfigId = '4402947513364167';
+    private $metaConfigId = '1403441077449207';
     private $lastCatalogError = null;
 
     /**
