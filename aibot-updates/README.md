@@ -100,7 +100,7 @@ rasa run --enable-api
 
 Your Meta App is already configured with:
 - **App ID**: 1559645705059315
-- **Config ID**: 4402947513364167
+- **Config ID**: 1403441077449207
 - **Business ID**: 1856101791959161
 
 Ensure webhook is pointing to:

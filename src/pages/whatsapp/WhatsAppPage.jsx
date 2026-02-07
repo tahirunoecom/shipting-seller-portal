@@ -62,7 +62,7 @@ import toast from 'react-hot-toast'
 
 // Meta App Configuration
 const META_APP_ID = '1559645705059315'
-const META_CONFIG_ID = '4402947513364167'
+const META_CONFIG_ID = '1403441077449207'
 
 function WhatsAppPage() {
   const { user, userDetails } = useAuthStore()
