@@ -30,6 +30,7 @@ const OrdersPage = lazy(() => import('@/pages/orders/OrdersPage'))
 const OrderFulfillmentBoardPage = lazy(() => import('@/pages/orders/OrderFulfillmentBoardPage'))
 const SettingsPage = lazy(() => import('@/pages/settings/SettingsPage'))
 const WhatsAppPage = lazy(() => import('@/pages/whatsapp/WhatsAppPage'))
+const BillingPage = lazy(() => import('@/pages/billing/BillingPage'))
 const StripeConnectReturnPage = lazy(() => import('@/pages/earnings/StripeConnectReturnPage'))
 
 // Driver pages - Lazy loaded
@@ -44,7 +45,6 @@ const DriverSettingsPage = lazy(() => import('@/pages/driver/DriverSettingsPage'
 const CatalogPage = () => <PlaceholderPage title="Catalog" description="Manage your WhatsApp product catalog" />
 const DriversPage = () => <PlaceholderPage title="Find Driver" description="Find and manage delivery drivers" />
 const PaymentsPage = () => <PlaceholderPage title="Payments" description="Manage your payment settings and Stripe integration" />
-const BillingPage = () => <PlaceholderPage title="Billing" description="View your billing history and statements" />
 
 // Placeholder component
 function PlaceholderPage({ title, description }) {
