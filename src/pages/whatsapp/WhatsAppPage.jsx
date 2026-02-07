@@ -360,14 +360,7 @@ function WhatsAppPage() {
         override_default_response_type: true,
         scope: 'whatsapp_business_management,whatsapp_business_messaging,catalog_management,business_management',
         extras: {
-          setup: {
-            // Pre-fill business info to default to Commerce vertical
-            business: {
-              name: userDetails?.company_name || userDetails?.name || '',
-              website: 'https://partners.shipting.com',
-              vertical: 'ECOMMERCE',
-            },
-          },
+          setup: {},
           featureType: '',
           sessionInfoVersion: '3',
         }
