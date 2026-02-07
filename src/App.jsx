@@ -30,6 +30,7 @@ const OrdersPage = lazy(() => import('@/pages/orders/OrdersPage'))
 const OrderFulfillmentBoardPage = lazy(() => import('@/pages/orders/OrderFulfillmentBoardPage'))
 const SettingsPage = lazy(() => import('@/pages/settings/SettingsPage'))
 const WhatsAppPage = lazy(() => import('@/pages/whatsapp/WhatsAppPage'))
+const StripeConnectReturnPage = lazy(() => import('@/pages/earnings/StripeConnectReturnPage'))
 
 // Driver pages - Lazy loaded
 const DriverOrdersPage = lazy(() => import('@/pages/driver/DriverOrdersPage'))
@@ -91,6 +92,7 @@ function App() {
           <Route path="/drivers" element={<DriversPage />} />
           <Route path="/payments" element={<PaymentsPage />} />
           <Route path="/billing" element={<BillingPage />} />
+          <Route path="/earnings/stripe-connect" element={<StripeConnectReturnPage />} />
           <Route path="/settings" element={<SettingsPage />} />
 
           {/* Driver routes */}
