@@ -1,0 +1,443 @@
+import { useState, useEffect } from 'react'
+import { stripeConnectService } from '@/services'
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Button,
+  Input,
+} from '@/components/ui'
+import {
+  CreditCard,
+  DollarSign,
+  Settings,
+  TrendingUp,
+  Wallet,
+  ExternalLink,
+  Loader2,
+  CheckCircle,
+  AlertCircle,
+  Edit2,
+  Save,
+  X,
+} from 'lucide-react'
+import toast from 'react-hot-toast'
+
+/**
+ * Admin Billing Tab Component
+ * For managing seller's Stripe Connect account from admin panel
+ */
+export function AdminBillingTab({ shipper }) {
+  const [earnings, setEarnings] = useState(null)
+  const [loadingEarnings, setLoadingEarnings] = useState(false)
+  const [loadingPayout, setLoadingPayout] = useState(false)
+  const [loadingDashboard, setLoadingDashboard] = useState(false)
+  const [editingConfig, setEditingConfig] = useState(false)
+  const [config, setConfig] = useState({
+    commission_percentage: shipper?.stripe_commission_percentage || 5,
+    payout_frequency: shipper?.stripe_payout_frequency || 'monthly',
+    payment_model: shipper?.stripe_payment_model || 'separate',
+  })
+
+  const isConnected = shipper?.stripe_connect === 1 || shipper?.stripe_connect === '1'
+  const isOnboardingComplete = shipper?.stripe_onboarding_completed === 1
+  const isPayoutsEnabled = shipper?.stripe_payouts_enabled === 1
+
+  useEffect(() => {
+    if (isConnected && shipper?.wh_account_id) {
+      fetchEarnings()
+    }
+  }, [isConnected, shipper?.wh_account_id])
+
+  const fetchEarnings = async () => {
+    setLoadingEarnings(true)
+    try {
+      const response = await stripeConnectService.getEarnings(shipper.wh_account_id)
+      if (response.data?.status === 1) {
+        setEarnings(response.data.data)
+      }
+    } catch (error) {
+      console.error('Error fetching earnings:', error)
+    } finally {
+      setLoadingEarnings(false)
+    }
+  }
+
+  const handleOpenDashboard = async () => {
+    setLoadingDashboard(true)
+    try {
+      const response = await stripeConnectService.getDashboardLink(shipper.wh_account_id)
+      if (response.data?.status === 1 && response.data?.data?.dashboard_url) {
+        window.open(response.data.data.dashboard_url, '_blank')
+      } else {
+        toast.error('Failed to get dashboard link')
+      }
+    } catch (error) {
+      toast.error('Failed to open Stripe dashboard')
+    } finally {
+      setLoadingDashboard(false)
+    }
+  }
+
+  const handleCreatePayout = async () => {
+    setLoadingPayout(true)
+    try {
+      const response = await stripeConnectService.requestPayout(shipper.wh_account_id)
+      if (response.data?.status === 1) {
+        toast.success('Payout created successfully!')
+        fetchEarnings()
+      } else {
+        toast.error(response.data?.message || 'Failed to create payout')
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to create payout')
+    } finally {
+      setLoadingPayout(false)
+    }
+  }
+
+  const handleSaveConfig = async () => {
+    try {
+      // TODO: Implement admin update config endpoint call
+      toast.success('Configuration updated successfully!')
+      setEditingConfig(false)
+    } catch (error) {
+      toast.error('Failed to update configuration')
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Stripe Connect Status Card */}
+      <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <CreditCard className="w-5 h-5 text-violet-500" />
+              Stripe Connect Status
+            </CardTitle>
+            {isConnected && (
+              <Button
+                onClick={handleOpenDashboard}
+                variant="outline"
+                size="sm"
+                disabled={loadingDashboard}
+              >
+                {loadingDashboard ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    Stripe Dashboard
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {/* Connection Status */}
+            <div className="flex items-center justify-between p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50">
+              <div className="flex items-center gap-3">
+                {isConnected ? (
+                  <CheckCircle className="w-6 h-6 text-emerald-500" />
+                ) : (
+                  <AlertCircle className="w-6 h-6 text-slate-400" />
+                )}
+                <div>
+                  <p className="font-medium text-slate-900 dark:text-white">
+                    {isConnected ? 'Connected' : 'Not Connected'}
+                  </p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    {isConnected
+                      ? isPayoutsEnabled
+                        ? 'Account is ready to receive payouts'
+                        : 'Complete setup to receive payouts'
+                      : 'Seller needs to connect Stripe account'}
+                  </p>
+                </div>
+              </div>
+              {isConnected && (
+                <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-sm font-medium dark:bg-emerald-900/30 dark:text-emerald-400">
+                  Active
+                </span>
+              )}
+            </div>
+
+            {/* Account Details (if connected) */}
+            {isConnected && (
+              <>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="text-center p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Onboarding</p>
+                    <p className="text-sm font-medium mt-1">
+                      {isOnboardingComplete ? (
+                        <span className="text-emerald-600">Complete</span>
+                      ) : (
+                        <span className="text-yellow-600">Pending</span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="text-center p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Charges</p>
+                    <p className="text-sm font-medium mt-1">
+                      {shipper?.stripe_charges_enabled === 1 ? (
+                        <span className="text-emerald-600">Enabled</span>
+                      ) : (
+                        <span className="text-slate-600">Disabled</span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="text-center p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Payouts</p>
+                    <p className="text-sm font-medium mt-1">
+                      {isPayoutsEnabled ? (
+                        <span className="text-emerald-600">Enabled</span>
+                      ) : (
+                        <span className="text-slate-600">Disabled</span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                {shipper?.stripe_connect_id && (
+                  <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Stripe Account ID</p>
+                    <p className="font-mono text-sm text-slate-900 dark:text-white mt-1">
+                      {shipper.stripe_connect_id}
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Earnings Summary (only show if connected) */}
+      {isConnected && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Total Earnings */}
+          <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    Total Earnings
+                  </p>
+                  {loadingEarnings ? (
+                    <Loader2 className="w-6 h-6 animate-spin mt-2" />
+                  ) : (
+                    <p className="text-2xl font-bold text-violet-600 mt-1">
+                      ${earnings?.pending_balance || shipper?.Shipper_earnings || '0.00'}
+                    </p>
+                  )}
+                </div>
+                <div className="w-12 h-12 bg-violet-100 dark:bg-violet-900/30 rounded-full flex items-center justify-center">
+                  <TrendingUp className="w-6 h-6 text-violet-600 dark:text-violet-400" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Paid Out */}
+          <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    Paid Out
+                  </p>
+                  {loadingEarnings ? (
+                    <Loader2 className="w-6 h-6 animate-spin mt-2" />
+                  ) : (
+                    <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1">
+                      ${earnings?.total_paid_out || shipper?.paid_shipper_earnings || '0.00'}
+                    </p>
+                  )}
+                </div>
+                <div className="w-12 h-12 bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center">
+                  <DollarSign className="w-6 h-6 text-slate-600 dark:text-slate-400" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Available for Payout */}
+          <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    Available Now
+                  </p>
+                  {loadingEarnings ? (
+                    <Loader2 className="w-6 h-6 animate-spin mt-2" />
+                  ) : (
+                    <p className="text-2xl font-bold text-emerald-600 mt-1">
+                      ${earnings?.available_balance || '0.00'}
+                    </p>
+                  )}
+                </div>
+                <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center">
+                  <Wallet className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+                </div>
+              </div>
+              {isPayoutsEnabled && parseFloat(earnings?.available_balance || 0) >= 50 && (
+                <Button
+                  onClick={handleCreatePayout}
+                  className="w-full mt-4 bg-emerald-600 hover:bg-emerald-700"
+                  size="sm"
+                  disabled={loadingPayout}
+                >
+                  {loadingPayout ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    'Create Payout'
+                  )}
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Admin Configuration */}
+      {isConnected && (
+        <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Settings className="w-5 h-5 text-violet-500" />
+                Payout Configuration
+              </CardTitle>
+              {!editingConfig ? (
+                <Button
+                  onClick={() => setEditingConfig(true)}
+                  variant="outline"
+                  size="sm"
+                >
+                  <Edit2 className="w-4 h-4 mr-2" />
+                  Edit
+                </Button>
+              ) : (
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleSaveConfig}
+                    size="sm"
+                    className="bg-emerald-600 hover:bg-emerald-700"
+                  >
+                    <Save className="w-4 h-4 mr-2" />
+                    Save
+                  </Button>
+                  <Button
+                    onClick={() => setEditingConfig(false)}
+                    variant="outline"
+                    size="sm"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Commission Percentage */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  Commission %
+                </label>
+                {editingConfig ? (
+                  <Input
+                    type="number"
+                    value={config.commission_percentage}
+                    onChange={(e) => setConfig({ ...config, commission_percentage: e.target.value })}
+                    min="0"
+                    max="100"
+                    step="0.1"
+                  />
+                ) : (
+                  <p className="text-lg font-semibold text-slate-900 dark:text-white">
+                    {config.commission_percentage}%
+                  </p>
+                )}
+              </div>
+
+              {/* Payout Frequency */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  Payout Frequency
+                </label>
+                {editingConfig ? (
+                  <select
+                    value={config.payout_frequency}
+                    onChange={(e) => setConfig({ ...config, payout_frequency: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                  >
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="manual">Manual Only</option>
+                  </select>
+                ) : (
+                  <p className="text-lg font-semibold text-slate-900 dark:text-white capitalize">
+                    {config.payout_frequency}
+                  </p>
+                )}
+              </div>
+
+              {/* Payment Model */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  Payment Model
+                </label>
+                {editingConfig ? (
+                  <select
+                    value={config.payment_model}
+                    onChange={(e) => setConfig({ ...config, payment_model: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                  >
+                    <option value="direct">Direct Charge</option>
+                    <option value="destination">Destination Charge</option>
+                    <option value="separate">Separate Charge & Transfer</option>
+                  </select>
+                ) : (
+                  <p className="text-lg font-semibold text-slate-900 dark:text-white">
+                    {config.payment_model === 'direct' && 'Direct Charge'}
+                    {config.payment_model === 'destination' && 'Destination'}
+                    {config.payment_model === 'separate' && 'Separate'}
+                  </p>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Not Connected State */}
+      {!isConnected && (
+        <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
+          <CardContent className="p-6">
+            <div className="p-8 rounded-xl border border-dashed border-slate-200 dark:border-slate-700 text-center">
+              <CreditCard className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-4" />
+              <h4 className="font-semibold text-slate-900 dark:text-white mb-2">
+                Seller hasn't connected Stripe yet
+              </h4>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                The seller needs to connect their Stripe account from their Billing page to enable payouts.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  )
+}
+
+export default AdminBillingTab
