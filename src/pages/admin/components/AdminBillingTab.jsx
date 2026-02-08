@@ -67,8 +67,20 @@ export function AdminBillingTab({ shipper }) {
     try {
       const response = await stripeConnectService.getConnectStatus(shipper.wh_account_id)
       if (response.data?.status === 1) {
-        // Update local state with current Stripe status
-        setStripeStatus(response.data.data)
+        // Map API response to match expected field names
+        const data = response.data.data
+        const mappedStatus = {
+          stripe_connect: data.connected ? 1 : 0,
+          stripe_connect_id: data.stripe_connect_id,
+          stripe_onboarding_completed: data.onboarding_completed ? 1 : 0,
+          stripe_charges_enabled: data.charges_enabled ? 1 : 0,
+          stripe_payouts_enabled: data.payouts_enabled ? 1 : 0,
+          stripe_payment_model: data.payment_model,
+          stripe_payout_frequency: data.payout_frequency,
+          stripe_commission_percentage: data.commission_percentage,
+          wh_account_id: shipper.wh_account_id,
+        }
+        setStripeStatus(mappedStatus)
       }
     } catch (error) {
       console.error('Error fetching Stripe status:', error)
@@ -227,7 +239,7 @@ export function AdminBillingTab({ shipper }) {
                   <div className="text-center p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
                     <p className="text-xs text-slate-500 dark:text-slate-400">Charges</p>
                     <p className="text-sm font-medium mt-1">
-                      {shipper?.stripe_charges_enabled === 1 ? (
+                      {currentStatus?.stripe_charges_enabled === 1 ? (
                         <span className="text-emerald-600">Enabled</span>
                       ) : (
                         <span className="text-slate-600">Disabled</span>
@@ -246,11 +258,11 @@ export function AdminBillingTab({ shipper }) {
                   </div>
                 </div>
 
-                {shipper?.stripe_connect_id && (
+                {currentStatus?.stripe_connect_id && (
                   <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50">
                     <p className="text-xs text-slate-500 dark:text-slate-400">Stripe Account ID</p>
                     <p className="font-mono text-sm text-slate-900 dark:text-white mt-1">
-                      {shipper.stripe_connect_id}
+                      {currentStatus.stripe_connect_id}
                     </p>
                   </div>
                 )}
