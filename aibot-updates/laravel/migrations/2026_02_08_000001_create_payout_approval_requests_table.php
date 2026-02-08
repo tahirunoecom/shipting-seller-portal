@@ -7,7 +7,8 @@ use Illuminate\Support\Facades\Schema;
 /**
  * Migration: Create payout_approval_requests table
  *
- * Run this migration to create the table for payout approval requests
+ * This migration creates the table for managing seller payout approval requests.
+ * Sellers request payouts, admins approve/reject them.
  *
  * To run: php artisan migrate
  * To rollback: php artisan migrate:rollback
@@ -28,19 +29,19 @@ return new class extends Migration
             $table->text('admin_notes')->nullable();
             $table->text('rejection_reason')->nullable();
             $table->unsignedBigInteger('approved_by_admin_id')->nullable();
-            $table->unsignedBigInteger('stripe_payout_id')->nullable(); // Link to stripe_payouts table
+            $table->unsignedBigInteger('stripe_payout_id')->nullable(); // Links to stripe_payouts.id
             $table->timestamp('processed_at')->nullable();
             $table->timestamps();
 
             // Indexes for performance
-            $table->index('wh_account_id');
-            $table->index('status');
-            $table->index('created_at');
-            $table->index(['wh_account_id', 'status']);
+            $table->index('wh_account_id', 'idx_wh_account_id');
+            $table->index('status', 'idx_status');
+            $table->index('created_at', 'idx_created_at');
+            $table->index(['wh_account_id', 'status'], 'idx_wh_status');
 
             // Foreign key constraint (only if wh_warehouse_user has proper index)
-            // Uncomment this if you created the index on wh_warehouse_user.wh_account_id
-            // $table->foreign('wh_account_id')
+            // Uncomment this if you created the index: CREATE INDEX idx_wh_account_id ON wh_warehouse_user(wh_account_id);
+            // $table->foreign('wh_account_id', 'fk_payout_wh_account')
             //     ->references('wh_account_id')
             //     ->on('wh_warehouse_user')
             //     ->onDelete('cascade');

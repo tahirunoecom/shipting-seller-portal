@@ -51,8 +51,12 @@ Route::prefix('seller/stripe')->group(function () {
     Route::post('/transactions', [StripeConnectController::class, 'getTransactions']);
     Route::post('/payouts', [StripeConnectController::class, 'getPayouts']);
 
-    // Manual payout request
+    // Manual payout request (DEPRECATED - Use approval system instead)
     Route::post('/request-payout', [StripeConnectController::class, 'requestPayout']);
+
+    // Payout Approval Requests (NEW)
+    Route::post('/request-payout-approval', [StripeConnectController::class, 'requestPayoutApproval']);
+    Route::post('/payout-approval-requests', [StripeConnectController::class, 'getPayoutApprovalRequests']);
 });
 
 // ============================================
@@ -73,6 +77,11 @@ Route::prefix('admin/stripe')->group(function () {
 
     // Transactions (platform-wide)
     Route::post('/transactions', [StripeConnectController::class, 'adminGetAllTransactions']);
+
+    // Payout Approval Management (NEW)
+    Route::post('/payout-approval-requests', [StripeConnectController::class, 'adminGetAllPayoutApprovalRequests']);
+    Route::post('/approve-payout-request', [StripeConnectController::class, 'approvePayoutRequest']);
+    Route::post('/reject-payout-request', [StripeConnectController::class, 'rejectPayoutRequest']);
 });
 
 // ============================================
