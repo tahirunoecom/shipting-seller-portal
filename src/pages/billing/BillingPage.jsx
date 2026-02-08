@@ -504,8 +504,24 @@ const BillingPage = () => {
                         <td className="py-3 px-4 text-sm text-gray-900 dark:text-white">
                           {new Date(request.created_at).toLocaleDateString()}
                         </td>
-                        <td className="py-3 px-4 text-sm font-medium text-gray-900 dark:text-white">
-                          ${parseFloat(request.amount).toFixed(2)}
+                        <td className="py-3 px-4">
+                          {request.approved_amount && parseFloat(request.approved_amount) < parseFloat(request.amount) ? (
+                            <div>
+                              <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                Requested: ${parseFloat(request.amount).toFixed(2)}
+                              </div>
+                              <div className="text-sm font-semibold text-green-600 dark:text-green-400">
+                                Approved: ${parseFloat(request.approved_amount).toFixed(2)}
+                              </div>
+                              <div className="text-xs text-orange-600 dark:text-orange-400">
+                                Remaining: ${(parseFloat(request.amount) - parseFloat(request.approved_amount)).toFixed(2)}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-sm font-medium text-gray-900 dark:text-white">
+                              ${parseFloat(request.amount).toFixed(2)}
+                            </div>
+                          )}
                         </td>
                         <td className="py-3 px-4">
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${
