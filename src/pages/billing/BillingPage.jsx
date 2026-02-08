@@ -25,7 +25,7 @@ import toast from 'react-hot-toast'
  * Centralized page for Stripe Connect, earnings, and payouts
  */
 const BillingPage = () => {
-  const { user } = useAuthStore()
+  const { user, updateUser } = useAuthStore()
   const [connectingStripe, setConnectingStripe] = useState(false)
   const [loadingDashboard, setLoadingDashboard] = useState(false)
   const [earnings, setEarnings] = useState(null)
@@ -77,9 +77,18 @@ const BillingPage = () => {
         }
         // Check if already connected and fully active
         else if (response.data?.data?.already_connected) {
+          // Update user in auth store with new Stripe values
+          updateUser({
+            stripe_connect: 1,
+            stripe_connect_id: response.data.data.stripe_account_id,
+            stripe_onboarding_completed: 1,
+            stripe_charges_enabled: 1,
+            stripe_payouts_enabled: 1,
+          })
+
           toast.success('Your Stripe account is already connected and active!')
-          // Reload user data to update UI
-          setTimeout(() => window.location.reload(), 2000)
+
+          // No need to reload - user object is updated!
         } else {
           toast.error('Unexpected response from server')
           console.error('Unexpected response:', response.data)
