@@ -73,6 +73,19 @@ class StripeConnectController extends Controller
                         'payouts_enabled' => $payouts_enabled
                     ]);
 
+                    // Update database with current Stripe status (sync in case webhook missed it)
+                    DB::table('wh_warehouse_user')
+                        ->where('wh_account_id', $wh_account_id)
+                        ->update([
+                            'stripe_onboarding_completed' => $details_submitted ? 1 : 0,
+                            'stripe_charges_enabled' => $charges_enabled ? 1 : 0,
+                            'stripe_payouts_enabled' => $payouts_enabled ? 1 : 0,
+                            'stripe_connect' => ($details_submitted && $payouts_enabled) ? 1 : 0,
+                            'updated_at' => now()
+                        ]);
+
+                    Log::info('[STRIPE CONNECT] Database updated with Stripe status');
+
                     // If account exists but onboarding not complete, return refresh link
                     if (!$details_submitted || !$payouts_enabled) {
                         Log::info('[STRIPE CONNECT] Account incomplete, providing refresh link');
@@ -86,9 +99,9 @@ class StripeConnectController extends Controller
                         'message' => 'Stripe account already connected and active',
                         'data' => [
                             'stripe_account_id' => $seller->stripe_connect_id,
-                            'onboarding_completed' => $seller->stripe_onboarding_completed,
-                            'charges_enabled' => $seller->stripe_charges_enabled,
-                            'payouts_enabled' => $seller->stripe_payouts_enabled,
+                            'onboarding_completed' => 1,
+                            'charges_enabled' => 1,
+                            'payouts_enabled' => 1,
                             'already_connected' => true
                         ]
                     ]);
