@@ -431,10 +431,27 @@ export function AdminBillingTab({ shipper }) {
       {isConnected && (
         <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <DollarSign className="w-5 h-5 text-violet-500" />
-              Payout History
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <DollarSign className="w-5 h-5 text-violet-500" />
+                Payout History
+              </CardTitle>
+              <Button
+                onClick={fetchPayouts}
+                variant="outline"
+                size="sm"
+                disabled={loadingPayouts}
+              >
+                {loadingPayouts ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Refresh
+                  </>
+                )}
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             {loadingPayouts ? (

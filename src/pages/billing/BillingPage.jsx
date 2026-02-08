@@ -7,6 +7,7 @@ import {
   CardHeader,
   CardTitle,
   Button,
+  Input,
 } from '@/components/ui'
 import {
   CreditCard,
@@ -17,6 +18,7 @@ import {
   Loader2,
   CheckCircle,
   AlertCircle,
+  RefreshCw,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -418,10 +420,27 @@ const BillingPage = () => {
       {isConnected && (
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <DollarSign className="w-5 h-5" />
-              Payout History
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <DollarSign className="w-5 h-5" />
+                Payout History
+              </CardTitle>
+              <Button
+                onClick={fetchPayouts}
+                variant="outline"
+                size="sm"
+                disabled={loadingPayouts}
+              >
+                {loadingPayouts ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Refresh
+                  </>
+                )}
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             {loadingPayouts ? (
