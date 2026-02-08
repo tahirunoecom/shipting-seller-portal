@@ -60,17 +60,27 @@ class StripeConnectController extends Controller
                 try {
                     $account = Account::retrieve($seller->stripe_connect_id);
 
-                    // If account exists but onboarding not complete OR payouts not enabled, return refresh link
-                    if (!$account->details_submitted || !$account->payouts_enabled) {
-                        Log::info('[STRIPE CONNECT] Account incomplete, providing refresh link', [
-                            'wh_account_id' => $wh_account_id,
-                            'details_submitted' => $account->details_submitted,
-                            'payouts_enabled' => $account->payouts_enabled
-                        ]);
+                    // Check if onboarding is incomplete
+                    $details_submitted = $account->details_submitted ?? false;
+                    $charges_enabled = $account->charges_enabled ?? false;
+                    $payouts_enabled = $account->payouts_enabled ?? false;
+
+                    Log::info('[STRIPE CONNECT] Checking account status', [
+                        'wh_account_id' => $wh_account_id,
+                        'stripe_account_id' => $seller->stripe_connect_id,
+                        'details_submitted' => $details_submitted,
+                        'charges_enabled' => $charges_enabled,
+                        'payouts_enabled' => $payouts_enabled
+                    ]);
+
+                    // If account exists but onboarding not complete, return refresh link
+                    if (!$details_submitted || !$payouts_enabled) {
+                        Log::info('[STRIPE CONNECT] Account incomplete, providing refresh link');
                         return $this->refreshOnboardingLink($request);
                     }
 
                     // Account is fully connected and active
+                    Log::info('[STRIPE CONNECT] Account fully connected');
                     return response()->json([
                         'status' => 1,
                         'message' => 'Stripe account already connected and active',
