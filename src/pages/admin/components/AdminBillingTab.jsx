@@ -21,6 +21,7 @@ import {
   Edit2,
   Save,
   X,
+  RefreshCw,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -29,6 +30,8 @@ import toast from 'react-hot-toast'
  * For managing seller's Stripe Connect account from admin panel
  */
 export function AdminBillingTab({ shipper }) {
+  const [stripeStatus, setStripeStatus] = useState(null)
+  const [loadingStatus, setLoadingStatus] = useState(false)
   const [earnings, setEarnings] = useState(null)
   const [loadingEarnings, setLoadingEarnings] = useState(false)
   const [loadingPayout, setLoadingPayout] = useState(false)
@@ -40,15 +43,39 @@ export function AdminBillingTab({ shipper }) {
     payment_model: shipper?.stripe_payment_model || 'separate',
   })
 
-  const isConnected = shipper?.stripe_connect === 1 || shipper?.stripe_connect === '1'
-  const isOnboardingComplete = shipper?.stripe_onboarding_completed === 1
-  const isPayoutsEnabled = shipper?.stripe_payouts_enabled === 1
+  // Use live Stripe status if fetched, otherwise fall back to shipper prop
+  const currentStatus = stripeStatus || shipper
+  const isConnected = currentStatus?.stripe_connect === 1 || currentStatus?.stripe_connect === '1'
+  const isOnboardingComplete = currentStatus?.stripe_onboarding_completed === 1
+  const isPayoutsEnabled = currentStatus?.stripe_payouts_enabled === 1
+
+  // Fetch current Stripe status from API on mount
+  useEffect(() => {
+    if (shipper?.wh_account_id) {
+      fetchStripeStatus()
+    }
+  }, [shipper?.wh_account_id])
 
   useEffect(() => {
     if (isConnected && shipper?.wh_account_id) {
       fetchEarnings()
     }
   }, [isConnected, shipper?.wh_account_id])
+
+  const fetchStripeStatus = async () => {
+    setLoadingStatus(true)
+    try {
+      const response = await stripeConnectService.getConnectStatus(shipper.wh_account_id)
+      if (response.data?.status === 1) {
+        // Update local state with current Stripe status
+        setStripeStatus(response.data.data)
+      }
+    } catch (error) {
+      console.error('Error fetching Stripe status:', error)
+    } finally {
+      setLoadingStatus(false)
+    }
+  }
 
   const fetchEarnings = async () => {
     setLoadingEarnings(true)
@@ -117,23 +144,40 @@ export function AdminBillingTab({ shipper }) {
               <CreditCard className="w-5 h-5 text-violet-500" />
               Stripe Connect Status
             </CardTitle>
-            {isConnected && (
+            <div className="flex gap-2">
               <Button
-                onClick={handleOpenDashboard}
+                onClick={fetchStripeStatus}
                 variant="outline"
                 size="sm"
-                disabled={loadingDashboard}
+                disabled={loadingStatus}
               >
-                {loadingDashboard ? (
+                {loadingStatus ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <>
-                    <ExternalLink className="w-4 h-4 mr-2" />
-                    Stripe Dashboard
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Refresh
                   </>
                 )}
               </Button>
-            )}
+              {isConnected && (
+                <Button
+                  onClick={handleOpenDashboard}
+                  variant="outline"
+                  size="sm"
+                  disabled={loadingDashboard}
+                >
+                  {loadingDashboard ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      Stripe Dashboard
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent>
