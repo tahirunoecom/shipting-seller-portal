@@ -23,6 +23,10 @@ import {
   X,
   RefreshCw,
   Info,
+  Clock,
+  ThumbsUp,
+  ThumbsDown,
+  Bell,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -41,6 +45,10 @@ export function AdminBillingTab({ shipper }) {
   const [payoutAmount, setPayoutAmount] = useState('')
   const [payouts, setPayouts] = useState([])
   const [loadingPayouts, setLoadingPayouts] = useState(false)
+  const [approvalRequests, setApprovalRequests] = useState([])
+  const [loadingApprovalRequests, setLoadingApprovalRequests] = useState(false)
+  const [approvingRequest, setApprovingRequest] = useState(null)
+  const [rejectingRequest, setRejectingRequest] = useState(null)
   const [config, setConfig] = useState({
     commission_percentage: shipper?.stripe_commission_percentage || 5,
     payout_frequency: shipper?.stripe_payout_frequency || 'monthly',
@@ -64,6 +72,7 @@ export function AdminBillingTab({ shipper }) {
     if (isConnected && shipper?.wh_account_id) {
       fetchEarnings()
       fetchPayouts()
+      fetchApprovalRequests()
     }
   }, [isConnected, shipper?.wh_account_id])
 
@@ -119,6 +128,72 @@ export function AdminBillingTab({ shipper }) {
       console.error('Error fetching payouts:', error)
     } finally {
       setLoadingPayouts(false)
+    }
+  }
+
+  const fetchApprovalRequests = async () => {
+    setLoadingApprovalRequests(true)
+    try {
+      const response = await stripeConnectService.getAllPayoutApprovalRequests(shipper.wh_account_id, 'all')
+      if (response.data?.status === 1) {
+        setApprovalRequests(response.data.data.requests || [])
+      }
+    } catch (error) {
+      console.error('Error fetching approval requests:', error)
+    } finally {
+      setLoadingApprovalRequests(false)
+    }
+  }
+
+  const handleApproveRequest = async (request) => {
+    if (!confirm(`Are you sure you want to approve payout of $${parseFloat(request.amount).toFixed(2)}?`)) {
+      return
+    }
+
+    setApprovingRequest(request.id)
+    try {
+      const response = await stripeConnectService.approvePayoutRequest(
+        request.id,
+        'Approved by admin'
+      )
+      if (response.data?.status === 1) {
+        toast.success(`Payout of $${parseFloat(request.amount).toFixed(2)} approved and created!`)
+        fetchApprovalRequests()
+        fetchPayouts() // Refresh payout history
+        fetchEarnings() // Refresh earnings
+      } else {
+        toast.error(response.data?.message || 'Failed to approve payout request')
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to approve payout request')
+    } finally {
+      setApprovingRequest(null)
+    }
+  }
+
+  const handleRejectRequest = async (request) => {
+    const reason = prompt('Enter reason for rejection:')
+    if (!reason) {
+      toast.error('Rejection reason is required')
+      return
+    }
+
+    setRejectingRequest(request.id)
+    try {
+      const response = await stripeConnectService.rejectPayoutRequest(
+        request.id,
+        reason
+      )
+      if (response.data?.status === 1) {
+        toast.success('Payout request rejected')
+        fetchApprovalRequests()
+      } else {
+        toast.error(response.data?.message || 'Failed to reject payout request')
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to reject payout request')
+    } finally {
+      setRejectingRequest(null)
     }
   }
 
@@ -385,46 +460,158 @@ export function AdminBillingTab({ shipper }) {
                 </div>
               </div>
               {isPayoutsEnabled && parseFloat(earnings?.available_balance || 0) >= 50 && (
-                <div className="mt-4 space-y-3">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                      Payout Amount (leave empty for full balance)
-                    </label>
-                    <Input
-                      type="number"
-                      value={payoutAmount}
-                      onChange={(e) => setPayoutAmount(e.target.value)}
-                      placeholder={`Max: $${parseFloat(earnings?.available_balance || 0).toFixed(2)}`}
-                      min="50"
-                      max={parseFloat(earnings?.available_balance || 0)}
-                      step="0.01"
-                      className="w-full"
-                      disabled={loadingPayout}
-                    />
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                      Minimum: $50.00 | Available: ${parseFloat(earnings?.available_balance || 0).toFixed(2)}
-                    </p>
+                <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-start gap-2">
+                    <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                    <div className="text-xs text-blue-700 dark:text-blue-300">
+                      <p className="font-medium mb-1">Manual Payout Override</p>
+                      <p className="mb-2">Payouts are now managed through approval requests. Check the "Payout Approval Requests" section above to approve pending requests.</p>
+                      <p className="text-blue-600 dark:text-blue-400">
+                        If you need to create a payout without a request (emergency), contact system administrator.
+                      </p>
+                    </div>
                   </div>
-                  <Button
-                    onClick={handleCreatePayout}
-                    className="w-full bg-emerald-600 hover:bg-emerald-700"
-                    size="sm"
-                    disabled={loadingPayout}
-                  >
-                    {loadingPayout ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Creating...
-                      </>
-                    ) : (
-                      `Create Payout${payoutAmount ? ` ($${parseFloat(payoutAmount).toFixed(2)})` : ' (Full Balance)'}`
-                    )}
-                  </Button>
                 </div>
               )}
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* Payout Approval Requests */}
+      {isConnected && (
+        <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm mb-6">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Bell className="w-5 h-5 text-amber-500" />
+                Payout Approval Requests
+              </CardTitle>
+              <Button
+                onClick={fetchApprovalRequests}
+                variant="outline"
+                size="sm"
+                disabled={loadingApprovalRequests}
+              >
+                {loadingApprovalRequests ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Refresh
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {loadingApprovalRequests ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="w-8 h-8 animate-spin text-violet-500" />
+              </div>
+            ) : approvalRequests.length > 0 ? (
+              <div className="space-y-4">
+                {approvalRequests.map((request) => (
+                  <div
+                    key={request.id}
+                    className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <h4 className="font-semibold text-slate-900 dark:text-white text-lg">
+                            ${parseFloat(request.amount).toFixed(2)}
+                          </h4>
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                            request.status === 'approved' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
+                            request.status === 'pending' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
+                            request.status === 'rejected' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                            'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-400'
+                          }`}>
+                            {request.status}
+                          </span>
+                        </div>
+
+                        <div className="space-y-1 text-sm text-slate-600 dark:text-slate-400">
+                          <p className="flex items-center gap-2">
+                            <Clock className="w-4 h-4" />
+                            Requested: {new Date(request.created_at).toLocaleString()}
+                          </p>
+                          {request.notes && (
+                            <p className="flex items-start gap-2">
+                              <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                              <span>Seller Notes: {request.notes}</span>
+                            </p>
+                          )}
+                          {(request.admin_notes || request.rejection_reason) && (
+                            <p className="flex items-start gap-2">
+                              <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                              <span>Admin Response: {request.admin_notes || request.rejection_reason}</span>
+                            </p>
+                          )}
+                          {request.processed_at && (
+                            <p className="flex items-center gap-2">
+                              <CheckCircle className="w-4 h-4" />
+                              Processed: {new Date(request.processed_at).toLocaleString()}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Action buttons - only show for pending requests */}
+                      {request.status === 'pending' && (
+                        <div className="flex gap-2">
+                          <Button
+                            onClick={() => handleApproveRequest(request)}
+                            size="sm"
+                            className="bg-emerald-600 hover:bg-emerald-700"
+                            disabled={approvingRequest === request.id || rejectingRequest === request.id}
+                          >
+                            {approvingRequest === request.id ? (
+                              <>
+                                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                                Approving...
+                              </>
+                            ) : (
+                              <>
+                                <ThumbsUp className="w-4 h-4 mr-1" />
+                                Approve
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            onClick={() => handleRejectRequest(request)}
+                            size="sm"
+                            variant="outline"
+                            className="border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
+                            disabled={approvingRequest === request.id || rejectingRequest === request.id}
+                          >
+                            {rejectingRequest === request.id ? (
+                              <>
+                                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                                Rejecting...
+                              </>
+                            ) : (
+                              <>
+                                <ThumbsDown className="w-4 h-4 mr-1" />
+                                Reject
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <Bell className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
+                <p className="text-sm text-slate-500 dark:text-slate-400">No payout approval requests</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {/* Payout History */}
