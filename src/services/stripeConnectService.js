@@ -103,6 +103,22 @@ export const stripeConnectService = {
       wh_account_id,
       amount
     }),
+
+  // ============================================
+  // ADMIN / TESTING ENDPOINTS
+  // ============================================
+
+  /**
+   * [ADMIN/TEST] Add test balance to connected account
+   * @param {number} wh_account_id - Seller's warehouse account ID
+   * @param {number} amount - Amount to add (default 500)
+   * @returns {Promise} Response with new balance
+   */
+  addTestBalance: (wh_account_id, amount = 500) =>
+    axios.post(`${API_BASE}/admin/stripe/add-test-balance`, {
+      wh_account_id,
+      amount
+    }),
 }
 
 export default stripeConnectService

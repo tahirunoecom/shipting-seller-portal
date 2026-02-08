@@ -1023,6 +1023,101 @@ class StripeConnectController extends Controller
     }
 
     /**
+     * [TESTING/DEV] Add test balance to connected account
+     * POST /admin/stripe/add-test-balance
+     *
+     * Body: { wh_account_id: 1016, amount: 500.00 }
+     *
+     * NOTE: Only works in TEST mode. Will fail in production.
+     */
+    public function adminAddTestBalance(Request $request)
+    {
+        $wh_account_id = $request->wh_account_id;
+        $amount = $request->amount ?? 500.00;
+
+        if (!$wh_account_id) {
+            return response()->json([
+                'status' => 0,
+                'message' => 'Account ID is required'
+            ]);
+        }
+
+        // Check if in test mode
+        $secretKey = config('stripe-connect.secret_key');
+        if (!str_starts_with($secretKey, 'sk_test_')) {
+            return response()->json([
+                'status' => 0,
+                'message' => 'This endpoint only works in TEST mode. Cannot add test balance in production.'
+            ]);
+        }
+
+        try {
+            $seller = DB::table('wh_warehouse_user')
+                ->where('wh_account_id', $wh_account_id)
+                ->first();
+
+            if (!$seller || !$seller->stripe_connect_id) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'Stripe Connect account not found for this seller'
+                ]);
+            }
+
+            // Create a test charge on the connected account
+            $charge = \Stripe\Charge::create([
+                'amount' => (int)($amount * 100),
+                'currency' => 'usd',
+                'source' => 'tok_visa', // Stripe test token
+                'description' => "Test balance for payout testing - $$amount",
+                'metadata' => [
+                    'wh_account_id' => $wh_account_id,
+                    'test_balance' => 'true',
+                    'added_at' => now()->toDateTimeString(),
+                ],
+            ], [
+                'stripe_account' => $seller->stripe_connect_id
+            ]);
+
+            // Get updated balance
+            $balance = \Stripe\Balance::retrieve(['stripe_account' => $seller->stripe_connect_id]);
+
+            $availableBalance = 0;
+            if (isset($balance->available) && count($balance->available) > 0) {
+                $availableBalance = $balance->available[0]->amount / 100;
+            }
+
+            Log::info('[STRIPE CONNECT TEST] Test balance added', [
+                'wh_account_id' => $wh_account_id,
+                'stripe_account_id' => $seller->stripe_connect_id,
+                'amount_added' => $amount,
+                'new_available_balance' => $availableBalance
+            ]);
+
+            return response()->json([
+                'status' => 1,
+                'message' => "Test balance of $$amount added successfully",
+                'data' => [
+                    'charge_id' => $charge->id,
+                    'amount_added' => $amount,
+                    'available_balance' => $availableBalance,
+                    'can_create_payout' => $availableBalance >= 50.00
+                ]
+            ]);
+
+        } catch (Exception $e) {
+            Log::error('[STRIPE CONNECT TEST] Error adding test balance', [
+                'error' => $e->getMessage(),
+                'wh_account_id' => $wh_account_id
+            ]);
+
+            return response()->json([
+                'status' => 0,
+                'message' => 'Failed to add test balance: ' . $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
      * [ADMIN] Get all transactions (platform-wide)
      * POST /admin/stripe/transactions
      *

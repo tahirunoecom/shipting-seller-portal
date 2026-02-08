@@ -39,6 +39,7 @@ export function AdminBillingTab({ shipper }) {
   const [loadingDashboard, setLoadingDashboard] = useState(false)
   const [editingConfig, setEditingConfig] = useState(false)
   const [payoutAmount, setPayoutAmount] = useState('')
+  const [loadingTestBalance, setLoadingTestBalance] = useState(false)
   const [config, setConfig] = useState({
     commission_percentage: shipper?.stripe_commission_percentage || 5,
     payout_frequency: shipper?.stripe_payout_frequency || 'monthly',
@@ -171,6 +172,27 @@ export function AdminBillingTab({ shipper }) {
     }
   }
 
+  const handleAddTestBalance = async () => {
+    if (!confirm('Add $500 test balance to this seller\'s connected Stripe account?\n\nNote: This only works in TEST mode.')) {
+      return
+    }
+
+    setLoadingTestBalance(true)
+    try {
+      const response = await stripeConnectService.addTestBalance(shipper.wh_account_id, 500)
+      if (response.data?.status === 1) {
+        toast.success(`Test balance added! Available: $${response.data.data.available_balance.toFixed(2)}`)
+        fetchEarnings() // Refresh earnings to show new balance
+      } else {
+        toast.error(response.data?.message || 'Failed to add test balance')
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to add test balance')
+    } finally {
+      setLoadingTestBalance(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Stripe Connect Status Card */}
@@ -296,6 +318,43 @@ export function AdminBillingTab({ shipper }) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Test Mode Helper (only show if connected) */}
+      {isConnected && (
+        <Card className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border-amber-200 dark:border-amber-800 shadow-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-amber-100 dark:bg-amber-900/50 rounded-full flex items-center justify-center">
+                  <Wallet className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div>
+                  <p className="font-medium text-amber-900 dark:text-amber-100">Testing Payouts</p>
+                  <p className="text-xs text-amber-700 dark:text-amber-300">
+                    Add test funds to this seller's Stripe account for payout testing
+                  </p>
+                </div>
+              </div>
+              <Button
+                onClick={handleAddTestBalance}
+                variant="outline"
+                size="sm"
+                disabled={loadingTestBalance}
+                className="border-amber-300 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/50"
+              >
+                {loadingTestBalance ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    Adding...
+                  </>
+                ) : (
+                  'Add $500 Test Balance'
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Earnings Summary (only show if connected) */}
       {isConnected && (
