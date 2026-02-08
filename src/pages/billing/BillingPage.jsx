@@ -326,75 +326,78 @@ const BillingPage = () => {
 
       {/* Earnings Summary (only show if connected) */}
       {isConnected && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           {/* Total Earnings */}
           <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex-1">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
                     Total Earnings
                   </p>
                   {loadingEarnings ? (
-                    <Loader2 className="w-6 h-6 animate-spin mt-2" />
+                    <Loader2 className="w-5 h-5 animate-spin mt-1" />
                   ) : (
-                    <p className="text-3xl font-bold text-primary-600 mt-1">
+                    <p className="text-2xl font-bold text-primary-600 mt-1">
                       ${earnings?.pending_balance || user?.Shipper_earnings || '0.00'}
                     </p>
                   )}
                 </div>
-                <div className="w-12 h-12 bg-primary-100 dark:bg-primary-900 rounded-full flex items-center justify-center">
-                  <TrendingUp className="w-6 h-6 text-primary-600" />
+                <div className="w-10 h-10 bg-primary-100 dark:bg-primary-900 rounded-full flex items-center justify-center flex-shrink-0">
+                  <TrendingUp className="w-5 h-5 text-primary-600" />
                 </div>
               </div>
+              <p className="text-xs text-gray-400">Cumulative earnings from all orders</p>
             </CardContent>
           </Card>
 
           {/* Paid Out */}
           <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex-1">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
                     Paid Out
                   </p>
                   {loadingEarnings ? (
-                    <Loader2 className="w-6 h-6 animate-spin mt-2" />
+                    <Loader2 className="w-5 h-5 animate-spin mt-1" />
                   ) : (
-                    <p className="text-3xl font-bold text-gray-900 dark:text-white mt-1">
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
                       ${earnings?.total_paid_out || user?.paid_shipper_earnings || '0.00'}
                     </p>
                   )}
                 </div>
-                <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
-                  <DollarSign className="w-6 h-6 text-gray-600" />
+                <div className="w-10 h-10 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center flex-shrink-0">
+                  <DollarSign className="w-5 h-5 text-gray-600" />
                 </div>
               </div>
+              <p className="text-xs text-gray-400">Already transferred to your bank</p>
             </CardContent>
           </Card>
 
           {/* Available for Payout */}
           <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex-1">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
                     Available Now
                   </p>
                   {loadingEarnings ? (
-                    <Loader2 className="w-6 h-6 animate-spin mt-2" />
+                    <Loader2 className="w-5 h-5 animate-spin mt-1" />
                   ) : (
-                    <p className="text-3xl font-bold text-green-600 mt-1">
+                    <p className="text-2xl font-bold text-green-600 mt-1">
                       ${earnings?.available_balance || '0.00'}
                     </p>
                   )}
                 </div>
-                <div className="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
-                  <Wallet className="w-6 h-6 text-green-600" />
+                <div className="w-10 h-10 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center flex-shrink-0">
+                  <Wallet className="w-5 h-5 text-green-600" />
                 </div>
               </div>
+              <p className="text-xs text-gray-400 mb-3">Ready to request for payout</p>
               {isPayoutsEnabled && parseFloat(earnings?.available_balance || 0) >= 50 && (
-                <div className="mt-4 space-y-3">
+                <div className="space-y-2">
                   <div>
                     <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                       Payout Amount (leave empty for full balance)
