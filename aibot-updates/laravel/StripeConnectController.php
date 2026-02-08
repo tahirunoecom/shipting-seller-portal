@@ -1403,13 +1403,15 @@ class StripeConnectController extends Controller
      *
      * Body: {
      *   request_id: 123,
-     *   admin_notes: "Approved by admin"
+     *   admin_notes: "Approved by admin",
+     *   approved_amount: 100.00 (optional - for partial approval, null = approve full requested amount)
      * }
      */
     public function approvePayoutRequest(Request $request)
     {
         $request_id = $request->request_id;
         $admin_notes = $request->admin_notes ?? '';
+        $approved_amount = $request->approved_amount; // NEW: Allow partial approval
 
         if (!$request_id) {
             return response()->json([
@@ -1458,20 +1460,39 @@ class StripeConnectController extends Controller
                 ]);
             }
 
-            // Verify seller still has sufficient balance
-            $availableBalance = $seller->Shipper_earnings ?? 0;
-            if ($approvalRequest->amount > $availableBalance) {
+            // Determine actual payout amount (support partial approval)
+            $payoutAmount = $approved_amount ?? $approvalRequest->amount;
+
+            // Validate approved amount doesn't exceed requested amount
+            if ($payoutAmount > $approvalRequest->amount) {
                 return response()->json([
                     'status' => 0,
-                    'message' => "Insufficient balance. Requested: $" . $approvalRequest->amount . ", Available: $" . $availableBalance
+                    'message' => "Cannot approve more than requested amount ($" . $approvalRequest->amount . ")"
                 ]);
             }
 
-            // Create the actual Stripe payout
+            // Validate minimum payout
+            if ($payoutAmount < 50) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => "Minimum payout amount is $50.00"
+                ]);
+            }
+
+            // Verify seller still has sufficient balance
+            $availableBalance = $seller->Shipper_earnings ?? 0;
+            if ($payoutAmount > $availableBalance) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => "Insufficient balance. Approved: $" . $payoutAmount . ", Available: $" . $availableBalance
+                ]);
+            }
+
+            // Create the actual Stripe payout with approved amount
             try {
                 $payout = $this->createStripePayout(
                     $seller->stripe_connect_id,
-                    $approvalRequest->amount,
+                    $payoutAmount, // Use approved amount (not requested amount)
                     $seller->wh_account_id
                 );
 
@@ -1480,7 +1501,7 @@ class StripeConnectController extends Controller
                     'wh_account_id' => $seller->wh_account_id,
                     'stripe_payout_id' => $payout->id,
                     'stripe_connect_account_id' => $seller->stripe_connect_id,
-                    'amount' => $approvalRequest->amount,
+                    'amount' => $payoutAmount, // Use approved amount
                     'currency' => 'USD',
                     'status' => $payout->status,
                     'payout_type' => 'admin_approved',
@@ -1492,11 +1513,11 @@ class StripeConnectController extends Controller
                     'updated_at' => now()
                 ]);
 
-                // Update seller balance
+                // Update seller balance with approved amount
                 DB::table('wh_warehouse_user')
                     ->where('wh_account_id', $seller->wh_account_id)
                     ->update([
-                        'Shipper_earnings' => DB::raw("Shipper_earnings - " . $approvalRequest->amount),
+                        'Shipper_earnings' => DB::raw("Shipper_earnings - " . $payoutAmount), // Use approved amount
                         'updated_at' => now()
                     ]);
 
@@ -1505,7 +1526,7 @@ class StripeConnectController extends Controller
                     ->where('id', $request_id)
                     ->update([
                         'status' => 'approved',
-                        'admin_notes' => $admin_notes,
+                        'admin_notes' => $admin_notes . ($approved_amount ? " (Partial approval: $$payoutAmount of $$approvalRequest->amount requested)" : ''),
                         'stripe_payout_id' => $payoutId,
                         'processed_at' => now(),
                         'updated_at' => now()
@@ -1514,7 +1535,9 @@ class StripeConnectController extends Controller
                 Log::info('[PAYOUT APPROVAL] Request approved and payout created', [
                     'request_id' => $request_id,
                     'wh_account_id' => $seller->wh_account_id,
-                    'amount' => $approvalRequest->amount,
+                    'requested_amount' => $approvalRequest->amount,
+                    'approved_amount' => $payoutAmount, // Log both amounts
+                    'is_partial' => $payoutAmount < $approvalRequest->amount,
                     'payout_id' => $payoutId,
                     'stripe_payout_id' => $payout->id
                 ]);
@@ -1526,7 +1549,9 @@ class StripeConnectController extends Controller
                         'approval_request_id' => $request_id,
                         'payout_id' => $payoutId,
                         'stripe_payout_id' => $payout->id,
-                        'amount' => $approvalRequest->amount,
+                        'requested_amount' => $approvalRequest->amount,
+                        'approved_amount' => $payoutAmount, // Actual amount paid out
+                        'is_partial' => $payoutAmount < $approvalRequest->amount,
                         'status' => $payout->status,
                         'arrival_date' => isset($payout->arrival_date) ? date('Y-m-d', $payout->arrival_date) : null
                     ]

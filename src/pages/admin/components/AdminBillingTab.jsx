@@ -7,6 +7,8 @@ import {
   CardTitle,
   Button,
   Input,
+  ApprovalModal,
+  PromptModal,
 } from '@/components/ui'
 import {
   CreditCard,
@@ -27,6 +29,7 @@ import {
   ThumbsUp,
   ThumbsDown,
   Bell,
+  Zap,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -49,6 +52,9 @@ export function AdminBillingTab({ shipper }) {
   const [loadingApprovalRequests, setLoadingApprovalRequests] = useState(false)
   const [approvingRequest, setApprovingRequest] = useState(null)
   const [rejectingRequest, setRejectingRequest] = useState(null)
+  const [showApprovalModal, setShowApprovalModal] = useState(false)
+  const [showRejectModal, setShowRejectModal] = useState(false)
+  const [selectedRequest, setSelectedRequest] = useState(null)
   const [config, setConfig] = useState({
     commission_percentage: shipper?.stripe_commission_percentage || 5,
     payout_frequency: shipper?.stripe_payout_frequency || 'monthly',
@@ -145,22 +151,29 @@ export function AdminBillingTab({ shipper }) {
     }
   }
 
-  const handleApproveRequest = async (request) => {
-    if (!confirm(`Are you sure you want to approve payout of $${parseFloat(request.amount).toFixed(2)}?`)) {
-      return
-    }
+  const handleApproveRequest = (request) => {
+    setSelectedRequest(request)
+    setShowApprovalModal(true)
+  }
 
-    setApprovingRequest(request.id)
+  const confirmApprove = async (approvedAmount, notes) => {
+    if (!selectedRequest) return
+
+    setApprovingRequest(selectedRequest.id)
+    setShowApprovalModal(false)
+
     try {
       const response = await stripeConnectService.approvePayoutRequest(
-        request.id,
-        'Approved by admin'
+        selectedRequest.id,
+        notes || 'Approved by admin',
+        approvedAmount // Will be null if approving full amount
       )
       if (response.data?.status === 1) {
-        toast.success(`Payout of $${parseFloat(request.amount).toFixed(2)} approved and created!`)
+        const actualAmount = approvedAmount || selectedRequest.amount
+        toast.success(`Payout of $${parseFloat(actualAmount).toFixed(2)} approved and created!`)
         fetchApprovalRequests()
-        fetchPayouts() // Refresh payout history
-        fetchEarnings() // Refresh earnings
+        fetchPayouts()
+        fetchEarnings()
       } else {
         toast.error(response.data?.message || 'Failed to approve payout request')
       }
@@ -171,17 +184,20 @@ export function AdminBillingTab({ shipper }) {
     }
   }
 
-  const handleRejectRequest = async (request) => {
-    const reason = prompt('Enter reason for rejection:')
-    if (!reason) {
-      toast.error('Rejection reason is required')
-      return
-    }
+  const handleRejectRequest = (request) => {
+    setSelectedRequest(request)
+    setShowRejectModal(true)
+  }
 
-    setRejectingRequest(request.id)
+  const confirmReject = async (reason) => {
+    if (!selectedRequest) return
+
+    setRejectingRequest(selectedRequest.id)
+    setShowRejectModal(false)
+
     try {
       const response = await stripeConnectService.rejectPayoutRequest(
-        request.id,
+        selectedRequest.id,
         reason
       )
       if (response.data?.status === 1) {
@@ -194,6 +210,46 @@ export function AdminBillingTab({ shipper }) {
       toast.error(error.response?.data?.message || 'Failed to reject payout request')
     } finally {
       setRejectingRequest(null)
+    }
+  }
+
+  const handleCreatePayout = async () => {
+    const availableBalance = parseFloat(earnings?.available_balance || 0)
+    const requestedAmount = payoutAmount ? parseFloat(payoutAmount) : availableBalance
+
+    if (requestedAmount <= 0) {
+      toast.error('Please enter a valid payout amount')
+      return
+    }
+
+    if (requestedAmount > availableBalance) {
+      toast.error(`Amount exceeds available balance ($${availableBalance.toFixed(2)})`)
+      return
+    }
+
+    if (requestedAmount < 50) {
+      toast.error('Minimum payout amount is $50.00')
+      return
+    }
+
+    setLoadingPayout(true)
+    try {
+      const response = await stripeConnectService.requestPayout(
+        shipper.wh_account_id,
+        requestedAmount
+      )
+      if (response.data?.status === 1) {
+        toast.success(`Payout of $${requestedAmount.toFixed(2)} created successfully!`)
+        setPayoutAmount('')
+        fetchEarnings()
+        fetchPayouts()
+      } else {
+        toast.error(response.data?.message || 'Failed to create payout')
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to create payout')
+    } finally {
+      setLoadingPayout(false)
     }
   }
 
@@ -460,15 +516,71 @@ export function AdminBillingTab({ shipper }) {
                 </div>
               </div>
               {isPayoutsEnabled && parseFloat(earnings?.available_balance || 0) >= 50 && (
-                <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                  <div className="flex items-start gap-2">
-                    <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-                    <div className="text-xs text-blue-700 dark:text-blue-300">
-                      <p className="font-medium mb-1">Manual Payout Override</p>
-                      <p className="mb-2">Payouts are now managed through approval requests. Check the "Payout Approval Requests" section above to approve pending requests.</p>
-                      <p className="text-blue-600 dark:text-blue-400">
-                        If you need to create a payout without a request (emergency), contact system administrator.
+                <div className="mt-4 space-y-4">
+                  {/* Manual Payout Section */}
+                  <div className="p-4 bg-violet-50 dark:bg-violet-900/20 rounded-lg border border-violet-200 dark:border-violet-800">
+                    <h4 className="text-sm font-medium text-violet-900 dark:text-violet-200 mb-3 flex items-center gap-2">
+                      <Zap className="w-4 h-4" />
+                      Admin Manual Payout (Direct Transfer)
+                    </h4>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                          Payout Amount (leave empty for full balance)
+                        </label>
+                        <Input
+                          type="number"
+                          value={payoutAmount}
+                          onChange={(e) => setPayoutAmount(e.target.value)}
+                          placeholder={`Max: $${parseFloat(earnings?.available_balance || 0).toFixed(2)}`}
+                          min="50"
+                          max={parseFloat(earnings?.available_balance || 0)}
+                          step="0.01"
+                          className="w-full"
+                          disabled={loadingPayout}
+                        />
+                      </div>
+                      <Button
+                        onClick={handleCreatePayout}
+                        className="w-full bg-violet-600 hover:bg-violet-700"
+                        size="sm"
+                        disabled={loadingPayout}
+                      >
+                        {loadingPayout ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Creating...
+                          </>
+                        ) : (
+                          `Create Payout Now${payoutAmount ? ` ($${parseFloat(payoutAmount).toFixed(2)})` : ' (Full Balance)'}`
+                        )}
+                      </Button>
+                      <p className="text-xs text-violet-600 dark:text-violet-400">
+                        Creates payout immediately without seller request
                       </p>
+                    </div>
+                  </div>
+
+                  {/* Separator */}
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-slate-200 dark:border-slate-700"></div>
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-white dark:bg-slate-800 px-2 text-slate-500">
+                        OR
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Approval System Notice */}
+                  <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <div className="flex items-start gap-2">
+                      <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                      <div className="text-xs text-blue-700 dark:text-blue-300">
+                        <p className="font-medium mb-1">Seller Payout Requests</p>
+                        <p>Check "Payout Approval Requests" section below to approve pending requests from sellers.</p>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -934,6 +1046,24 @@ export function AdminBillingTab({ shipper }) {
           </CardContent>
         </Card>
       )}
+
+      {/* Modals */}
+      <ApprovalModal
+        isOpen={showApprovalModal}
+        onClose={() => setShowApprovalModal(false)}
+        onApprove={confirmApprove}
+        request={selectedRequest}
+        availableBalance={earnings?.available_balance}
+      />
+
+      <PromptModal
+        isOpen={showRejectModal}
+        onClose={() => setShowRejectModal(false)}
+        onSubmit={confirmReject}
+        title="Reject Payout Request"
+        message="Please provide a reason for rejecting this payout request:"
+        placeholder="e.g., Pending verification, Insufficient documentation..."
+      />
     </div>
   )
 }
