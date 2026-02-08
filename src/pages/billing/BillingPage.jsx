@@ -66,19 +66,23 @@ const BillingPage = () => {
     try {
       const response = await stripeConnectService.createConnectAccount(user.wh_account_id)
 
+      // Debug: Log the response
+      console.log('[STRIPE CONNECT] Response:', response.data)
+
       if (response.data?.status === 1) {
-        // Check if already connected
-        if (response.data?.data?.already_connected) {
-          toast.success('Your Stripe account is already connected!')
-          // Reload user data to update UI
-          window.location.reload()
-        }
-        // Check if onboarding URL provided
-        else if (response.data?.data?.onboarding_url) {
+        // Check if onboarding URL provided (refresh link or new account)
+        if (response.data?.data?.onboarding_url) {
           // Redirect to Stripe onboarding
           window.location.href = response.data.data.onboarding_url
+        }
+        // Check if already connected and fully active
+        else if (response.data?.data?.already_connected) {
+          toast.success('Your Stripe account is already connected and active!')
+          // Reload user data to update UI
+          setTimeout(() => window.location.reload(), 2000)
         } else {
-          toast.error('Failed to get onboarding URL')
+          toast.error('Unexpected response from server')
+          console.error('Unexpected response:', response.data)
         }
       } else {
         toast.error(response.data?.message || 'Failed to connect Stripe account')
