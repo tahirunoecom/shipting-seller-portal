@@ -9,6 +9,7 @@ import { productService } from '@/services/products'
 import { orderService } from '@/services/orders'
 import { DRIVER_STATUS_LABELS } from '@/services/driver'
 import { Card, CardContent, Modal, Button, Input } from '@/components/ui'
+import { AdminBillingTab } from './components/AdminBillingTab'
 import {
   ArrowLeft,
   User,
@@ -3025,49 +3026,7 @@ function WhatsAppTab({ shipperId }) {
 }
 
 function BillingTab({ shipper }) {
-  return (
-    <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
-      <CardContent className="p-6">
-        <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-          <CreditCard className="w-5 h-5 text-violet-500" />
-          Billing Information
-        </h3>
-
-        <div className="space-y-4">
-          <div className="flex items-center justify-between p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
-                <CreditCard className="w-5 h-5 text-violet-600 dark:text-violet-400" />
-              </div>
-              <div>
-                <p className="font-medium text-slate-900 dark:text-white">Stripe Connect</p>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Payment processing</p>
-              </div>
-            </div>
-            {shipper?.stripe_connect === 1 || shipper?.stripe_connect === '1' ? (
-              <span className="px-3 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">Connected</span>
-            ) : (
-              <span className="px-3 py-1 rounded-full text-xs font-medium bg-slate-200 text-slate-600 dark:bg-slate-600 dark:text-slate-400">Not Connected</span>
-            )}
-          </div>
-
-          {shipper?.stripe_account_id && (
-            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50">
-              <p className="text-xs text-slate-500 dark:text-slate-400">Stripe Account ID</p>
-              <p className="font-mono text-sm text-slate-900 dark:text-white mt-1">{shipper.stripe_account_id}</p>
-            </div>
-          )}
-
-          <div className="p-4 rounded-xl border border-dashed border-slate-200 dark:border-slate-700 text-center">
-            <CreditCard className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto" />
-            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-              Detailed billing history and invoices will be available here
-            </p>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  )
+  return <AdminBillingTab shipper={shipper} />
 }
 
 function DriverTab({ shipper, shipperId }) {
