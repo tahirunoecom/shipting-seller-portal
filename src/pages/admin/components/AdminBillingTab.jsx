@@ -269,47 +269,6 @@ export function AdminBillingTab({ shipper }) {
     }
   }
 
-  const handleCreatePayout = async () => {
-    // Validate payout amount
-    const availableBalance = parseFloat(earnings?.available_balance || 0)
-    const requestedAmount = payoutAmount ? parseFloat(payoutAmount) : availableBalance
-
-    if (requestedAmount <= 0) {
-      toast.error('Please enter a valid payout amount')
-      return
-    }
-
-    if (requestedAmount > availableBalance) {
-      toast.error(`Amount exceeds available balance ($${availableBalance.toFixed(2)})`)
-      return
-    }
-
-    if (requestedAmount < 50) {
-      toast.error('Minimum payout amount is $50.00')
-      return
-    }
-
-    setLoadingPayout(true)
-    try {
-      const response = await stripeConnectService.requestPayout(
-        shipper.wh_account_id,
-        requestedAmount
-      )
-      if (response.data?.status === 1) {
-        toast.success(`Payout of $${requestedAmount.toFixed(2)} created successfully!`)
-        setPayoutAmount('') // Reset amount field
-        fetchEarnings()
-        fetchPayouts() // Refresh payout history
-      } else {
-        toast.error(response.data?.message || 'Failed to create payout')
-      }
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to create payout')
-    } finally {
-      setLoadingPayout(false)
-    }
-  }
-
   const handleSaveConfig = async () => {
     try {
       // TODO: Implement admin update config endpoint call
