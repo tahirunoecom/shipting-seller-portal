@@ -7,3 +7,4 @@ export { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 export { Modal, ModalFooter } from './Modal'
 export { Spinner, PageLoader, FullPageLoader } from './Spinner'
 export { ConfirmModal, PromptModal, ApprovalModal } from './ConfirmModal'
+export { default as UrgentAlert } from './UrgentAlert'
