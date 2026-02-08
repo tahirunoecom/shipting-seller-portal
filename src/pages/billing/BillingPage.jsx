@@ -32,6 +32,8 @@ const BillingPage = () => {
   const [payoutAmount, setPayoutAmount] = useState('')
   const [earnings, setEarnings] = useState(null)
   const [loadingEarnings, setLoadingEarnings] = useState(false)
+  const [payouts, setPayouts] = useState([])
+  const [loadingPayouts, setLoadingPayouts] = useState(false)
 
   const isConnected = user?.stripe_connect_id && user?.stripe_connect === 1
   const isOnboardingComplete = user?.stripe_onboarding_completed === 1
@@ -41,6 +43,7 @@ const BillingPage = () => {
   useEffect(() => {
     if (isConnected && user?.wh_account_id) {
       fetchEarnings()
+      fetchPayouts()
     }
   }, [isConnected, user?.wh_account_id])
 
@@ -55,6 +58,20 @@ const BillingPage = () => {
       console.error('Error fetching earnings:', error)
     } finally {
       setLoadingEarnings(false)
+    }
+  }
+
+  const fetchPayouts = async () => {
+    setLoadingPayouts(true)
+    try {
+      const response = await stripeConnectService.getPayouts(user.wh_account_id, 20)
+      if (response.data?.status === 1) {
+        setPayouts(response.data.data.payouts || [])
+      }
+    } catch (error) {
+      console.error('Error fetching payouts:', error)
+    } finally {
+      setLoadingPayouts(false)
     }
   }
 
@@ -152,6 +169,7 @@ const BillingPage = () => {
         toast.success(`Payout of $${requestedAmount.toFixed(2)} requested successfully!`)
         setPayoutAmount('') // Reset amount field
         fetchEarnings()
+        fetchPayouts() // Refresh payout history
       } else {
         toast.error(response.data?.message || 'Failed to request payout')
       }
@@ -394,6 +412,72 @@ const BillingPage = () => {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* Payout History */}
+      {isConnected && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <DollarSign className="w-5 h-5" />
+              Payout History
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loadingPayouts ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
+              </div>
+            ) : payouts.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-gray-200 dark:border-gray-700">
+                      <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Date</th>
+                      <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Amount</th>
+                      <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>
+                      <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Method</th>
+                      <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Arrival Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {payouts.map((payout) => (
+                      <tr key={payout.id} className="border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                        <td className="py-3 px-4 text-sm text-gray-900 dark:text-white">
+                          {new Date(payout.created_at).toLocaleDateString()}
+                        </td>
+                        <td className="py-3 px-4 text-sm font-medium text-gray-900 dark:text-white">
+                          ${parseFloat(payout.amount).toFixed(2)}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            payout.status === 'paid' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                            payout.status === 'pending' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                            payout.status === 'in_transit' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                            'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-400'
+                          }`}>
+                            {payout.status}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-sm text-gray-600 dark:text-gray-400 capitalize">
+                          {payout.method || 'standard'}
+                        </td>
+                        <td className="py-3 px-4 text-sm text-gray-600 dark:text-gray-400">
+                          {payout.arrival_date ? new Date(payout.arrival_date).toLocaleDateString() : '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <DollarSign className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+                <p className="text-sm text-gray-500 dark:text-gray-400">No payouts yet</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {/* Info Card */}
