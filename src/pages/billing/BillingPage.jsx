@@ -28,6 +28,7 @@ const BillingPage = () => {
   const { user, updateUser } = useAuthStore()
   const [connectingStripe, setConnectingStripe] = useState(false)
   const [loadingDashboard, setLoadingDashboard] = useState(false)
+  const [loadingPayout, setLoadingPayout] = useState(false)
   const [earnings, setEarnings] = useState(null)
   const [loadingEarnings, setLoadingEarnings] = useState(false)
 
@@ -121,6 +122,7 @@ const BillingPage = () => {
   }
 
   const handleRequestPayout = async () => {
+    setLoadingPayout(true)
     try {
       const response = await stripeConnectService.requestPayout(user.wh_account_id)
       if (response.data?.status === 1) {
@@ -131,6 +133,8 @@ const BillingPage = () => {
       }
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to request payout')
+    } finally {
+      setLoadingPayout(false)
     }
   }
 
@@ -330,8 +334,16 @@ const BillingPage = () => {
                   onClick={handleRequestPayout}
                   className="w-full mt-4"
                   size="sm"
+                  disabled={loadingPayout}
                 >
-                  Request Payout
+                  {loadingPayout ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    'Request Payout'
+                  )}
                 </Button>
               )}
             </CardContent>
