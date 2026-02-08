@@ -173,7 +173,7 @@ export function AdminBillingTab({ shipper }) {
   }
 
   const handleAddTestBalance = async () => {
-    if (!confirm('Add $500 test balance to this seller\'s connected Stripe account?\n\nNote: This only works in TEST mode.')) {
+    if (!confirm('Add $500 test balance to PLATFORM account?\n\nThis simulates a customer payment so you can pay this seller.\nNote: Only works in TEST mode.')) {
       return
     }
 
@@ -181,7 +181,8 @@ export function AdminBillingTab({ shipper }) {
     try {
       const response = await stripeConnectService.addTestBalance(shipper.wh_account_id, 500)
       if (response.data?.status === 1) {
-        toast.success(`Test balance added! Available: $${response.data.data.available_balance.toFixed(2)}`)
+        const platformBalance = response.data.data.platform_balance || response.data.data.available_balance
+        toast.success(`Test balance added! Platform has: $${platformBalance.toFixed(2)}`)
         fetchEarnings() // Refresh earnings to show new balance
       } else {
         toast.error(response.data?.message || 'Failed to add test balance')
@@ -331,7 +332,7 @@ export function AdminBillingTab({ shipper }) {
                 <div>
                   <p className="font-medium text-amber-900 dark:text-amber-100">Testing Payouts</p>
                   <p className="text-xs text-amber-700 dark:text-amber-300">
-                    Add test funds to this seller's Stripe account for payout testing
+                    Add test funds to platform account so you can pay sellers (TEST mode only)
                   </p>
                 </div>
               </div>

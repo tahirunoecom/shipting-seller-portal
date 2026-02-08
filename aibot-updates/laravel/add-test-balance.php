@@ -1,16 +1,20 @@
 <?php
 
 /**
- * Add Test Balance to Stripe Connected Account
+ * Add Test Balance to PLATFORM Account
  *
- * This script helps you add test funds to a seller's connected Stripe account
- * so you can test payouts in development.
+ * This script helps you add test funds to the PLATFORM's Stripe account
+ * so you can test payouts to sellers in development.
+ *
+ * The correct flow:
+ * 1. Platform receives payments from customers (this script simulates that)
+ * 2. Platform pays out sellers from platform balance
  *
  * Usage:
- *   php add-test-balance.php <connected_account_id> <amount_in_dollars>
+ *   php add-test-balance.php <amount_in_dollars>
  *
  * Example:
- *   php add-test-balance.php acct_1234567890 500
+ *   php add-test-balance.php 500
  */
 
 require __DIR__ . '/../../vendor/autoload.php';
@@ -22,37 +26,24 @@ $dotenv->load();
 \Stripe\Stripe::setApiKey($_ENV['STRIPE_SECRET_KEY']);
 
 // Get command line arguments
-$connectedAccountId = $argv[1] ?? null;
-$amountInDollars = $argv[2] ?? 500;
+$amountInDollars = $argv[1] ?? 500;
 
-if (!$connectedAccountId) {
-    echo "❌ Error: Connected account ID is required\n\n";
-    echo "Usage: php add-test-balance.php <connected_account_id> <amount>\n";
-    echo "Example: php add-test-balance.php acct_1234567890 500\n\n";
-    echo "To find connected account IDs, check your database:\n";
-    echo "  SELECT wh_account_id, stripe_connect_id, locationname FROM wh_warehouse_user WHERE stripe_connect_id IS NOT NULL;\n\n";
-    exit(1);
-}
-
-echo "🔄 Adding test balance to connected account...\n";
-echo "Connected Account ID: $connectedAccountId\n";
+echo "🔄 Adding test balance to PLATFORM account...\n";
 echo "Amount: $$amountInDollars\n\n";
 
 try {
-    // Method 1: Create a test charge directly on the connected account
-    echo "📝 Creating test charge on connected account...\n";
+    // Create a test charge on the PLATFORM account (simulates customer payment)
+    echo "📝 Creating test charge on platform account...\n";
 
     $charge = \Stripe\Charge::create([
         'amount' => (int)($amountInDollars * 100), // Convert to cents
         'currency' => 'usd',
         'source' => 'tok_visa', // Stripe test token
-        'description' => "Test charge for payout testing - $" . $amountInDollars,
+        'description' => "Test platform balance for seller payouts - $" . $amountInDollars,
         'metadata' => [
             'test_balance' => 'true',
             'added_at' => date('Y-m-d H:i:s'),
         ],
-    ], [
-        'stripe_account' => $connectedAccountId // Create charge on connected account
     ]);
 
     echo "✅ Success! Test charge created:\n";
@@ -60,9 +51,9 @@ try {
     echo "   Amount: $" . ($charge->amount / 100) . "\n";
     echo "   Status: " . $charge->status . "\n\n";
 
-    // Check the balance
-    echo "💰 Checking connected account balance...\n";
-    $balance = \Stripe\Balance::retrieve(['stripe_account' => $connectedAccountId]);
+    // Check the PLATFORM balance
+    echo "💰 Checking platform account balance...\n";
+    $balance = \Stripe\Balance::retrieve();
 
     $availableBalance = 0;
     if (isset($balance->available) && count($balance->available) > 0) {
@@ -78,10 +69,10 @@ try {
     echo "   Pending Balance: $" . number_format($pendingBalance, 2) . "\n\n";
 
     if ($availableBalance >= 50) {
-        echo "✅ Connected account now has sufficient balance for payouts!\n";
+        echo "✅ Platform account now has sufficient balance for seller payouts!\n";
         echo "   Minimum payout: $50.00\n";
         echo "   Available: $" . number_format($availableBalance, 2) . "\n\n";
-        echo "🎉 You can now test payouts in your app!\n";
+        echo "🎉 You can now pay sellers from your app!\n";
     } else {
         echo "⚠️  Warning: Balance is still below minimum payout amount ($50.00)\n";
         echo "   Run this script again to add more funds.\n";
@@ -90,9 +81,8 @@ try {
 } catch (\Stripe\Exception\InvalidRequestException $e) {
     echo "❌ Error: " . $e->getMessage() . "\n\n";
     echo "Possible causes:\n";
-    echo "  - Invalid connected account ID\n";
-    echo "  - Account doesn't exist\n";
-    echo "  - Using live API key with test account ID (or vice versa)\n\n";
+    echo "  - Invalid API key\n";
+    echo "  - Using live API key in test mode (or vice versa)\n\n";
     exit(1);
 } catch (Exception $e) {
     echo "❌ Error: " . $e->getMessage() . "\n";

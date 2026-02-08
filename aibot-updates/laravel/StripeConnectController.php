@@ -1023,12 +1023,12 @@ class StripeConnectController extends Controller
     }
 
     /**
-     * [TESTING/DEV] Add test balance to connected account
+     * [TESTING/DEV] Add test balance to PLATFORM account
      * POST /admin/stripe/add-test-balance
      *
      * Body: { wh_account_id: 1016, amount: 500.00 }
      *
-     * NOTE: Only works in TEST mode. Will fail in production.
+     * NOTE: Only works in TEST mode. Adds balance to platform (not seller).
      */
     public function adminAddTestBalance(Request $request)
     {
@@ -1056,50 +1056,57 @@ class StripeConnectController extends Controller
                 ->where('wh_account_id', $wh_account_id)
                 ->first();
 
-            if (!$seller || !$seller->stripe_connect_id) {
+            if (!$seller) {
                 return response()->json([
                     'status' => 0,
-                    'message' => 'Stripe Connect account not found for this seller'
+                    'message' => 'Seller not found'
                 ]);
             }
 
-            // Create a test charge on the connected account
+            // Create a test charge on the PLATFORM account (not connected account)
+            // This simulates a customer payment to the platform
             $charge = \Stripe\Charge::create([
                 'amount' => (int)($amount * 100),
                 'currency' => 'usd',
                 'source' => 'tok_visa', // Stripe test token
-                'description' => "Test balance for payout testing - $$amount",
+                'description' => "Test platform balance for seller payouts - $$amount",
                 'metadata' => [
                     'wh_account_id' => $wh_account_id,
                     'test_balance' => 'true',
                     'added_at' => now()->toDateTimeString(),
                 ],
-            ], [
-                'stripe_account' => $seller->stripe_connect_id
             ]);
 
-            // Get updated balance
-            $balance = \Stripe\Balance::retrieve(['stripe_account' => $seller->stripe_connect_id]);
+            // Get updated PLATFORM balance
+            $platformBalance = \Stripe\Balance::retrieve();
 
             $availableBalance = 0;
-            if (isset($balance->available) && count($balance->available) > 0) {
-                $availableBalance = $balance->available[0]->amount / 100;
+            if (isset($platformBalance->available) && count($platformBalance->available) > 0) {
+                $availableBalance = $platformBalance->available[0]->amount / 100;
             }
 
-            Log::info('[STRIPE CONNECT TEST] Test balance added', [
+            // Also update the seller's pending earnings in database
+            DB::table('wh_warehouse_user')
+                ->where('wh_account_id', $wh_account_id)
+                ->update([
+                    'Shipper_earnings' => DB::raw("Shipper_earnings + $amount"),
+                    'updated_at' => now()
+                ]);
+
+            Log::info('[STRIPE CONNECT TEST] Test balance added to PLATFORM', [
                 'wh_account_id' => $wh_account_id,
-                'stripe_account_id' => $seller->stripe_connect_id,
                 'amount_added' => $amount,
-                'new_available_balance' => $availableBalance
+                'new_platform_balance' => $availableBalance
             ]);
 
             return response()->json([
                 'status' => 1,
-                'message' => "Test balance of $$amount added successfully",
+                'message' => "Test balance of $$amount added to platform account",
                 'data' => [
                     'charge_id' => $charge->id,
                     'amount_added' => $amount,
-                    'available_balance' => $availableBalance,
+                    'platform_balance' => $availableBalance,
+                    'seller_pending_earnings' => $seller->Shipper_earnings + $amount,
                     'can_create_payout' => $availableBalance >= 50.00
                 ]
             ]);
@@ -1256,63 +1263,107 @@ class StripeConnectController extends Controller
     }
 
     /**
-     * Create a Stripe payout
+     * Create a Stripe transfer from platform to seller's connected account
+     * Then optionally trigger a payout from connected account to seller's bank
      */
     private function createStripePayout($stripeAccountId, $amount, $wh_account_id)
     {
         try {
-            // First, check the account balance
-            $balance = \Stripe\Balance::retrieve(['stripe_account' => $stripeAccountId]);
+            // First, check PLATFORM balance (not connected account balance)
+            $platformBalance = \Stripe\Balance::retrieve();
 
-            // Get available balance in cents (default currency)
+            // Get platform's available balance in cents
             $availableBalance = 0;
-            if (isset($balance->available) && count($balance->available) > 0) {
-                $availableBalance = $balance->available[0]->amount; // amount in cents
+            if (isset($platformBalance->available) && count($platformBalance->available) > 0) {
+                $availableBalance = $platformBalance->available[0]->amount;
             }
 
-            Log::info('[STRIPE CONNECT] Checking balance before payout', [
+            Log::info('[STRIPE CONNECT] Checking PLATFORM balance before payout', [
                 'wh_account_id' => $wh_account_id,
                 'stripe_account_id' => $stripeAccountId,
-                'available_balance_cents' => $availableBalance,
+                'platform_available_balance_cents' => $availableBalance,
                 'requested_amount_dollars' => $amount
             ]);
 
             // Convert to cents
             $amountInCents = (int) ($amount * 100);
 
-            // Check if sufficient balance
+            // Check if platform has sufficient balance
             if ($availableBalance < $amountInCents) {
                 $availableInDollars = number_format($availableBalance / 100, 2);
-                Log::warning('[STRIPE CONNECT] Insufficient Stripe balance', [
+                Log::warning('[STRIPE CONNECT] Insufficient PLATFORM balance', [
                     'wh_account_id' => $wh_account_id,
-                    'available_stripe_balance' => $availableInDollars,
+                    'platform_available_balance' => $availableInDollars,
                     'requested_amount' => $amount
                 ]);
 
-                throw new Exception("Insufficient balance in Stripe account. Available: $$availableInDollars, Requested: $$amount. Note: You need to charge customers through Stripe first before creating payouts.");
+                throw new Exception("Insufficient balance in platform account. Available: $$availableInDollars, Requested: $$amount. Platform needs funds before paying sellers.");
             }
 
-            // Create payout on connected account
-            $payout = Payout::create(
-                [
-                    'amount' => $amountInCents,
-                    'currency' => 'usd',
-                    'description' => "Payout for seller $wh_account_id",
-                    'metadata' => [
-                        'wh_account_id' => $wh_account_id,
-                        'platform' => 'shipting'
-                    ]
-                ],
-                ['stripe_account' => $stripeAccountId] // Make payout on connected account
-            );
+            // Step 1: Transfer from platform to connected account
+            $transfer = Transfer::create([
+                'amount' => $amountInCents,
+                'currency' => 'usd',
+                'destination' => $stripeAccountId,
+                'description' => "Payout to seller (wh_account_id: $wh_account_id)",
+                'metadata' => [
+                    'wh_account_id' => $wh_account_id,
+                    'platform' => 'shipting',
+                    'type' => 'seller_payout'
+                ]
+            ]);
 
-            Log::info('[STRIPE CONNECT] Payout created successfully', [
+            Log::info('[STRIPE CONNECT] Transfer created from platform to seller', [
                 'wh_account_id' => $wh_account_id,
-                'payout_id' => $payout->id,
+                'transfer_id' => $transfer->id,
                 'amount' => $amount
             ]);
 
-            return $payout;
+            // Step 2: Create payout from connected account to seller's bank (optional)
+            // The transfer already moved money to their Stripe balance
+            // Stripe will handle automatic payouts based on their schedule,
+            // but we can trigger immediate payout if needed
+            try {
+                $payout = Payout::create(
+                    [
+                        'amount' => $amountInCents,
+                        'currency' => 'usd',
+                        'description' => "Payout for seller $wh_account_id",
+                        'method' => 'standard', // Free, takes 2-3 business days
+                        'metadata' => [
+                            'wh_account_id' => $wh_account_id,
+                            'platform' => 'shipting',
+                            'transfer_id' => $transfer->id
+                        ]
+                    ],
+                    ['stripe_account' => $stripeAccountId]
+                );
+
+                Log::info('[STRIPE CONNECT] Payout created to seller bank', [
+                    'wh_account_id' => $wh_account_id,
+                    'payout_id' => $payout->id,
+                    'transfer_id' => $transfer->id,
+                    'amount' => $amount
+                ]);
+
+                // Return payout object
+                return $payout;
+            } catch (Exception $payoutError) {
+                // If payout fails (e.g., no bank account), just log it
+                // The transfer still succeeded, money is in their Stripe balance
+                Log::warning('[STRIPE CONNECT] Payout to bank failed, but transfer succeeded', [
+                    'wh_account_id' => $wh_account_id,
+                    'transfer_id' => $transfer->id,
+                    'payout_error' => $payoutError->getMessage()
+                ]);
+
+                // Return a mock payout object with the transfer info
+                return (object)[
+                    'id' => $transfer->id,
+                    'status' => 'transferred',
+                    'arrival_date' => null
+                ];
+            }
 
         } catch (Exception $e) {
             Log::error('[STRIPE CONNECT] Error creating payout', [
@@ -1321,7 +1372,6 @@ class StripeConnectController extends Controller
                 'amount' => $amount
             ]);
 
-            // Throw the exception so the calling function can handle it
             throw $e;
         }
     }
