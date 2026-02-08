@@ -60,19 +60,26 @@ class StripeConnectController extends Controller
                 try {
                     $account = Account::retrieve($seller->stripe_connect_id);
 
-                    // If account exists but onboarding not complete, return refresh link
-                    if (!$account->details_submitted) {
+                    // If account exists but onboarding not complete OR payouts not enabled, return refresh link
+                    if (!$account->details_submitted || !$account->payouts_enabled) {
+                        Log::info('[STRIPE CONNECT] Account incomplete, providing refresh link', [
+                            'wh_account_id' => $wh_account_id,
+                            'details_submitted' => $account->details_submitted,
+                            'payouts_enabled' => $account->payouts_enabled
+                        ]);
                         return $this->refreshOnboardingLink($request);
                     }
 
+                    // Account is fully connected and active
                     return response()->json([
-                        'status' => 0,
-                        'message' => 'Stripe account already connected',
+                        'status' => 1,
+                        'message' => 'Stripe account already connected and active',
                         'data' => [
                             'stripe_account_id' => $seller->stripe_connect_id,
                             'onboarding_completed' => $seller->stripe_onboarding_completed,
                             'charges_enabled' => $seller->stripe_charges_enabled,
-                            'payouts_enabled' => $seller->stripe_payouts_enabled
+                            'payouts_enabled' => $seller->stripe_payouts_enabled,
+                            'already_connected' => true
                         ]
                     ]);
                 } catch (Exception $e) {
