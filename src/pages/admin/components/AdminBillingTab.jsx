@@ -40,6 +40,8 @@ export function AdminBillingTab({ shipper }) {
   const [editingConfig, setEditingConfig] = useState(false)
   const [payoutAmount, setPayoutAmount] = useState('')
   const [loadingTestBalance, setLoadingTestBalance] = useState(false)
+  const [payouts, setPayouts] = useState([])
+  const [loadingPayouts, setLoadingPayouts] = useState(false)
   const [config, setConfig] = useState({
     commission_percentage: shipper?.stripe_commission_percentage || 5,
     payout_frequency: shipper?.stripe_payout_frequency || 'monthly',
@@ -62,6 +64,7 @@ export function AdminBillingTab({ shipper }) {
   useEffect(() => {
     if (isConnected && shipper?.wh_account_id) {
       fetchEarnings()
+      fetchPayouts()
     }
   }, [isConnected, shipper?.wh_account_id])
 
@@ -103,6 +106,20 @@ export function AdminBillingTab({ shipper }) {
       console.error('Error fetching earnings:', error)
     } finally {
       setLoadingEarnings(false)
+    }
+  }
+
+  const fetchPayouts = async () => {
+    setLoadingPayouts(true)
+    try {
+      const response = await stripeConnectService.getPayouts(shipper.wh_account_id, 20)
+      if (response.data?.status === 1) {
+        setPayouts(response.data.data.payouts || [])
+      }
+    } catch (error) {
+      console.error('Error fetching payouts:', error)
+    } finally {
+      setLoadingPayouts(false)
     }
   }
 
@@ -152,6 +169,7 @@ export function AdminBillingTab({ shipper }) {
         toast.success(`Payout of $${requestedAmount.toFixed(2)} created successfully!`)
         setPayoutAmount('') // Reset amount field
         fetchEarnings()
+        fetchPayouts() // Refresh payout history
       } else {
         toast.error(response.data?.message || 'Failed to create payout')
       }
@@ -467,6 +485,76 @@ export function AdminBillingTab({ shipper }) {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* Payout History */}
+      {isConnected && (
+        <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <DollarSign className="w-5 h-5 text-violet-500" />
+              Payout History
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loadingPayouts ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="w-8 h-8 animate-spin text-violet-500" />
+              </div>
+            ) : payouts.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-slate-200 dark:border-slate-700">
+                      <th className="text-left py-3 px-4 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Date</th>
+                      <th className="text-left py-3 px-4 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Amount</th>
+                      <th className="text-left py-3 px-4 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Status</th>
+                      <th className="text-left py-3 px-4 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Method</th>
+                      <th className="text-left py-3 px-4 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Arrival Date</th>
+                      <th className="text-left py-3 px-4 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Payout ID</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {payouts.map((payout) => (
+                      <tr key={payout.id} className="border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30">
+                        <td className="py-3 px-4 text-sm text-slate-900 dark:text-white">
+                          {new Date(payout.created_at).toLocaleDateString()}
+                        </td>
+                        <td className="py-3 px-4 text-sm font-medium text-slate-900 dark:text-white">
+                          ${parseFloat(payout.amount).toFixed(2)}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            payout.status === 'paid' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
+                            payout.status === 'pending' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                            payout.status === 'in_transit' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                            'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-400'
+                          }`}>
+                            {payout.status}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-sm text-slate-600 dark:text-slate-400 capitalize">
+                          {payout.method || 'standard'}
+                        </td>
+                        <td className="py-3 px-4 text-sm text-slate-600 dark:text-slate-400">
+                          {payout.arrival_date ? new Date(payout.arrival_date).toLocaleDateString() : '-'}
+                        </td>
+                        <td className="py-3 px-4 text-xs font-mono text-slate-500 dark:text-slate-400">
+                          {payout.stripe_payout_id}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <DollarSign className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
+                <p className="text-sm text-slate-500 dark:text-slate-400">No payouts yet</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {/* Admin Configuration */}
