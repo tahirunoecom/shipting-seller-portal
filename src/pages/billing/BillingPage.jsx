@@ -202,6 +202,40 @@ const BillingPage = () => {
     }
   }
 
+  const handleRequestRemainingAmount = async (remainingAmount) => {
+    const availableBalance = parseFloat(earnings?.available_balance || 0)
+
+    if (remainingAmount > availableBalance) {
+      toast.error(`Remaining amount ($${remainingAmount.toFixed(2)}) exceeds available balance ($${availableBalance.toFixed(2)})`)
+      return
+    }
+
+    if (remainingAmount < 50) {
+      toast.error('Minimum payout amount is $50.00')
+      return
+    }
+
+    setLoadingPayout(true)
+    try {
+      const response = await stripeConnectService.requestPayoutApproval(
+        user.wh_account_id,
+        remainingAmount,
+        'Request for remaining amount from previous partial approval'
+      )
+      if (response.data?.status === 1) {
+        toast.success(`Payout approval request of $${remainingAmount.toFixed(2)} submitted successfully!`)
+        fetchApprovalRequests() // Refresh approval requests
+        fetchEarnings()
+      } else {
+        toast.error(response.data?.message || 'Failed to submit approval request')
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to submit approval request')
+    } finally {
+      setLoadingPayout(false)
+    }
+  }
+
   return (
     <div className="container mx-auto px-4 py-6 max-w-7xl">
       {/* Page Header */}
@@ -513,8 +547,18 @@ const BillingPage = () => {
                               <div className="text-sm font-semibold text-green-600 dark:text-green-400">
                                 Approved: ${parseFloat(request.approved_amount).toFixed(2)}
                               </div>
-                              <div className="text-xs text-orange-600 dark:text-orange-400">
-                                Remaining: ${(parseFloat(request.amount) - parseFloat(request.approved_amount)).toFixed(2)}
+                              <div className="flex items-center gap-2 mt-1">
+                                <div className="text-xs text-orange-600 dark:text-orange-400 font-medium">
+                                  Remaining: ${(parseFloat(request.amount) - parseFloat(request.approved_amount)).toFixed(2)}
+                                </div>
+                                <Button
+                                  onClick={() => handleRequestRemainingAmount(parseFloat(request.amount) - parseFloat(request.approved_amount))}
+                                  size="sm"
+                                  className="h-6 px-2 text-xs bg-orange-600 hover:bg-orange-700"
+                                  disabled={loadingPayout}
+                                >
+                                  Request Remaining →
+                                </Button>
                               </div>
                             </div>
                           ) : (
