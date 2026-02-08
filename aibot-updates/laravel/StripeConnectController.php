@@ -1526,6 +1526,7 @@ class StripeConnectController extends Controller
                     ->where('id', $request_id)
                     ->update([
                         'status' => 'approved',
+                        'approved_amount' => $payoutAmount, // Store actual approved amount
                         'admin_notes' => $admin_notes . ($approved_amount ? " (Partial approval: $$payoutAmount of $$approvalRequest->amount requested)" : ''),
                         'stripe_payout_id' => $payoutId,
                         'processed_at' => now(),

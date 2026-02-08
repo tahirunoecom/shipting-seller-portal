@@ -590,9 +590,27 @@ export function AdminBillingTab({ shipper }) {
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
-                          <h4 className="font-semibold text-slate-900 dark:text-white text-lg">
-                            ${parseFloat(request.amount).toFixed(2)}
-                          </h4>
+                          {request.approved_amount && parseFloat(request.approved_amount) < parseFloat(request.amount) ? (
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-semibold text-slate-900 dark:text-white text-base">
+                                  Requested: ${parseFloat(request.amount).toFixed(2)}
+                                </h4>
+                              </div>
+                              <div className="flex items-center gap-2 mt-1">
+                                <h4 className="font-semibold text-emerald-600 dark:text-emerald-400 text-lg">
+                                  Approved: ${parseFloat(request.approved_amount).toFixed(2)}
+                                </h4>
+                                <span className="px-2 py-0.5 bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 rounded text-xs font-medium">
+                                  Partial (${(parseFloat(request.amount) - parseFloat(request.approved_amount)).toFixed(2)} remaining)
+                                </span>
+                              </div>
+                            </div>
+                          ) : (
+                            <h4 className="font-semibold text-slate-900 dark:text-white text-lg">
+                              ${parseFloat(request.amount).toFixed(2)}
+                            </h4>
+                          )}
                           <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
                             request.status === 'approved' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
                             request.status === 'pending' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
