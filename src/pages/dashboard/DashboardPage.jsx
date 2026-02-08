@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store'
+import { useWhatsAppStatus } from '@/hooks/useWhatsAppStatus'
 import { Card, CardContent, CardHeader, CardTitle, Badge, PageLoader, UrgentAlert } from '@/components/ui'
 import { formatCurrency, formatDate } from '@/utils/helpers'
 import { dashboardService, productService } from '@/services'
@@ -139,6 +140,7 @@ function getOrderStatusBadge(order) {
 function DashboardPage() {
   const { user } = useAuthStore()
   const navigate = useNavigate()
+  const { isConnected: isWhatsAppConnected } = useWhatsAppStatus()
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [period, setPeriod] = useState('month')
@@ -249,7 +251,7 @@ function DashboardPage() {
       {(!user?.stripe_connect || user?.stripe_connect !== 1) && (
         <UrgentAlert type="stripe" compact={false} />
       )}
-      {!user?.whatsapp_phone_number_id && (
+      {!isWhatsAppConnected && (
         <UrgentAlert type="whatsapp" compact={false} />
       )}
 

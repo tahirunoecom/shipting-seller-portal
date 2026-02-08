@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useAuthStore } from '@/store'
+import { useWhatsAppStatus } from '@/hooks/useWhatsAppStatus'
 import { orderService } from '@/services'
 import {
   Card,
@@ -72,6 +73,7 @@ const STATUS_COLORS = {
 
 function OrdersPage() {
   const { user } = useAuthStore()
+  const { isConnected: isWhatsAppConnected } = useWhatsAppStatus()
   const [searchParams, setSearchParams] = useSearchParams()
   const [loading, setLoading] = useState(true)
   const [orders, setOrders] = useState([])
@@ -494,7 +496,7 @@ function OrdersPage() {
       {(!user?.stripe_connect || user?.stripe_connect !== 1) && (
         <UrgentAlert type="stripe" compact={true} />
       )}
-      {!user?.whatsapp_phone_number_id && (
+      {!isWhatsAppConnected && (
         <UrgentAlert type="whatsapp" compact={true} />
       )}
 

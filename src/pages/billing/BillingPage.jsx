@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuthStore } from '@/store'
+import { useWhatsAppStatus } from '@/hooks/useWhatsAppStatus'
 import { stripeConnectService } from '@/services'
 import {
   Card,
@@ -29,6 +30,7 @@ import toast from 'react-hot-toast'
  */
 const BillingPage = () => {
   const { user, updateUser } = useAuthStore()
+  const { isConnected: isWhatsAppConnected } = useWhatsAppStatus()
   const [connectingStripe, setConnectingStripe] = useState(false)
   const [loadingDashboard, setLoadingDashboard] = useState(false)
   const [loadingPayout, setLoadingPayout] = useState(false)
@@ -240,7 +242,7 @@ const BillingPage = () => {
   return (
     <div className="container mx-auto px-4 py-6 max-w-7xl">
       {/* Compact alert for WhatsApp if not connected */}
-      {!user?.whatsapp_phone_number_id && (
+      {!isWhatsAppConnected && (
         <UrgentAlert type="whatsapp" compact={true} />
       )}
 
