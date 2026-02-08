@@ -540,27 +540,40 @@ const BillingPage = () => {
                         </td>
                         <td className="py-3 px-4">
                           {request.approved_amount && parseFloat(request.approved_amount) < parseFloat(request.amount) ? (
-                            <div>
-                              <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                Requested: ${parseFloat(request.amount).toFixed(2)}
-                              </div>
-                              <div className="text-sm font-semibold text-green-600 dark:text-green-400">
-                                Approved: ${parseFloat(request.approved_amount).toFixed(2)}
-                              </div>
-                              <div className="flex items-center gap-2 mt-1">
-                                <div className="text-xs text-orange-600 dark:text-orange-400 font-medium">
-                                  Remaining: ${(parseFloat(request.amount) - parseFloat(request.approved_amount)).toFixed(2)}
+                            (() => {
+                              const remainingAmount = parseFloat(request.amount) - parseFloat(request.approved_amount)
+                              // Check if there's already a pending request for this remaining amount
+                              const hasPendingRemainingRequest = approvalRequests.some(req =>
+                                req.status === 'pending' &&
+                                parseFloat(req.amount).toFixed(2) === remainingAmount.toFixed(2)
+                              )
+
+                              return (
+                                <div>
+                                  <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                    Requested: ${parseFloat(request.amount).toFixed(2)}
+                                  </div>
+                                  <div className="text-sm font-semibold text-green-600 dark:text-green-400">
+                                    Approved: ${parseFloat(request.approved_amount).toFixed(2)}
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <div className="text-xs text-orange-600 dark:text-orange-400 font-medium">
+                                      Remaining: ${remainingAmount.toFixed(2)}
+                                    </div>
+                                    {!hasPendingRemainingRequest && (
+                                      <Button
+                                        onClick={() => handleRequestRemainingAmount(remainingAmount)}
+                                        size="sm"
+                                        className="h-6 px-2 text-xs bg-orange-600 hover:bg-orange-700"
+                                        disabled={loadingPayout}
+                                      >
+                                        Request Remaining →
+                                      </Button>
+                                    )}
+                                  </div>
                                 </div>
-                                <Button
-                                  onClick={() => handleRequestRemainingAmount(parseFloat(request.amount) - parseFloat(request.approved_amount))}
-                                  size="sm"
-                                  className="h-6 px-2 text-xs bg-orange-600 hover:bg-orange-700"
-                                  disabled={loadingPayout}
-                                >
-                                  Request Remaining →
-                                </Button>
-                              </div>
-                            </div>
+                              )
+                            })()
                           ) : (
                             <div className="text-sm font-medium text-gray-900 dark:text-white">
                               ${parseFloat(request.amount).toFixed(2)}
