@@ -29,6 +29,7 @@ const BillingPage = () => {
   const [connectingStripe, setConnectingStripe] = useState(false)
   const [loadingDashboard, setLoadingDashboard] = useState(false)
   const [loadingPayout, setLoadingPayout] = useState(false)
+  const [payoutAmount, setPayoutAmount] = useState('')
   const [earnings, setEarnings] = useState(null)
   const [loadingEarnings, setLoadingEarnings] = useState(false)
 
@@ -122,11 +123,34 @@ const BillingPage = () => {
   }
 
   const handleRequestPayout = async () => {
+    // Validate payout amount
+    const availableBalance = parseFloat(earnings?.available_balance || 0)
+    const requestedAmount = payoutAmount ? parseFloat(payoutAmount) : availableBalance
+
+    if (requestedAmount <= 0) {
+      toast.error('Please enter a valid payout amount')
+      return
+    }
+
+    if (requestedAmount > availableBalance) {
+      toast.error(`Amount exceeds available balance ($${availableBalance.toFixed(2)})`)
+      return
+    }
+
+    if (requestedAmount < 50) {
+      toast.error('Minimum payout amount is $50.00')
+      return
+    }
+
     setLoadingPayout(true)
     try {
-      const response = await stripeConnectService.requestPayout(user.wh_account_id)
+      const response = await stripeConnectService.requestPayout(
+        user.wh_account_id,
+        requestedAmount
+      )
       if (response.data?.status === 1) {
-        toast.success('Payout requested successfully!')
+        toast.success(`Payout of $${requestedAmount.toFixed(2)} requested successfully!`)
+        setPayoutAmount('') // Reset amount field
         fetchEarnings()
       } else {
         toast.error(response.data?.message || 'Failed to request payout')
@@ -330,21 +354,42 @@ const BillingPage = () => {
                 </div>
               </div>
               {isPayoutsEnabled && parseFloat(earnings?.available_balance || 0) >= 50 && (
-                <Button
-                  onClick={handleRequestPayout}
-                  className="w-full mt-4"
-                  size="sm"
-                  disabled={loadingPayout}
-                >
-                  {loadingPayout ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Processing...
-                    </>
-                  ) : (
-                    'Request Payout'
-                  )}
-                </Button>
+                <div className="mt-4 space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                      Payout Amount (leave empty for full balance)
+                    </label>
+                    <Input
+                      type="number"
+                      value={payoutAmount}
+                      onChange={(e) => setPayoutAmount(e.target.value)}
+                      placeholder={`Max: $${parseFloat(earnings?.available_balance || 0).toFixed(2)}`}
+                      min="50"
+                      max={parseFloat(earnings?.available_balance || 0)}
+                      step="0.01"
+                      className="w-full"
+                      disabled={loadingPayout}
+                    />
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Minimum: $50.00 | Available: ${parseFloat(earnings?.available_balance || 0).toFixed(2)}
+                    </p>
+                  </div>
+                  <Button
+                    onClick={handleRequestPayout}
+                    className="w-full"
+                    size="sm"
+                    disabled={loadingPayout}
+                  >
+                    {loadingPayout ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      `Request Payout${payoutAmount ? ` ($${parseFloat(payoutAmount).toFixed(2)})` : ' (Full Balance)'}`
+                    )}
+                  </Button>
+                </div>
               )}
             </CardContent>
           </Card>
