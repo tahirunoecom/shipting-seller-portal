@@ -93,7 +93,7 @@ export const stripeConnectService = {
   // ============================================
 
   /**
-   * Request manual payout
+   * Request manual payout (DEPRECATED - Use requestPayoutApproval for seller-initiated requests)
    * @param {number} wh_account_id - Seller's warehouse account ID
    * @param {number|null} amount - Amount to payout (null for all available)
    * @returns {Promise} Response with payout details
@@ -102,6 +102,72 @@ export const stripeConnectService = {
     axios.post(`${API_BASE}/seller/stripe/request-payout`, {
       wh_account_id,
       amount
+    }),
+
+  // ============================================
+  // PAYOUT APPROVAL REQUESTS (New System)
+  // ============================================
+
+  /**
+   * Request payout approval from admin (Seller-side)
+   * @param {number} wh_account_id - Seller's warehouse account ID
+   * @param {number|null} amount - Amount to request (null for full balance)
+   * @param {string} notes - Optional notes for admin
+   * @returns {Promise} Response with approval request details
+   */
+  requestPayoutApproval: (wh_account_id, amount = null, notes = '') =>
+    axios.post(`${API_BASE}/seller/stripe/request-payout-approval`, {
+      wh_account_id,
+      amount,
+      notes
+    }),
+
+  /**
+   * Get payout approval requests for seller
+   * @param {number} wh_account_id - Seller's warehouse account ID
+   * @param {number} limit - Number of requests to fetch
+   * @returns {Promise} Response with approval requests
+   */
+  getPayoutApprovalRequests: (wh_account_id, limit = 20) =>
+    axios.post(`${API_BASE}/seller/stripe/payout-approval-requests`, {
+      wh_account_id,
+      limit
+    }),
+
+  /**
+   * [ADMIN] Get all pending payout approval requests
+   * @param {number|null} wh_account_id - Optional: Filter by specific seller
+   * @param {string} status - Filter by status (pending, approved, rejected, all)
+   * @returns {Promise} Response with approval requests
+   */
+  getAllPayoutApprovalRequests: (wh_account_id = null, status = 'all') =>
+    axios.post(`${API_BASE}/admin/stripe/payout-approval-requests`, {
+      wh_account_id,
+      status
+    }),
+
+  /**
+   * [ADMIN] Approve payout request and create payout
+   * @param {number} request_id - Approval request ID
+   * @param {string} admin_notes - Optional admin notes
+   * @returns {Promise} Response with payout details
+   */
+  approvePayoutRequest: (request_id, admin_notes = '') =>
+    axios.post(`${API_BASE}/admin/stripe/approve-payout-request`, {
+      request_id,
+      admin_notes
+    }),
+
+  /**
+   * [ADMIN] Reject payout request
+   * @param {number} request_id - Approval request ID
+   * @param {string} rejection_reason - Reason for rejection
+   * @returns {Promise} Response with updated request
+   */
+  rejectPayoutRequest: (request_id, rejection_reason = '') =>
+    axios.post(`${API_BASE}/admin/stripe/reject-payout-request`, {
+      request_id,
+      rejection_reason
     }),
 
   // ============================================

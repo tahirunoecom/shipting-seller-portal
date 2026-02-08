@@ -36,6 +36,9 @@ const BillingPage = () => {
   const [loadingEarnings, setLoadingEarnings] = useState(false)
   const [payouts, setPayouts] = useState([])
   const [loadingPayouts, setLoadingPayouts] = useState(false)
+  const [approvalRequests, setApprovalRequests] = useState([])
+  const [loadingApprovalRequests, setLoadingApprovalRequests] = useState(false)
+  const [requestNotes, setRequestNotes] = useState('')
 
   const isConnected = user?.stripe_connect_id && user?.stripe_connect === 1
   const isOnboardingComplete = user?.stripe_onboarding_completed === 1
@@ -46,6 +49,7 @@ const BillingPage = () => {
     if (isConnected && user?.wh_account_id) {
       fetchEarnings()
       fetchPayouts()
+      fetchApprovalRequests()
     }
   }, [isConnected, user?.wh_account_id])
 
@@ -74,6 +78,20 @@ const BillingPage = () => {
       console.error('Error fetching payouts:', error)
     } finally {
       setLoadingPayouts(false)
+    }
+  }
+
+  const fetchApprovalRequests = async () => {
+    setLoadingApprovalRequests(true)
+    try {
+      const response = await stripeConnectService.getPayoutApprovalRequests(user.wh_account_id, 20)
+      if (response.data?.status === 1) {
+        setApprovalRequests(response.data.data.requests || [])
+      }
+    } catch (error) {
+      console.error('Error fetching approval requests:', error)
+    } finally {
+      setLoadingApprovalRequests(false)
     }
   }
 
@@ -141,7 +159,7 @@ const BillingPage = () => {
     }
   }
 
-  const handleRequestPayout = async () => {
+  const handleRequestPayoutApproval = async () => {
     // Validate payout amount
     const availableBalance = parseFloat(earnings?.available_balance || 0)
     const requestedAmount = payoutAmount ? parseFloat(payoutAmount) : availableBalance
@@ -163,20 +181,22 @@ const BillingPage = () => {
 
     setLoadingPayout(true)
     try {
-      const response = await stripeConnectService.requestPayout(
+      const response = await stripeConnectService.requestPayoutApproval(
         user.wh_account_id,
-        requestedAmount
+        requestedAmount,
+        requestNotes
       )
       if (response.data?.status === 1) {
-        toast.success(`Payout of $${requestedAmount.toFixed(2)} requested successfully!`)
+        toast.success(`Payout approval request of $${requestedAmount.toFixed(2)} submitted successfully!`)
         setPayoutAmount('') // Reset amount field
+        setRequestNotes('') // Reset notes field
+        fetchApprovalRequests() // Refresh approval requests
         fetchEarnings()
-        fetchPayouts() // Refresh payout history
       } else {
-        toast.error(response.data?.message || 'Failed to request payout')
+        toast.error(response.data?.message || 'Failed to submit approval request')
       }
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to request payout')
+      toast.error(error.response?.data?.message || 'Failed to submit approval request')
     } finally {
       setLoadingPayout(false)
     }
@@ -394,26 +414,126 @@ const BillingPage = () => {
                       Minimum: $50.00 | Available: ${parseFloat(earnings?.available_balance || 0).toFixed(2)}
                     </p>
                   </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                      Notes for Admin (Optional)
+                    </label>
+                    <Input
+                      type="text"
+                      value={requestNotes}
+                      onChange={(e) => setRequestNotes(e.target.value)}
+                      placeholder="Add any notes for the admin..."
+                      className="w-full"
+                      disabled={loadingPayout}
+                    />
+                  </div>
                   <Button
-                    onClick={handleRequestPayout}
-                    className="w-full"
+                    onClick={handleRequestPayoutApproval}
+                    className="w-full bg-primary-600 hover:bg-primary-700"
                     size="sm"
                     disabled={loadingPayout}
                   >
                     {loadingPayout ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Processing...
+                        Submitting Request...
                       </>
                     ) : (
-                      `Request Payout${payoutAmount ? ` ($${parseFloat(payoutAmount).toFixed(2)})` : ' (Full Balance)'}`
+                      `Ask Admin for Payout${payoutAmount ? ` ($${parseFloat(payoutAmount).toFixed(2)})` : ' (Full Balance)'}`
                     )}
                   </Button>
+                  <p className="text-xs text-center text-gray-500 dark:text-gray-400">
+                    Admin will review and approve your payout request
+                  </p>
                 </div>
               )}
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* Payout Approval Requests */}
+      {isConnected && (
+        <Card className="mb-6">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <AlertCircle className="w-5 h-5" />
+                Payout Approval Requests
+              </CardTitle>
+              <Button
+                onClick={fetchApprovalRequests}
+                variant="outline"
+                size="sm"
+                disabled={loadingApprovalRequests}
+              >
+                {loadingApprovalRequests ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Refresh
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {loadingApprovalRequests ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
+              </div>
+            ) : approvalRequests.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-gray-200 dark:border-gray-700">
+                      <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Date</th>
+                      <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Amount</th>
+                      <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>
+                      <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Notes</th>
+                      <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Admin Response</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {approvalRequests.map((request) => (
+                      <tr key={request.id} className="border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                        <td className="py-3 px-4 text-sm text-gray-900 dark:text-white">
+                          {new Date(request.created_at).toLocaleDateString()}
+                        </td>
+                        <td className="py-3 px-4 text-sm font-medium text-gray-900 dark:text-white">
+                          ${parseFloat(request.amount).toFixed(2)}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            request.status === 'approved' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                            request.status === 'pending' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                            request.status === 'rejected' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                            'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-400'
+                          }`}>
+                            {request.status}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-sm text-gray-600 dark:text-gray-400">
+                          {request.notes || '-'}
+                        </td>
+                        <td className="py-3 px-4 text-sm text-gray-600 dark:text-gray-400">
+                          {request.admin_notes || request.rejection_reason || '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <AlertCircle className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+                <p className="text-sm text-gray-500 dark:text-gray-400">No payout approval requests yet</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Request a payout above to get started</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {/* Payout History */}
