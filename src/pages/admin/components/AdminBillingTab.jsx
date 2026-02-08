@@ -22,6 +22,7 @@ import {
   Save,
   X,
   RefreshCw,
+  Info,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -454,15 +455,22 @@ export function AdminBillingTab({ shipper }) {
                   Payment Model
                 </label>
                 {editingConfig ? (
-                  <select
-                    value={config.payment_model}
-                    onChange={(e) => setConfig({ ...config, payment_model: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
-                  >
-                    <option value="direct">Direct Charge</option>
-                    <option value="destination">Destination Charge</option>
-                    <option value="separate">Separate Charge & Transfer</option>
-                  </select>
+                  <div>
+                    <select
+                      value={config.payment_model}
+                      onChange={(e) => setConfig({ ...config, payment_model: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                    >
+                      <option value="direct">Direct Charge</option>
+                      <option value="destination">Destination Charge</option>
+                      <option value="separate">Separate Charge & Transfer</option>
+                    </select>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+                      {config.payment_model === 'direct' && 'Connected account charges customer directly. You receive application fees separately.'}
+                      {config.payment_model === 'destination' && 'You charge customer and funds go to connected account. Deduct commission automatically.'}
+                      {config.payment_model === 'separate' && 'You charge customer to your account, then manually transfer funds to connected account.'}
+                    </p>
+                  </div>
                 ) : (
                   <p className="text-lg font-semibold text-slate-900 dark:text-white">
                     {config.payment_model === 'direct' && 'Direct Charge'}
@@ -470,6 +478,103 @@ export function AdminBillingTab({ shipper }) {
                     {config.payment_model === 'separate' && 'Separate'}
                   </p>
                 )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Payment Model Info Card (only show if connected) */}
+      {isConnected && (
+        <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Info className="w-5 h-5 text-blue-500" />
+              Payment Model Details
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Direct Charge */}
+              <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                    <span className="text-lg font-bold text-blue-600 dark:text-blue-400">1</span>
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-slate-900 dark:text-white mb-1">
+                      Direct Charge
+                    </h4>
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+                      The connected account (seller) charges the customer directly. The platform receives application fees separately.
+                    </p>
+                    <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-3 text-xs text-slate-600 dark:text-slate-400">
+                      <strong>Flow:</strong> Customer → Seller Account (minus fees) → Platform receives commission
+                    </div>
+                    <div className="mt-2 flex items-start gap-2">
+                      <CheckCircle className="w-4 h-4 text-emerald-500 mt-0.5 flex-shrink-0" />
+                      <span className="text-xs text-slate-600 dark:text-slate-400">Best for: Marketplaces where sellers manage their own payments</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Destination Charge */}
+              <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 bg-violet-100 dark:bg-violet-900/30 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                    <span className="text-lg font-bold text-violet-600 dark:text-violet-400">2</span>
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-slate-900 dark:text-white mb-1">
+                      Destination Charge
+                    </h4>
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+                      The platform charges the customer, and funds are sent directly to the connected account. Commission is deducted automatically.
+                    </p>
+                    <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-3 text-xs text-slate-600 dark:text-slate-400">
+                      <strong>Flow:</strong> Customer → Platform Charges → Seller Account (after commission) → Platform keeps commission
+                    </div>
+                    <div className="mt-2 flex items-start gap-2">
+                      <CheckCircle className="w-4 h-4 text-emerald-500 mt-0.5 flex-shrink-0" />
+                      <span className="text-xs text-slate-600 dark:text-slate-400">Best for: Simplified payment flow with automatic commission deduction</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Separate Charge & Transfer */}
+              <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                    <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400">3</span>
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-slate-900 dark:text-white mb-1">
+                      Separate Charge & Transfer (Recommended)
+                    </h4>
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+                      The platform charges the customer to its own account, then manually transfers funds to the seller's connected account at a later time (e.g., weekly, monthly).
+                    </p>
+                    <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-3 text-xs text-slate-600 dark:text-slate-400">
+                      <strong>Flow:</strong> Customer → Platform Account → Platform Manually Transfers → Seller Account
+                    </div>
+                    <div className="mt-2 space-y-1">
+                      <div className="flex items-start gap-2">
+                        <CheckCircle className="w-4 h-4 text-emerald-500 mt-0.5 flex-shrink-0" />
+                        <span className="text-xs text-slate-600 dark:text-slate-400">Best for: Maximum control and flexibility over payout timing</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <CheckCircle className="w-4 h-4 text-emerald-500 mt-0.5 flex-shrink-0" />
+                        <span className="text-xs text-slate-600 dark:text-slate-400">Platform holds funds and can implement custom payout schedules</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <CheckCircle className="w-4 h-4 text-emerald-500 mt-0.5 flex-shrink-0" />
+                        <span className="text-xs text-slate-600 dark:text-slate-400">Easier dispute handling and refund management</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </CardContent>

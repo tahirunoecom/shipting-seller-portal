@@ -668,9 +668,9 @@ class StripeConnectController extends Controller
             }
 
             // Create payout via Stripe
-            $payout = $this->createStripePayout($seller->stripe_connect_id, $payoutAmount, $wh_account_id);
+            try {
+                $payout = $this->createStripePayout($seller->stripe_connect_id, $payoutAmount, $wh_account_id);
 
-            if ($payout) {
                 // Record in database
                 $payoutId = DB::table('stripe_payouts')->insertGetId([
                     'wh_account_id' => $wh_account_id,
@@ -713,12 +713,13 @@ class StripeConnectController extends Controller
                         'arrival_date' => isset($payout->arrival_date) ? date('Y-m-d', $payout->arrival_date) : null
                     ]
                 ]);
+            } catch (Exception $payoutException) {
+                // Return the specific error message from Stripe
+                return response()->json([
+                    'status' => 0,
+                    'message' => $payoutException->getMessage()
+                ]);
             }
-
-            return response()->json([
-                'status' => 0,
-                'message' => 'Failed to create payout'
-            ]);
 
         } catch (Exception $e) {
             Log::error('[STRIPE CONNECT] Error requesting payout', [
@@ -1165,8 +1166,36 @@ class StripeConnectController extends Controller
     private function createStripePayout($stripeAccountId, $amount, $wh_account_id)
     {
         try {
+            // First, check the account balance
+            $balance = \Stripe\Balance::retrieve(['stripe_account' => $stripeAccountId]);
+
+            // Get available balance in cents (default currency)
+            $availableBalance = 0;
+            if (isset($balance->available) && count($balance->available) > 0) {
+                $availableBalance = $balance->available[0]->amount; // amount in cents
+            }
+
+            Log::info('[STRIPE CONNECT] Checking balance before payout', [
+                'wh_account_id' => $wh_account_id,
+                'stripe_account_id' => $stripeAccountId,
+                'available_balance_cents' => $availableBalance,
+                'requested_amount_dollars' => $amount
+            ]);
+
             // Convert to cents
             $amountInCents = (int) ($amount * 100);
+
+            // Check if sufficient balance
+            if ($availableBalance < $amountInCents) {
+                $availableInDollars = number_format($availableBalance / 100, 2);
+                Log::warning('[STRIPE CONNECT] Insufficient Stripe balance', [
+                    'wh_account_id' => $wh_account_id,
+                    'available_stripe_balance' => $availableInDollars,
+                    'requested_amount' => $amount
+                ]);
+
+                throw new Exception("Insufficient balance in Stripe account. Available: $$availableInDollars, Requested: $$amount. Note: You need to charge customers through Stripe first before creating payouts.");
+            }
 
             // Create payout on connected account
             $payout = Payout::create(
@@ -1182,6 +1211,12 @@ class StripeConnectController extends Controller
                 ['stripe_account' => $stripeAccountId] // Make payout on connected account
             );
 
+            Log::info('[STRIPE CONNECT] Payout created successfully', [
+                'wh_account_id' => $wh_account_id,
+                'payout_id' => $payout->id,
+                'amount' => $amount
+            ]);
+
             return $payout;
 
         } catch (Exception $e) {
@@ -1191,7 +1226,8 @@ class StripeConnectController extends Controller
                 'amount' => $amount
             ]);
 
-            return null;
+            // Throw the exception so the calling function can handle it
+            throw $e;
         }
     }
 }
