@@ -150,12 +150,14 @@ export const stripeConnectService = {
    * [ADMIN] Approve payout request and create payout
    * @param {number} request_id - Approval request ID
    * @param {string} admin_notes - Optional admin notes
+   * @param {number|null} approved_amount - Optional: Different amount than requested (partial approval)
    * @returns {Promise} Response with payout details
    */
-  approvePayoutRequest: (request_id, admin_notes = '') =>
+  approvePayoutRequest: (request_id, admin_notes = '', approved_amount = null) =>
     axios.post(`${API_BASE}/admin/stripe/approve-payout-request`, {
       request_id,
-      admin_notes
+      admin_notes,
+      approved_amount
     }),
 
   /**
