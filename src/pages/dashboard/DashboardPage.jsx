@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store'
-import { Card, CardContent, CardHeader, CardTitle, Badge, PageLoader } from '@/components/ui'
+import { Card, CardContent, CardHeader, CardTitle, Badge, PageLoader, UrgentAlert } from '@/components/ui'
 import { formatCurrency, formatDate } from '@/utils/helpers'
 import { dashboardService, productService } from '@/services'
 import {
@@ -245,6 +245,14 @@ function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      {/* Urgent Alerts for missing integrations */}
+      {(!user?.stripe_connect || user?.stripe_connect !== 1) && (
+        <UrgentAlert type="stripe" compact={false} />
+      )}
+      {!user?.whatsapp_phone_number_id && (
+        <UrgentAlert type="whatsapp" compact={false} />
+      )}
+
       {/* Welcome header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>

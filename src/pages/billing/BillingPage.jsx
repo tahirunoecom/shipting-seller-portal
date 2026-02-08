@@ -8,6 +8,7 @@ import {
   CardTitle,
   Button,
   Input,
+  UrgentAlert,
 } from '@/components/ui'
 import {
   CreditCard,
@@ -238,6 +239,11 @@ const BillingPage = () => {
 
   return (
     <div className="container mx-auto px-4 py-6 max-w-7xl">
+      {/* Compact alert for WhatsApp if not connected */}
+      {!user?.whatsapp_phone_number_id && (
+        <UrgentAlert type="whatsapp" compact={true} />
+      )}
+
       {/* Page Header */}
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">

@@ -11,6 +11,7 @@ import {
   Modal,
   ModalFooter,
   PageLoader,
+  UrgentAlert,
 } from '@/components/ui'
 import { formatCurrency, formatDateTime } from '@/utils/helpers'
 import {
@@ -489,6 +490,14 @@ function OrdersPage() {
 
   return (
     <div className="space-y-6">
+      {/* Compact alerts for missing integrations */}
+      {(!user?.stripe_connect || user?.stripe_connect !== 1) && (
+        <UrgentAlert type="stripe" compact={true} />
+      )}
+      {!user?.whatsapp_phone_number_id && (
+        <UrgentAlert type="whatsapp" compact={true} />
+      )}
+
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-dark-text">Orders</h1>
