@@ -1287,7 +1287,7 @@ function WhatsAppPage() {
                             <FileText className="h-5 w-5" />
                             Setup Guide: Connect Your WhatsApp Business
                             <span className="text-xs font-normal text-green-600 dark:text-green-400 ml-2">
-                              (6 steps)
+                              (Complete Step-by-Step)
                             </span>
                           </h4>
                           <div className="flex items-center gap-2">
@@ -1305,93 +1305,315 @@ function WhatsAppPage() {
                         {/* Collapsible Content */}
                         {showSetupGuide && (
                           <div className="px-5 pb-5 space-y-4">
-                            <p className="text-sm text-green-700 dark:text-green-300">
-                              Follow these steps when you click "Login with Facebook" below:
+                            {/* Before You Begin */}
+                            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                              <h5 className="font-semibold text-blue-800 dark:text-blue-200 mb-2 flex items-center gap-2">
+                                <AlertCircle className="h-5 w-5" />
+                                Before You Begin
+                              </h5>
+                              <p className="text-sm text-blue-700 dark:text-blue-300 mb-2">
+                                You need a WhatsApp Business phone number to connect. You can either:
+                              </p>
+                              <ul className="text-sm text-blue-600 dark:text-blue-400 space-y-1 ml-4">
+                                <li className="flex items-start gap-2">
+                                  <span className="text-blue-500 font-bold">•</span>
+                                  <span>Use your own existing business number, OR</span>
+                                </li>
+                                <li className="flex items-start gap-2">
+                                  <span className="text-blue-500 font-bold">•</span>
+                                  <span>Purchase a new number from our website below (check the "Need a Phone Number?" section)</span>
+                                </li>
+                              </ul>
+                              {twilioState.hasNumber && (
+                                <div className="mt-3 p-2 bg-emerald-50 dark:bg-emerald-900/30 rounded border border-emerald-200 dark:border-emerald-800">
+                                  <p className="text-xs text-emerald-700 dark:text-emerald-300">
+                                    <strong>✓ You have a number:</strong> Use <span className="font-mono font-bold">{twilioState.number}</span> during setup.
+                                    Click "SMS Inbox" below to get verification codes sent to this number.
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+
+                            <p className="text-sm text-green-700 dark:text-green-300 font-medium">
+                              Follow these steps carefully when you click "Login with Facebook" below:
                             </p>
 
                             <div className="space-y-3">
-                              {/* Step 1 */}
+                              {/* Step 1 - Facebook Login */}
                               <div className="flex items-start gap-3 bg-white/60 dark:bg-gray-800/40 p-3 rounded-lg">
-                                <span className="flex items-center justify-center w-6 h-6 bg-green-500 text-white text-sm font-bold rounded-full flex-shrink-0">1</span>
-                                <div>
-                                  <p className="font-medium text-gray-800 dark:text-gray-200">Log in with Facebook</p>
-                                  <p className="text-sm text-gray-600 dark:text-gray-400">Use your Facebook account to authenticate. This gives access to Meta Business tools.</p>
+                                <span className="flex items-center justify-center w-7 h-7 bg-green-500 text-white text-sm font-bold rounded-full flex-shrink-0">1</span>
+                                <div className="flex-1">
+                                  <p className="font-medium text-gray-800 dark:text-gray-200">Click "Login with Facebook"</p>
+                                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                    Use your Facebook account to authenticate with Meta Business tools.
+                                  </p>
                                 </div>
                               </div>
 
-                              {/* Step 2 */}
+                              {/* Step 2 - Continue Dialog */}
                               <div className="flex items-start gap-3 bg-white/60 dark:bg-gray-800/40 p-3 rounded-lg">
-                                <span className="flex items-center justify-center w-6 h-6 bg-green-500 text-white text-sm font-bold rounded-full flex-shrink-0">2</span>
-                                <div>
-                                  <p className="font-medium text-gray-800 dark:text-gray-200">Create or Select WhatsApp Business Account</p>
-                                  <p className="text-sm text-gray-600 dark:text-gray-400">You can create a new WhatsApp Business Account or connect an existing one.</p>
+                                <span className="flex items-center justify-center w-7 h-7 bg-green-500 text-white text-sm font-bold rounded-full flex-shrink-0">2</span>
+                                <div className="flex-1">
+                                  <p className="font-medium text-gray-800 dark:text-gray-200">Click "Continue"</p>
+                                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                    You'll see a popup saying "Seamlessly connect your account to AnythingInstantly" with permissions details.
+                                  </p>
+                                  <ul className="text-xs text-gray-500 dark:text-gray-400 mt-2 ml-4 space-y-1">
+                                    <li>• Communicate with customers at scale</li>
+                                    <li>• Send messages with optimizations</li>
+                                  </ul>
+                                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-2 font-medium">
+                                    Click the blue "Continue" button.
+                                  </p>
                                 </div>
                               </div>
 
-                              {/* Step 3 - IMPORTANT */}
+                              {/* Step 3 - Select Business Assets */}
+                              <div className="flex items-start gap-3 bg-white/60 dark:bg-gray-800/40 p-3 rounded-lg">
+                                <span className="flex items-center justify-center w-7 h-7 bg-green-500 text-white text-sm font-bold rounded-full flex-shrink-0">3</span>
+                                <div className="flex-1">
+                                  <p className="font-medium text-gray-800 dark:text-gray-200">Select Business Assets</p>
+                                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                    You'll see "Select the business assets to share with AnythingInstantly":
+                                  </p>
+                                  <div className="mt-2 space-y-2 text-sm text-gray-600 dark:text-gray-400">
+                                    <div className="flex items-start gap-2">
+                                      <span className="font-bold text-gray-800 dark:text-gray-200 min-w-[140px]">Business portfolio:</span>
+                                      <span>Select existing or create new</span>
+                                    </div>
+                                    <div className="flex items-start gap-2">
+                                      <span className="font-bold text-gray-800 dark:text-gray-200 min-w-[140px]">WhatsApp Account:</span>
+                                      <span>Select existing or create new</span>
+                                    </div>
+                                    <div className="flex items-start gap-2">
+                                      <span className="font-bold text-gray-800 dark:text-gray-200 min-w-[140px]">Catalogue:</span>
+                                      <span>Select existing or create new</span>
+                                    </div>
+                                  </div>
+                                  <p className="text-xs text-blue-600 dark:text-blue-400 mt-2 font-medium">
+                                    Click "Next" after making your selections.
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* Step 4 - Business Information */}
                               <div className="flex items-start gap-3 bg-amber-100/80 dark:bg-amber-900/30 p-3 rounded-lg border border-amber-300 dark:border-amber-700">
-                                <span className="flex items-center justify-center w-6 h-6 bg-amber-500 text-white text-sm font-bold rounded-full flex-shrink-0">3</span>
-                                <div>
+                                <span className="flex items-center justify-center w-7 h-7 bg-amber-500 text-white text-sm font-bold rounded-full flex-shrink-0">4</span>
+                                <div className="flex-1">
                                   <p className="font-medium text-amber-800 dark:text-amber-200 flex items-center gap-2">
                                     <AlertTriangle className="h-4 w-4" />
-                                    Create Catalog - Select "Commerce" Vertical
+                                    Enter Business Information
                                   </p>
                                   <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
-                                    <strong>Important:</strong> When asked to create a catalog, you'll see a dropdown for "Vertical".
-                                    Make sure to select <span className="font-bold bg-amber-200 dark:bg-amber-800 px-1.5 py-0.5 rounded">"Commerce"</span> from the options.
+                                    Fill in your business details:
                                   </p>
-                                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-2 italic">
-                                    This enables product catalog features for your WhatsApp store.
+                                  <ul className="text-sm text-amber-600 dark:text-amber-400 mt-2 ml-4 space-y-1">
+                                    <li>• <strong>Name:</strong> Your business name</li>
+                                    <li>• <strong>Category:</strong> Choose your business type (e.g., Restaurant, Clothing, Education, Food & Groceries)</li>
+                                    <li>• <strong>Country:</strong> Your location</li>
+                                    <li>• <strong>Website:</strong> Your website URL (if any)</li>
+                                    <li>• <strong>Time zone:</strong> Your time zone</li>
+                                  </ul>
+                                  <div className="mt-3 p-3 bg-amber-200 dark:bg-amber-900/50 rounded-lg border border-amber-400 dark:border-amber-600">
+                                    <p className="text-sm text-amber-800 dark:text-amber-100 font-bold flex items-center gap-2">
+                                      <AlertTriangle className="h-4 w-4" />
+                                      CRITICAL: Select "Commerce" for Vertical
+                                    </p>
+                                    <p className="text-xs text-amber-700 dark:text-amber-200 mt-1">
+                                      In the <strong>"Vertical"</strong> dropdown, you MUST select <span className="font-bold bg-amber-300 dark:bg-amber-800 px-1.5 py-0.5 rounded">"Commerce"</span>.
+                                      This is required for your WhatsApp product catalog to work properly!
+                                    </p>
+                                  </div>
+                                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
+                                    <strong>Business description</strong> is optional - you can add it now or skip it.
                                   </p>
                                 </div>
                               </div>
 
-                              {/* Step 4 - IMPORTANT */}
-                              <div className="flex items-start gap-3 bg-blue-100/80 dark:bg-blue-900/30 p-3 rounded-lg border border-blue-300 dark:border-blue-700">
-                                <span className="flex items-center justify-center w-6 h-6 bg-blue-500 text-white text-sm font-bold rounded-full flex-shrink-0">4</span>
-                                <div>
-                                  <p className="font-medium text-blue-800 dark:text-blue-200 flex items-center gap-2">
-                                    <Phone className="h-4 w-4" />
-                                    Add Your Phone Number
+                              {/* Step 5 - Add Phone Number */}
+                              <div className="flex items-start gap-3 bg-red-100/80 dark:bg-red-900/30 p-3 rounded-lg border-2 border-red-300 dark:border-red-700">
+                                <span className="flex items-center justify-center w-7 h-7 bg-red-500 text-white text-sm font-bold rounded-full flex-shrink-0">5</span>
+                                <div className="flex-1">
+                                  <p className="font-medium text-red-800 dark:text-red-200 flex items-center gap-2">
+                                    <AlertTriangle className="h-5 w-5" />
+                                    Add Your WhatsApp Phone Number (IMPORTANT!)
                                   </p>
-                                  <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
-                                    <strong>Required:</strong> Select <span className="font-bold bg-blue-200 dark:bg-blue-800 px-1.5 py-0.5 rounded">"Use a new or existing WhatsApp number"</span> option.
+
+                                  <div className="mt-2 p-3 bg-red-50 dark:bg-red-900/40 rounded border border-red-300 dark:border-red-700">
+                                    <p className="text-sm text-red-800 dark:text-red-200 font-bold">
+                                      ⚠️ You MUST select "Add a new number" option
+                                    </p>
+                                    <p className="text-xs text-red-700 dark:text-red-300 mt-1">
+                                      Do NOT select "Use a display name only" - the bot needs a real phone number to receive customer messages!
+                                    </p>
+                                  </div>
+
+                                  <div className="mt-3 space-y-2">
+                                    <p className="text-sm text-red-700 dark:text-red-300 font-medium">
+                                      In the "Phone number" field:
+                                    </p>
+                                    <ul className="text-sm text-red-600 dark:text-red-400 ml-4 space-y-1.5">
+                                      <li className="flex items-start gap-2">
+                                        <span className="font-bold min-w-[20px]">1.</span>
+                                        <span>Enter your business phone number (or the number you purchased from our website)</span>
+                                      </li>
+                                      {twilioState.hasNumber && (
+                                        <li className="flex items-start gap-2 bg-emerald-50 dark:bg-emerald-900/30 p-2 rounded border border-emerald-300 dark:border-emerald-700">
+                                          <CheckCircle className="h-4 w-4 text-emerald-600 dark:text-emerald-400 mt-0.5" />
+                                          <span className="text-emerald-700 dark:text-emerald-300 text-xs">
+                                            <strong>Your number:</strong> Copy and paste <span className="font-mono font-bold">{twilioState.number}</span> into the phone number field
+                                          </span>
+                                        </li>
+                                      )}
+                                      <li className="flex items-start gap-2">
+                                        <span className="font-bold min-w-[20px]">2.</span>
+                                        <span><strong>Choose verification method:</strong> Select "Text message" (recommended if you purchased from our website)</span>
+                                      </li>
+                                    </ul>
+                                  </div>
+
+                                  {twilioState.hasNumber && (
+                                    <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900/30 rounded border border-blue-300 dark:border-blue-700">
+                                      <p className="text-xs text-blue-700 dark:text-blue-300">
+                                        <strong>💡 Tip:</strong> After requesting verification, click the "SMS Inbox" button below to see the verification code sent to your purchased number!
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  <div className="mt-3 p-3 bg-orange-50 dark:bg-orange-900/30 rounded border border-orange-300 dark:border-orange-700">
+                                    <p className="text-sm text-orange-800 dark:text-orange-200 font-bold mb-1">
+                                      ⚠️ If you see an error message:
+                                    </p>
+                                    <p className="text-xs text-orange-700 dark:text-orange-300 mb-2">
+                                      "To use this phone number, you'll need to delete an existing one from WhatsApp Manager..."
+                                    </p>
+                                    <p className="text-xs text-orange-800 dark:text-orange-200 font-medium">
+                                      This means the number is already registered in your Meta account. You have two options:
+                                    </p>
+                                    <ul className="text-xs text-orange-600 dark:text-orange-400 mt-2 ml-4 space-y-1">
+                                      <li>• Go back and select "Use a new or existing WhatsApp number"</li>
+                                      <li>• Then select your already registered number from the dropdown</li>
+                                      <li>• Choose "Text message" or "Phone call" for verification</li>
+                                    </ul>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Step 6 - Review Permissions */}
+                              <div className="flex items-start gap-3 bg-white/60 dark:bg-gray-800/40 p-3 rounded-lg">
+                                <span className="flex items-center justify-center w-7 h-7 bg-green-500 text-white text-sm font-bold rounded-full flex-shrink-0">6</span>
+                                <div className="flex-1">
+                                  <p className="font-medium text-gray-800 dark:text-gray-200">Review Permissions</p>
+                                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                    You'll see "Review what you'll share with AnythingInstantly" screen showing:
                                   </p>
-                                  <p className="text-xs text-blue-600 dark:text-blue-400 mt-2 italic">
-                                    Do NOT select "Display name only" or "Add later" - the bot needs a real phone number to receive customer messages.
+                                  <ul className="text-xs text-gray-500 dark:text-gray-400 mt-2 ml-4 space-y-1">
+                                    <li>• Business (your business portfolio)</li>
+                                    <li>• WhatsApp Business account</li>
+                                    <li>• Catalogs (your product catalogs)</li>
+                                  </ul>
+                                  <p className="text-sm text-gray-700 dark:text-gray-300 mt-2 font-medium">
+                                    AnythingInstantly will be able to:
                                   </p>
-                                  <div className="mt-2 p-2 bg-red-50 dark:bg-red-900/30 rounded border border-red-200 dark:border-red-800">
-                                    <p className="text-xs text-red-700 dark:text-red-300">
-                                      <strong>If you see an error:</strong> "To use this phone number, you'll need to delete an existing one from WhatsApp Manager" -
-                                      this means the number is already registered. Visit <span className="font-semibold">WhatsApp Manager</span> to remove it first, or use a different number.
+                                  <ul className="text-xs text-gray-500 dark:text-gray-400 ml-4 space-y-1 mt-1">
+                                    <li>• Manage your product catalogues</li>
+                                    <li>• Manage your business</li>
+                                    <li>• Manage your WhatsApp accounts</li>
+                                    <li>• Manage and access conversations in WhatsApp</li>
+                                  </ul>
+                                  <p className="text-xs text-blue-600 dark:text-blue-400 mt-2 font-medium">
+                                    Click the blue "Confirm" button to continue.
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* Step 7 - Success & Finish */}
+                              <div className="flex items-start gap-3 bg-green-100/80 dark:bg-green-900/30 p-3 rounded-lg border border-green-300 dark:border-green-700">
+                                <span className="flex items-center justify-center w-7 h-7 bg-green-600 text-white text-sm font-bold rounded-full flex-shrink-0">7</span>
+                                <div className="flex-1">
+                                  <p className="font-medium text-green-800 dark:text-green-200 flex items-center gap-2">
+                                    <CheckCircle className="h-5 w-5" />
+                                    Success! Complete Setup
+                                  </p>
+                                  <p className="text-sm text-green-700 dark:text-green-300 mt-1">
+                                    You'll see: "Your account is connected to AnythingInstantly"
+                                  </p>
+                                  <p className="text-xs text-green-600 dark:text-green-400 mt-2">
+                                    Meta will review your business to ensure it complies with WhatsApp's Commerce Policy and get in touch within 24 hours if there's an issue.
+                                  </p>
+                                  <div className="mt-3 p-2 bg-green-50 dark:bg-green-900/40 rounded border border-green-300 dark:border-green-700">
+                                    <p className="text-xs text-green-800 dark:text-green-200 font-bold">
+                                      ✓ Click "Finish" button
+                                    </p>
+                                    <p className="text-xs text-green-700 dark:text-green-300 mt-1">
+                                      You do NOT need to click "Add payment method" - just click "Finish".
                                     </p>
                                   </div>
                                 </div>
                               </div>
 
-                              {/* Step 5 */}
-                              <div className="flex items-start gap-3 bg-white/60 dark:bg-gray-800/40 p-3 rounded-lg">
-                                <span className="flex items-center justify-center w-6 h-6 bg-green-500 text-white text-sm font-bold rounded-full flex-shrink-0">5</span>
-                                <div>
-                                  <p className="font-medium text-gray-800 dark:text-gray-200">Verify Phone Number</p>
-                                  <p className="text-sm text-gray-600 dark:text-gray-400">You'll receive a verification code via SMS or Voice call. Enter the code to complete verification.</p>
-                                </div>
-                              </div>
-
-                              {/* Step 6 */}
-                              <div className="flex items-start gap-3 bg-white/60 dark:bg-gray-800/40 p-3 rounded-lg">
-                                <span className="flex items-center justify-center w-6 h-6 bg-green-500 text-white text-sm font-bold rounded-full flex-shrink-0">6</span>
-                                <div>
-                                  <p className="font-medium text-gray-800 dark:text-gray-200">Complete Setup</p>
-                                  <p className="text-sm text-gray-600 dark:text-gray-400">Review permissions and click "Continue" to finish. Your WhatsApp Bot will be ready!</p>
+                              {/* Step 8 - Redirect Back */}
+                              <div className="flex items-start gap-3 bg-blue-100/80 dark:bg-blue-900/30 p-3 rounded-lg border border-blue-300 dark:border-blue-700">
+                                <span className="flex items-center justify-center w-7 h-7 bg-blue-600 text-white text-sm font-bold rounded-full flex-shrink-0">8</span>
+                                <div className="flex-1">
+                                  <p className="font-medium text-blue-800 dark:text-blue-200">Automatic Redirect</p>
+                                  <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                                    After clicking "Finish", you'll be redirected back to our website.
+                                  </p>
+                                  <ul className="text-xs text-blue-600 dark:text-blue-400 mt-2 ml-4 space-y-1">
+                                    <li>• You'll see "Connecting..." for a few seconds</li>
+                                    <li>• Then your WhatsApp Business connection details will appear</li>
+                                    <li>• Including: Phone number, Phone number ID, WABA ID, Business info</li>
+                                    <li>• Business verification status and account status</li>
+                                  </ul>
+                                  <p className="text-xs text-blue-700 dark:text-blue-300 mt-2 font-medium">
+                                    You can then manage your business profile, product catalog, share WhatsApp link/QR code, and more!
+                                  </p>
                                 </div>
                               </div>
                             </div>
 
-                            <div className="p-3 bg-green-100 dark:bg-green-900/40 rounded-lg flex items-start gap-2">
-                              <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
-                              <p className="text-sm text-green-700 dark:text-green-300">
-                                <strong>After setup:</strong> Customers can message your WhatsApp number to browse products, place orders, and track deliveries - all automated!
+                            {/* After Setup Notice */}
+                            <div className="p-4 bg-gradient-to-r from-green-100 to-emerald-100 dark:from-green-900/40 dark:to-emerald-900/40 rounded-lg border border-green-300 dark:border-green-700">
+                              <div className="flex items-start gap-3">
+                                <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+                                <div>
+                                  <p className="font-semibold text-green-800 dark:text-green-200 mb-1">
+                                    🎉 What Happens After Setup
+                                  </p>
+                                  <p className="text-sm text-green-700 dark:text-green-300">
+                                    Once connected, customers can message your WhatsApp number to:
+                                  </p>
+                                  <ul className="text-sm text-green-600 dark:text-green-400 mt-2 space-y-1">
+                                    <li className="flex items-center gap-2">
+                                      <CheckCircle className="h-3 w-3 flex-shrink-0" />
+                                      Browse your products directly in WhatsApp
+                                    </li>
+                                    <li className="flex items-center gap-2">
+                                      <CheckCircle className="h-3 w-3 flex-shrink-0" />
+                                      Place orders through automated chat
+                                    </li>
+                                    <li className="flex items-center gap-2">
+                                      <CheckCircle className="h-3 w-3 flex-shrink-0" />
+                                      Track their deliveries in real-time
+                                    </li>
+                                    <li className="flex items-center gap-2">
+                                      <CheckCircle className="h-3 w-3 flex-shrink-0" />
+                                      Get instant support from your bot
+                                    </li>
+                                  </ul>
+                                  <p className="text-xs text-green-700 dark:text-green-300 mt-2 font-medium italic">
+                                    All automated - your WhatsApp Bot handles everything! 🤖✨
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Need Help? */}
+                            <div className="p-3 bg-gray-100 dark:bg-gray-800/50 rounded-lg border border-gray-300 dark:border-gray-700">
+                              <p className="text-xs text-gray-600 dark:text-gray-400 flex items-center gap-2">
+                                <AlertCircle className="h-4 w-4" />
+                                <span><strong>Need help?</strong> If you encounter any issues during setup, don't hesitate to contact our support team.</span>
                               </p>
                             </div>
                           </div>
