@@ -52,16 +52,17 @@ const sellerMenuItems = [
     href: '/whatsapp',
     icon: MessageSquare,
   },
-  {
-    title: 'Find Driver',
-    href: '/drivers',
-    icon: Truck,
-  },
-  {
-    title: 'Payments',
-    href: '/payments',
-    icon: CreditCard,
-  },
+  // Hidden - pages not yet implemented
+  // {
+  //   title: 'Find Driver',
+  //   href: '/drivers',
+  //   icon: Truck,
+  // },
+  // {
+  //   title: 'Payments',
+  //   href: '/payments',
+  //   icon: CreditCard,
+  // },
   {
     title: 'Billing',
     href: '/billing',
