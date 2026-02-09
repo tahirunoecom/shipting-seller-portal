@@ -1571,6 +1571,51 @@ function WhatsAppPage() {
                                   </p>
                                 </div>
                               </div>
+
+                              {/* Step 9 - Sync Products - CRITICAL! */}
+                              <div className="flex items-start gap-3 bg-gradient-to-r from-purple-100 to-violet-100 dark:from-purple-900/30 dark:to-violet-900/30 p-4 rounded-lg border-2 border-purple-400 dark:border-purple-600 shadow-md">
+                                <span className="flex items-center justify-center w-7 h-7 bg-purple-600 text-white text-sm font-bold rounded-full flex-shrink-0">9</span>
+                                <div className="flex-1">
+                                  <p className="font-bold text-purple-900 dark:text-purple-100 flex items-center gap-2 text-base">
+                                    <Package className="h-5 w-5" />
+                                    Sync Your Products to Catalog (CRITICAL!)
+                                  </p>
+                                  <div className="mt-2 p-3 bg-purple-200 dark:bg-purple-900/50 rounded-lg border border-purple-400 dark:border-purple-700">
+                                    <p className="text-sm text-purple-900 dark:text-purple-100 font-bold">
+                                      ⚠️ This is the MOST IMPORTANT step - don't skip it!
+                                    </p>
+                                    <p className="text-xs text-purple-800 dark:text-purple-200 mt-1">
+                                      Without syncing, customers won't see your products on WhatsApp!
+                                    </p>
+                                  </div>
+                                  <p className="text-sm text-purple-800 dark:text-purple-200 mt-3 font-medium">
+                                    After you're redirected back to our website:
+                                  </p>
+                                  <ol className="text-sm text-purple-700 dark:text-purple-300 mt-2 ml-4 space-y-2">
+                                    <li className="flex items-start gap-2">
+                                      <span className="font-bold">1.</span>
+                                      <span>Scroll down to the <strong>"Product Catalog"</strong> section</span>
+                                    </li>
+                                    <li className="flex items-start gap-2">
+                                      <span className="font-bold">2.</span>
+                                      <span>Select a <strong>Commerce</strong> catalog (one with "Commerce - OK" label)</span>
+                                    </li>
+                                    <li className="flex items-start gap-2">
+                                      <span className="font-bold">3.</span>
+                                      <span>Click the <strong className="text-purple-900 dark:text-purple-100 bg-purple-300 dark:bg-purple-800 px-2 py-0.5 rounded">"Sync Products to Catalog"</strong> button at the bottom</span>
+                                    </li>
+                                    <li className="flex items-start gap-2">
+                                      <span className="font-bold">4.</span>
+                                      <span>Wait for confirmation - all your Shipting products will be synced to Meta catalog</span>
+                                    </li>
+                                  </ol>
+                                  <div className="mt-3 p-2 bg-emerald-50 dark:bg-emerald-900/30 rounded border border-emerald-300 dark:border-emerald-700">
+                                    <p className="text-xs text-emerald-800 dark:text-emerald-200">
+                                      <strong>✓ Result:</strong> Your products will appear in WhatsApp catalog, customers can browse and order them directly in chat!
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
                             </div>
 
                             {/* After Setup Notice */}
@@ -2551,14 +2596,22 @@ function WhatsAppPage() {
                             </Button>
                           </>
                         ) : (
-                          <Button
-                            variant="outline"
-                            onClick={handleSyncCatalog}
-                            isLoading={saving}
-                          >
-                            <Package className="h-4 w-4" />
-                            Sync Products to Catalog
-                          </Button>
+                          <div className="relative">
+                            <Button
+                              onClick={handleSyncCatalog}
+                              isLoading={saving}
+                              className="bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200 border-2 border-purple-400 relative"
+                            >
+                              <Package className="h-4 w-4" />
+                              Sync Products to Catalog
+                              <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full animate-pulse">
+                                REQUIRED
+                              </span>
+                            </Button>
+                            <p className="text-xs text-purple-600 dark:text-purple-400 font-medium mt-1">
+                              ⚠️ Critical: Click this to sync your products to WhatsApp!
+                            </p>
+                          </div>
                         )}
                         <Button
                           variant="outline"
