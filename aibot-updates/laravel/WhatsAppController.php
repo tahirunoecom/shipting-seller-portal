@@ -683,10 +683,12 @@ class WhatsAppController extends Controller
                 ]);
             }
 
-            // Debug access token permissions
+            // Debug access token permissions using App Access Token
+            $appAccessToken = $this->metaAppId . '|' . $this->metaAppSecret;
+
             $response = Http::get('https://graph.facebook.com/v21.0/debug_token', [
                 'input_token' => $config->access_token,
-                'access_token' => $config->access_token // Using same token for now
+                'access_token' => $appAccessToken
             ]);
 
             if ($response->successful()) {
