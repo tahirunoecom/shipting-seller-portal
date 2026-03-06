@@ -2906,31 +2906,58 @@ function WhatsAppTab({ shipperId, shipper }) {
                   </>
                 )}
               </h3>
-              <button
-                onClick={async () => {
-                  try {
-                    setIsLoadingCatalogs(true)
-                    const response = await whatsappService.listCatalogs(shipperId)
-                    if (response.status === 1) {
-                      const catalogData = response.data?.catalogs || response.data || []
-                      setCatalogs(catalogData)
-                      // Re-check health after reloading
-                      await checkCatalogHealth()
-                      toast.success('Diagnostics reloaded!')
-                    } else {
-                      toast.error(response.message || 'Failed to reload catalogs')
+              <div className="flex gap-3">
+                <button
+                  onClick={async () => {
+                    try {
+                      setIsLoadingCatalogs(true)
+                      const response = await whatsappService.listCatalogs(shipperId)
+                      if (response.status === 1) {
+                        const catalogData = response.data?.catalogs || response.data || []
+                        setCatalogs(catalogData)
+                        // Re-check health after reloading
+                        await checkCatalogHealth()
+                        toast.success('Diagnostics reloaded!')
+                      } else {
+                        toast.error(response.message || 'Failed to reload catalogs')
+                      }
+                    } catch (error) {
+                      toast.error('Failed to reload catalogs')
+                    } finally {
+                      setIsLoadingCatalogs(false)
                     }
-                  } catch (error) {
-                    toast.error('Failed to reload catalogs')
-                  } finally {
-                    setIsLoadingCatalogs(false)
-                  }
-                }}
-                className={`text-sm flex items-center gap-1 ${catalogHealth.hasIssues ? 'text-orange-600 hover:text-orange-700' : 'text-emerald-600 hover:text-emerald-700'}`}
-              >
-                <RefreshCw className="w-4 h-4" />
-                Reload Diagnostics
-              </button>
+                  }}
+                  className={`text-sm flex items-center gap-1 ${catalogHealth.hasIssues ? 'text-orange-600 hover:text-orange-700' : 'text-emerald-600 hover:text-emerald-700'}`}
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Reload Diagnostics
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      const response = await whatsappService.checkPermissions(shipperId)
+                      if (response.status === 1) {
+                        const { has_all_permissions, granted_permissions, missing_permissions } = response.data
+                        if (has_all_permissions) {
+                          toast.success('✅ Token has all required permissions including catalog_management!', { duration: 5000 })
+                        } else {
+                          toast.error(`❌ Missing permissions: ${missing_permissions.join(', ')}. User needs to RECONNECT WhatsApp!`, { duration: 10000 })
+                        }
+                        console.log('Token permissions:', response.data)
+                      } else {
+                        toast.error('Failed to check permissions')
+                      }
+                    } catch (error) {
+                      console.error('Check permissions error:', error)
+                      toast.error('Failed to check token permissions')
+                    }
+                  }}
+                  className="text-sm flex items-center gap-1 text-blue-600 hover:text-blue-700"
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  Check Token Permissions
+                </button>
+              </div>
             </div>
 
             <div className="bg-white dark:bg-slate-800 rounded-lg p-4 space-y-4">
