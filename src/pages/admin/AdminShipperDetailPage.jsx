@@ -2730,6 +2730,249 @@ function WhatsAppTab({ shipperId, shipper }) {
         </CardContent>
       </Card>
 
+      {/* Catalog Diagnostics */}
+      {isConnected && (
+        <Card className="bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 border-2 border-orange-200 dark:border-orange-700">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-orange-900 dark:text-orange-100 flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-orange-500" />
+                Catalog Diagnostics
+              </h3>
+              <button
+                onClick={async () => {
+                  try {
+                    setIsLoadingCatalogs(true)
+                    const response = await whatsappService.listCatalogs(shipperId)
+                    if (response.status === 1) {
+                      const catalogData = response.data?.catalogs || response.data || []
+                      setCatalogs(catalogData)
+                      toast.success('Catalogs reloaded!')
+                    } else {
+                      toast.error(response.message || 'Failed to reload catalogs')
+                    }
+                  } catch (error) {
+                    toast.error('Failed to reload catalogs')
+                  } finally {
+                    setIsLoadingCatalogs(false)
+                  }
+                }}
+                className="text-sm text-orange-600 hover:text-orange-700 flex items-center gap-1"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Reload Diagnostics
+              </button>
+            </div>
+
+            <div className="bg-white dark:bg-slate-800 rounded-lg p-4 space-y-4">
+              {/* Current Status */}
+              <div>
+                <h4 className="font-semibold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-orange-500" />
+                  Current Catalog Status
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Catalog ID (from WhatsApp)</p>
+                    <p className="text-sm font-mono text-slate-900 dark:text-white mt-1">
+                      {whatsappStatus?.catalog_id || whatsappStatus?.catalogId || 'Not set'}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Phone Number ID</p>
+                    <p className="text-sm font-mono text-slate-900 dark:text-white mt-1">
+                      {whatsappStatus?.phone_number_id || phoneStatus?.phone_number_id || 'Not set'}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">WABA ID</p>
+                    <p className="text-sm font-mono text-slate-900 dark:text-white mt-1">
+                      {whatsappStatus?.waba_id || whatsappStatus?.wabaId || 'Not set'}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Product Count</p>
+                    <p className="text-sm font-mono text-slate-900 dark:text-white mt-1">
+                      {whatsappStatus?.product_count ?? whatsappStatus?.productCount ?? 'Unknown'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Available Catalogs Check */}
+              <div>
+                <h4 className="font-semibold text-slate-900 dark:text-white mb-3">Available Catalogs</h4>
+                {catalogs.length > 0 ? (
+                  <div className="space-y-2">
+                    {catalogs.map((catalog, index) => {
+                      const isActive = catalog.id === (whatsappStatus?.catalog_id || whatsappStatus?.catalogId)
+                      const catalogType = catalog.type || catalog.vertical || 'Unknown'
+                      const productCount = catalog.product_count ?? catalog.productCount ?? 0
+
+                      return (
+                        <div key={catalog.id || index} className={`p-3 rounded-lg border-2 ${isActive ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-300' : 'bg-amber-50 dark:bg-amber-900/20 border-amber-300'}`}>
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <p className="font-medium text-slate-900 dark:text-white">{catalog.name || 'Unnamed Catalog'}</p>
+                                {isActive && <span className="px-2 py-0.5 text-xs bg-emerald-500 text-white rounded-full">Active</span>}
+                              </div>
+                              <p className="text-xs font-mono text-slate-600 dark:text-slate-400">ID: {catalog.id}</p>
+                              <div className="flex gap-4 mt-2">
+                                <p className="text-xs text-slate-600 dark:text-slate-400">Type: <span className={catalogType === 'Commerce' || catalogType === 'commerce' ? 'text-emerald-600 font-semibold' : 'text-red-600 font-semibold'}>{catalogType}</span></p>
+                                <p className="text-xs text-slate-600 dark:text-slate-400">Products: <span className={productCount > 0 ? 'text-emerald-600 font-semibold' : 'text-red-600 font-semibold'}>{productCount}</span></p>
+                              </div>
+                            </div>
+                            {!isActive && (
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    const response = await whatsappService.selectCatalog(shipperId, catalog.id)
+                                    if (response.status === 1) {
+                                      toast.success('Catalog linked!')
+                                      fetchWhatsAppData()
+                                    } else {
+                                      toast.error(response.message || 'Failed to link catalog')
+                                    }
+                                  } catch (error) {
+                                    toast.error('Failed to link catalog')
+                                  }
+                                }}
+                                className="px-3 py-1 text-xs bg-orange-500 text-white rounded-lg hover:bg-orange-600"
+                              >
+                                Link This Catalog
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="p-4 border-2 border-dashed border-orange-300 rounded-lg text-center">
+                    <Package className="w-8 h-8 text-orange-300 mx-auto mb-2" />
+                    <p className="text-sm text-orange-700 dark:text-orange-300">No catalogs found</p>
+                    <button
+                      onClick={async () => {
+                        try {
+                          const response = await whatsappService.createCatalog(shipperId)
+                          if (response.status === 1) {
+                            toast.success('Catalog created!')
+                            fetchWhatsAppData()
+                          } else {
+                            toast.error(response.message || 'Failed to create catalog')
+                          }
+                        } catch (error) {
+                          toast.error('Failed to create catalog')
+                        }
+                      }}
+                      className="mt-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm"
+                    >
+                      Create Catalog
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Common Issues & Fixes */}
+              <div className="border-t border-orange-200 pt-4">
+                <h4 className="font-semibold text-slate-900 dark:text-white mb-3">⚠️ Error 131009 Troubleshooting</h4>
+                <div className="space-y-2 text-sm">
+                  <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+                    <p className="font-semibold text-amber-900 dark:text-amber-100 mb-1">Issue 1: Catalog not linked to phone number</p>
+                    <p className="text-xs text-amber-700 dark:text-amber-300 mb-2">
+                      The catalog might exist but not be connected to the WhatsApp phone number.
+                    </p>
+                    <button
+                      onClick={async () => {
+                        try {
+                          const response = await whatsappService.syncCatalog(shipperId)
+                          if (response.status === 1) {
+                            toast.success('Catalog re-synced!')
+                            fetchWhatsAppData()
+                          } else {
+                            toast.error(response.message || 'Failed to sync catalog')
+                          }
+                        } catch (error) {
+                          toast.error('Failed to sync catalog')
+                        }
+                      }}
+                      className="px-3 py-1 bg-amber-600 text-white rounded text-xs hover:bg-amber-700"
+                    >
+                      Fix: Re-sync Catalog
+                    </button>
+                  </div>
+
+                  <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+                    <p className="font-semibold text-amber-900 dark:text-amber-100 mb-1">Issue 2: Wrong catalog type (must be "Commerce")</p>
+                    <p className="text-xs text-amber-700 dark:text-amber-300 mb-2">
+                      Catalog vertical must be set to "Commerce" for product features to work.
+                    </p>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">
+                      Check Meta Business Manager → Catalog Settings → Vertical = Commerce
+                    </p>
+                  </div>
+
+                  <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+                    <p className="font-semibold text-amber-900 dark:text-amber-100 mb-1">Issue 3: No products in catalog</p>
+                    <p className="text-xs text-amber-700 dark:text-amber-300 mb-2">
+                      Catalog exists but has 0 products. Products need to be synced.
+                    </p>
+                    <button
+                      onClick={() => window.open(`/admin/shipper/${shipperId}`, '_blank')}
+                      className="px-3 py-1 bg-amber-600 text-white rounded text-xs hover:bg-amber-700"
+                    >
+                      Check Products
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Actions */}
+              <div className="border-t border-orange-200 pt-4">
+                <h4 className="font-semibold text-slate-900 dark:text-white mb-3">Quick Fixes</h4>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={handleLoadCatalogs}
+                    disabled={isLoadingCatalogs}
+                    className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm disabled:opacity-50"
+                  >
+                    {isLoadingCatalogs ? 'Loading...' : 'Reload Catalogs'}
+                  </button>
+                  <button
+                    onClick={handleSyncCatalog}
+                    disabled={isSyncing}
+                    className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm disabled:opacity-50"
+                  >
+                    {isSyncing ? 'Syncing...' : 'Re-Sync Catalog'}
+                  </button>
+                  <button
+                    onClick={handleCheckPhoneStatus}
+                    disabled={isCheckingStatus}
+                    className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm disabled:opacity-50"
+                  >
+                    {isCheckingStatus ? 'Checking...' : 'Check Phone Status'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      console.log('=== Catalog Debug Info ===')
+                      console.log('WhatsApp Status:', whatsappStatus)
+                      console.log('Phone Status:', phoneStatus)
+                      console.log('Catalogs:', catalogs)
+                      console.log('Bot Settings:', botSettings)
+                      toast.success('Debug info logged to console (F12)')
+                    }}
+                    className="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 text-sm"
+                  >
+                    Log Debug Info
+                  </button>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Bot Settings */}
       <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
         <CardContent className="p-6">
