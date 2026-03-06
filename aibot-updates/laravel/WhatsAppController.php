@@ -590,14 +590,20 @@ class WhatsAppController extends Controller
                 ]);
             }
 
-            Log::info("Connecting catalog {$catalogId} to phone number {$config->phone_number_id}");
+            if (!$config->waba_id) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'No WABA ID found'
+                ]);
+            }
 
-            // Call Meta's API to connect catalog to phone number
+            Log::info("Connecting catalog {$catalogId} to WABA {$config->waba_id}");
+
+            // Try WABA-level endpoint first (only needs catalog_management permission)
             $response = Http::withHeaders([
                 'Authorization' => 'Bearer ' . $config->access_token
-            ])->post("https://graph.facebook.com/v21.0/{$config->phone_number_id}/whatsapp_commerce_settings", [
-                'catalog_id' => $catalogId,
-                'is_catalog_visible' => true
+            ])->post("https://graph.facebook.com/v21.0/{$config->waba_id}/product_catalogs", [
+                'catalog_id' => $catalogId
             ]);
 
             if (!$response->successful()) {
@@ -605,22 +611,19 @@ class WhatsAppController extends Controller
                 $errorCode = $errorData['error']['code'] ?? null;
                 $errorMessage = $errorData['error']['message'] ?? 'Unknown error';
 
-                Log::error('Meta connect catalog API error: ' . $response->body());
+                Log::error('Meta connect catalog (WABA) API error: ' . $response->body());
 
                 // Check for permissions error (#10)
                 if ($errorCode == 10) {
                     return response()->json([
                         'status' => 0,
-                        'message' => 'Permission denied: Your Meta app needs catalog_management permission',
+                        'message' => 'Permission denied: Your token needs catalog_management permission',
                         'error' => $errorData,
                         'fix_instructions' => [
-                            'Go to Meta App Dashboard → App Review → Permissions',
-                            'Add "catalog_management" permission',
-                            'Or go to Business Manager → System Users → Grant catalog access',
-                            'User may need to reconnect WhatsApp account with new permissions'
+                            'User needs to RECONNECT WhatsApp to get catalog_management permission',
+                            'Or check Business Manager → Catalog → Assign to WABA',
                         ],
-                        'meta_app_url' => "https://developers.facebook.com/apps/{$this->metaAppId}/app-review/permissions/",
-                        'business_manager_url' => "https://business.facebook.com/settings/system-users"
+                        'business_manager_url' => "https://business.facebook.com/settings/catalogs"
                     ], 403);
                 }
 
