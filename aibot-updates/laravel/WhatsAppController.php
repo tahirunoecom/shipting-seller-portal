@@ -442,11 +442,31 @@ class WhatsAppController extends Controller
 
             if (!$response->successful()) {
                 $errorData = $response->json();
+                $errorCode = $errorData['error']['code'] ?? null;
+                $errorMessage = $errorData['error']['message'] ?? 'Unknown error';
+
                 Log::error('Meta connect catalog API error: ' . $response->body());
+
+                // Check for permissions error (#10)
+                if ($errorCode == 10) {
+                    return response()->json([
+                        'status' => 0,
+                        'message' => 'Permission denied: Your Meta app needs catalog_management permission',
+                        'error' => $errorData,
+                        'fix_instructions' => [
+                            'Go to Meta App Dashboard → App Review → Permissions',
+                            'Add "catalog_management" permission',
+                            'Or go to Business Manager → System Users → Grant catalog access',
+                            'User may need to reconnect WhatsApp account with new permissions'
+                        ],
+                        'meta_app_url' => "https://developers.facebook.com/apps/{$this->metaAppId}/app-review/permissions/",
+                        'business_manager_url' => "https://business.facebook.com/settings/system-users"
+                    ], 403);
+                }
 
                 return response()->json([
                     'status' => 0,
-                    'message' => 'Failed to connect catalog in Meta: ' . ($errorData['error']['message'] ?? 'Unknown error'),
+                    'message' => 'Failed to connect catalog in Meta: ' . $errorMessage,
                     'error' => $errorData
                 ], $response->status());
             }
@@ -474,6 +494,79 @@ class WhatsAppController extends Controller
             return response()->json([
                 'status' => 0,
                 'message' => 'Failed to connect catalog: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Check access token permissions
+     * POST /api/seller/whatsapp/check-permissions
+     */
+    public function checkPermissions(Request $request)
+    {
+        try {
+            $whAccountId = $request->input('wh_account_id');
+
+            if (!$whAccountId) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'wh_account_id is required'
+                ]);
+            }
+
+            $config = SellerWhatsappConfig::where('wh_account_id', $whAccountId)->first();
+
+            if (!$config || !$config->is_connected) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'WhatsApp not connected'
+                ]);
+            }
+
+            // Debug access token permissions
+            $response = Http::get('https://graph.facebook.com/v21.0/debug_token', [
+                'input_token' => $config->access_token,
+                'access_token' => $config->access_token // Using same token for now
+            ]);
+
+            if ($response->successful()) {
+                $data = $response->json()['data'] ?? [];
+                $scopes = $data['scopes'] ?? [];
+
+                // Check required permissions
+                $requiredPermissions = [
+                    'whatsapp_business_management',
+                    'whatsapp_business_messaging',
+                    'catalog_management', // THIS IS CRITICAL!
+                ];
+
+                $missingPermissions = array_diff($requiredPermissions, $scopes);
+                $hasAllPermissions = count($missingPermissions) === 0;
+
+                return response()->json([
+                    'status' => 1,
+                    'data' => [
+                        'has_all_permissions' => $hasAllPermissions,
+                        'granted_permissions' => $scopes,
+                        'required_permissions' => $requiredPermissions,
+                        'missing_permissions' => array_values($missingPermissions),
+                        'app_id' => $data['app_id'] ?? null,
+                        'expires_at' => $data['expires_at'] ?? null,
+                    ]
+                ]);
+            }
+
+            return response()->json([
+                'status' => 0,
+                'message' => 'Failed to check permissions',
+                'error' => $response->json()
+            ], $response->status());
+
+        } catch (\Exception $e) {
+            Log::error('WhatsApp checkPermissions error: ' . $e->getMessage());
+            return response()->json([
+                'status' => 0,
+                'message' => 'Failed to check permissions: ' . $e->getMessage()
             ], 500);
         }
     }
