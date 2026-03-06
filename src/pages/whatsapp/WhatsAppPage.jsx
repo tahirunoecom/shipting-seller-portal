@@ -62,6 +62,7 @@ import {
   Eye,
   ZoomIn,
   X,
+  Play,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -78,6 +79,7 @@ function WhatsAppPage() {
   const [fbSDKLoaded, setFbSDKLoaded] = useState(false)
   const [showSetupGuide, setShowSetupGuide] = useState(true)
   const [previewScreenshot, setPreviewScreenshot] = useState(null) // { src, alt } for fullscreen preview
+  const [showVideoTutorial, setShowVideoTutorial] = useState(false) // Video tutorial modal
 
   // Setup guide screenshot paths
   const setupScreenshots = {
@@ -1383,6 +1385,32 @@ function WhatsAppPage() {
                                   </p>
                                 </div>
                               )}
+                            </div>
+
+                            {/* Video Tutorial Button */}
+                            <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 p-4 rounded-lg border-2 border-purple-300 dark:border-purple-700">
+                              <div className="flex items-start gap-3">
+                                <div className="flex-shrink-0 w-12 h-12 bg-purple-500 rounded-full flex items-center justify-center">
+                                  <Play className="h-6 w-6 text-white fill-white" />
+                                </div>
+                                <div className="flex-1">
+                                  <h5 className="font-semibold text-purple-800 dark:text-purple-200 mb-1 flex items-center gap-2">
+                                    🎥 Prefer Video Instructions?
+                                  </h5>
+                                  <p className="text-sm text-purple-700 dark:text-purple-300 mb-3">
+                                    Watch our step-by-step video tutorial that walks you through the entire setup process
+                                    with detailed explanations and visual guidance.
+                                  </p>
+                                  <button
+                                    onClick={() => setShowVideoTutorial(true)}
+                                    className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-medium text-sm rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+                                  >
+                                    <Play className="h-4 w-4 fill-white" />
+                                    Watch Video Tutorial
+                                    <ExternalLink className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
+                              </div>
                             </div>
 
                             <p className="text-sm text-green-700 dark:text-green-300 font-medium">
@@ -3455,6 +3483,53 @@ function WhatsAppPage() {
               <Send className="h-4 w-4" />
               Submit for Review
             </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Video Tutorial Modal */}
+      <Modal
+        isOpen={showVideoTutorial}
+        onClose={() => setShowVideoTutorial(false)}
+        title="📹 WhatsApp Setup Video Tutorial"
+        size="xl"
+      >
+        <div className="space-y-4">
+          <div className="p-3 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-lg border border-purple-200 dark:border-purple-700">
+            <p className="text-sm text-purple-700 dark:text-purple-300">
+              <strong>🎥 Interactive Video Guide:</strong> This video tutorial will walk you through each step
+              of the WhatsApp Business setup process with detailed explanations and visual guidance.
+              You can pause, navigate between steps, and follow along at your own pace.
+            </p>
+          </div>
+
+          {/* Video Tutorial iframe */}
+          <div className="bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden" style={{ height: '600px' }}>
+            <iframe
+              src="/whatsapp-setup-video.html"
+              className="w-full h-full border-0"
+              title="WhatsApp Setup Video Tutorial"
+              allow="fullscreen"
+            />
+          </div>
+
+          <div className="flex items-center justify-between pt-2 border-t dark:border-dark-border">
+            <div className="text-xs text-gray-500 dark:text-gray-400">
+              💡 <strong>Tip:</strong> Use arrow keys to navigate, spacebar to play/pause
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => window.open('/whatsapp-setup-video.html', '_blank')}
+                className="text-sm"
+              >
+                <ExternalLink className="h-4 w-4" />
+                Open in New Tab
+              </Button>
+              <Button onClick={() => setShowVideoTutorial(false)}>
+                Close
+              </Button>
+            </div>
           </div>
         </div>
       </Modal>
