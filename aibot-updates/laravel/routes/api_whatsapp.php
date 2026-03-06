@@ -37,6 +37,8 @@ Route::middleware(['auth:sanctum'])->prefix('seller/whatsapp')->group(function (
     Route::post('/list-catalogs', [WhatsAppController::class, 'listCatalogs']);
     Route::post('/update-catalog', [WhatsAppController::class, 'updateCatalog']);
     Route::post('/sync-catalog', [WhatsAppController::class, 'syncCatalog']);
+    Route::post('/commerce-settings', [WhatsAppController::class, 'getCommerceSettings']); // Check if catalog is connected in Meta
+    Route::post('/connect-catalog', [WhatsAppController::class, 'connectCatalog']); // Connect catalog via Meta API (auto-fix)
 
     // Webhook configuration (auto-configured on connection, but can be done manually)
     Route::post('/configure-webhook', [WhatsAppController::class, 'configureWebhook']);
