@@ -10,6 +10,7 @@ import { orderService } from '@/services/orders'
 import { DRIVER_STATUS_LABELS } from '@/services/driver'
 import { Card, CardContent, Modal, Button, Input } from '@/components/ui'
 import { AdminBillingTab } from './components/AdminBillingTab'
+import { AdminWhatsAppOnboarding } from './components/AdminWhatsAppOnboarding'
 import {
   ArrowLeft,
   User,
@@ -1480,7 +1481,7 @@ function OrdersTab({ shipperId }) {
   )
 }
 
-function WhatsAppTab({ shipperId }) {
+function WhatsAppTab({ shipperId, shipper }) {
   const [whatsappStatus, setWhatsappStatus] = useState(null)
   const [botSettings, setBotSettings] = useState(null)
   const [phoneStatus, setPhoneStatus] = useState(null)
@@ -1948,6 +1949,15 @@ function WhatsAppTab({ shipperId }) {
 
   return (
     <div className="space-y-6">
+      {/* Admin-Assisted Onboarding */}
+      {!isConnected && (
+        <AdminWhatsAppOnboarding
+          shipperId={shipperId}
+          sellerEmail={shipper?.email}
+          sellerName={shipper?.firstname || shipper?.name || 'Seller'}
+        />
+      )}
+
       {/* Connection Status */}
       <Card className="bg-white dark:bg-slate-800 border-0 shadow-sm">
         <CardContent className="p-6">
@@ -3410,7 +3420,7 @@ function AdminShipperDetailPage() {
         {activeTab === 'dashboard' && <DashboardTab key={shipperId} shipperId={shipperId} />}
         {activeTab === 'products' && <ProductsTab key={shipperId} shipperId={shipperId} />}
         {activeTab === 'orders' && <OrdersTab key={shipperId} shipperId={shipperId} />}
-        {activeTab === 'whatsapp' && <WhatsAppTab key={shipperId} shipperId={shipperId} />}
+        {activeTab === 'whatsapp' && <WhatsAppTab key={shipperId} shipperId={shipperId} shipper={shipper} />}
         {activeTab === 'billing' && <BillingTab shipper={shipper} />}
         {activeTab === 'driver' && <DriverTab shipper={shipper} shipperId={shipperId} />}
       </div>
