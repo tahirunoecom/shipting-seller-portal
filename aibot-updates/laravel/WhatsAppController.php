@@ -686,9 +686,21 @@ class WhatsAppController extends Controller
                 ]);
             }
 
-            // Debug access token permissions using App Access Token
-            $appAccessToken = $this->metaAppId . '|' . $this->metaAppSecret;
+            $diagnostics = [
+                'token_valid' => false,
+                'has_all_permissions' => false,
+                'catalog_accessible' => false,
+                'waba_catalog_connected' => false,
+                'granted_permissions' => [],
+                'missing_permissions' => [],
+                'catalog_info' => null,
+                'waba_info' => null,
+                'errors' => [],
+                'recommendations' => []
+            ];
 
+            // Step 1: Check access token permissions
+            $appAccessToken = $this->metaAppId . '|' . $this->metaAppSecret;
             $response = Http::get('https://graph.facebook.com/v21.0/debug_token', [
                 'input_token' => $config->access_token,
                 'access_token' => $appAccessToken
@@ -697,35 +709,106 @@ class WhatsAppController extends Controller
             if ($response->successful()) {
                 $data = $response->json()['data'] ?? [];
                 $scopes = $data['scopes'] ?? [];
+                $diagnostics['token_valid'] = true;
+                $diagnostics['granted_permissions'] = $scopes;
+                $diagnostics['app_id'] = $data['app_id'] ?? null;
+                $diagnostics['expires_at'] = $data['expires_at'] ?? null;
 
                 // Check required permissions
                 $requiredPermissions = [
                     'whatsapp_business_management',
                     'whatsapp_business_messaging',
-                    'catalog_management', // THIS IS CRITICAL!
+                    'catalog_management',
                 ];
 
                 $missingPermissions = array_diff($requiredPermissions, $scopes);
-                $hasAllPermissions = count($missingPermissions) === 0;
+                $diagnostics['missing_permissions'] = array_values($missingPermissions);
+                $diagnostics['has_all_permissions'] = count($missingPermissions) === 0;
 
-                return response()->json([
-                    'status' => 1,
-                    'data' => [
-                        'has_all_permissions' => $hasAllPermissions,
-                        'granted_permissions' => $scopes,
-                        'required_permissions' => $requiredPermissions,
-                        'missing_permissions' => array_values($missingPermissions),
-                        'app_id' => $data['app_id'] ?? null,
-                        'expires_at' => $data['expires_at'] ?? null,
-                    ]
-                ]);
+                if (!$diagnostics['has_all_permissions']) {
+                    $diagnostics['errors'][] = 'Missing required permissions: ' . implode(', ', $missingPermissions);
+                    $diagnostics['recommendations'][] = 'Disconnect and reconnect WhatsApp to grant missing permissions';
+                }
+            } else {
+                $diagnostics['errors'][] = 'Failed to validate access token';
+                return response()->json(['status' => 1, 'data' => $diagnostics]);
             }
 
+            // Step 2: Check WABA access
+            $wabaResponse = Http::withToken($config->access_token)
+                ->get("https://graph.facebook.com/v21.0/{$config->waba_id}", [
+                    'fields' => 'id,name,currency,timezone_id,message_template_namespace'
+                ]);
+
+            if ($wabaResponse->successful()) {
+                $diagnostics['waba_info'] = $wabaResponse->json();
+            } else {
+                $wabaError = $wabaResponse->json()['error'] ?? [];
+                $diagnostics['errors'][] = 'Cannot access WABA: ' . ($wabaError['message'] ?? 'Unknown error');
+                $diagnostics['recommendations'][] = 'Verify you have permissions to the WhatsApp Business Account in Business Manager';
+            }
+
+            // Step 3: Check if catalog exists and is accessible
+            if ($config->catalog_id) {
+                $catalogResponse = Http::withToken($config->access_token)
+                    ->get("https://graph.facebook.com/v21.0/{$config->catalog_id}", [
+                        'fields' => 'id,name,product_count,vertical'
+                    ]);
+
+                if ($catalogResponse->successful()) {
+                    $diagnostics['catalog_accessible'] = true;
+                    $diagnostics['catalog_info'] = $catalogResponse->json();
+                } else {
+                    $catalogError = $catalogResponse->json()['error'] ?? [];
+                    $errorCode = $catalogError['code'] ?? null;
+                    $errorMessage = $catalogError['message'] ?? 'Unknown error';
+
+                    $diagnostics['errors'][] = "Cannot access catalog (Error #{$errorCode}): {$errorMessage}";
+
+                    if ($errorCode == 200) {
+                        $diagnostics['recommendations'][] = 'Catalog permissions issue detected! You need to:';
+                        $diagnostics['recommendations'][] = '1. Go to Commerce Manager → Your Catalog → Settings → People';
+                        $diagnostics['recommendations'][] = '2. Add yourself with "Manage catalog" permission';
+                        $diagnostics['recommendations'][] = '3. Ensure the catalog is owned by your Business Manager';
+                    } else if ($errorCode == 10) {
+                        $diagnostics['recommendations'][] = 'Permission denied. Make sure:';
+                        $diagnostics['recommendations'][] = '1. You have access to this catalog in Business Manager';
+                        $diagnostics['recommendations'][] = '2. The catalog is in the same Business Manager as your WABA';
+                    }
+                }
+
+                // Step 4: Check WABA-Catalog connection
+                $wabaProductCatalogsResponse = Http::withToken($config->access_token)
+                    ->get("https://graph.facebook.com/v21.0/{$config->waba_id}/product_catalogs");
+
+                if ($wabaProductCatalogsResponse->successful()) {
+                    $catalogs = $wabaProductCatalogsResponse->json()['data'] ?? [];
+                    $connectedCatalogIds = array_column($catalogs, 'id');
+
+                    $diagnostics['waba_catalog_connected'] = in_array($config->catalog_id, $connectedCatalogIds);
+
+                    if (!$diagnostics['waba_catalog_connected']) {
+                        $diagnostics['errors'][] = 'Catalog is NOT connected to WABA in Meta Business Manager';
+                        $diagnostics['recommendations'][] = 'Click "Fix Automatically" to connect the catalog via API';
+                    }
+                } else {
+                    $diagnostics['errors'][] = 'Cannot check WABA-catalog connection status';
+                }
+            } else {
+                $diagnostics['errors'][] = 'No catalog ID found in database';
+                $diagnostics['recommendations'][] = 'Create or link a catalog first';
+            }
+
+            // Overall health check
+            $diagnostics['overall_health'] = $diagnostics['token_valid']
+                && $diagnostics['has_all_permissions']
+                && $diagnostics['catalog_accessible']
+                && $diagnostics['waba_catalog_connected'];
+
             return response()->json([
-                'status' => 0,
-                'message' => 'Failed to check permissions',
-                'error' => $response->json()
-            ], $response->status());
+                'status' => 1,
+                'data' => $diagnostics
+            ]);
 
         } catch (\Exception $e) {
             Log::error('WhatsApp checkPermissions error: ' . $e->getMessage());

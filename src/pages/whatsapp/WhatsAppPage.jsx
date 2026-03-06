@@ -64,6 +64,7 @@ import {
   ZoomIn,
   X,
   Play,
+  Lightbulb,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -117,6 +118,11 @@ function WhatsAppPage() {
   // Catalog management state
   const [catalogs, setCatalogs] = useState([])
   const [loadingCatalogs, setLoadingCatalogs] = useState(false)
+
+  // Permission diagnostics state
+  const [permissionDiagnostics, setPermissionDiagnostics] = useState(null)
+  const [loadingDiagnostics, setLoadingDiagnostics] = useState(false)
+  const [showDiagnostics, setShowDiagnostics] = useState(false)
 
   // Phone status state
   const [phoneStatus, setPhoneStatus] = useState(null)
@@ -884,6 +890,33 @@ function WhatsAppPage() {
       toast.error('Failed to update catalog')
     } finally {
       setSaving(false)
+    }
+  }
+
+  // Check permissions and catalog access
+  const handleCheckPermissions = async () => {
+    try {
+      setLoadingDiagnostics(true)
+      setShowDiagnostics(true)
+      const response = await whatsappService.checkPermissions(user?.wh_account_id)
+
+      if (response.status === 1) {
+        setPermissionDiagnostics(response.data)
+        if (response.data.overall_health) {
+          toast.success('All permissions are configured correctly!')
+        } else {
+          toast.warning('Some permissions are missing. Check the diagnostics below.')
+        }
+      } else {
+        toast.error(response.message || 'Failed to check permissions')
+        setPermissionDiagnostics(null)
+      }
+    } catch (error) {
+      console.error('Permission check error:', error)
+      toast.error('Failed to check permissions')
+      setPermissionDiagnostics(null)
+    } finally {
+      setLoadingDiagnostics(false)
     }
   }
 
@@ -2712,6 +2745,174 @@ function WhatsAppPage() {
                           <Store className="h-4 w-4" />
                           Create New Commerce Catalog
                         </Button>
+                      </div>
+
+                      {/* Permission Diagnostics Section */}
+                      <div className="p-4 border rounded-lg dark:border-dark-border bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center gap-2">
+                            <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                            <span className="font-medium text-gray-900 dark:text-dark-text">
+                              Permission Diagnostics
+                            </span>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={handleCheckPermissions}
+                            isLoading={loadingDiagnostics}
+                            className="bg-blue-600 text-white hover:bg-blue-700"
+                          >
+                            <RefreshCw className="h-4 w-4" />
+                            Check Permissions
+                          </Button>
+                        </div>
+
+                        <p className="text-sm text-blue-700 dark:text-blue-300 mb-3">
+                          Having issues connecting your catalog? Click "Check Permissions" to diagnose permission and access problems.
+                        </p>
+
+                        {/* Diagnostics Results */}
+                        {showDiagnostics && permissionDiagnostics && (
+                          <div className="space-y-3 mt-4">
+                            {/* Overall Health Status */}
+                            <div className={`p-3 rounded-lg ${
+                              permissionDiagnostics.overall_health
+                                ? 'bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700'
+                                : 'bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700'
+                            }`}>
+                              <div className="flex items-center gap-2">
+                                {permissionDiagnostics.overall_health ? (
+                                  <>
+                                    <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+                                    <span className="font-medium text-green-800 dark:text-green-200">
+                                      All Systems Operational
+                                    </span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <XCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
+                                    <span className="font-medium text-red-800 dark:text-red-200">
+                                      Issues Detected
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Permission Checks */}
+                            <div className="space-y-2">
+                              {/* Token Valid */}
+                              <div className="flex items-start gap-2 p-2 bg-white/50 dark:bg-gray-800/50 rounded">
+                                {permissionDiagnostics.token_valid ? (
+                                  <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+                                ) : (
+                                  <XCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                                )}
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium text-gray-900 dark:text-dark-text">
+                                    Access Token Valid
+                                  </p>
+                                  {permissionDiagnostics.expires_at && (
+                                    <p className="text-xs text-gray-500">
+                                      Expires: {new Date(permissionDiagnostics.expires_at * 1000).toLocaleDateString()}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* All Permissions */}
+                              <div className="flex items-start gap-2 p-2 bg-white/50 dark:bg-gray-800/50 rounded">
+                                {permissionDiagnostics.has_all_permissions ? (
+                                  <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+                                ) : (
+                                  <XCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                                )}
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium text-gray-900 dark:text-dark-text">
+                                    Required Permissions
+                                  </p>
+                                  {permissionDiagnostics.missing_permissions.length > 0 && (
+                                    <p className="text-xs text-red-600 dark:text-red-400">
+                                      Missing: {permissionDiagnostics.missing_permissions.join(', ')}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Catalog Access */}
+                              <div className="flex items-start gap-2 p-2 bg-white/50 dark:bg-gray-800/50 rounded">
+                                {permissionDiagnostics.catalog_accessible ? (
+                                  <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+                                ) : (
+                                  <XCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                                )}
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium text-gray-900 dark:text-dark-text">
+                                    Catalog Accessible
+                                  </p>
+                                  {permissionDiagnostics.catalog_info && (
+                                    <p className="text-xs text-gray-500">
+                                      {permissionDiagnostics.catalog_info.name} ({permissionDiagnostics.catalog_info.product_count} products)
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* WABA-Catalog Connection */}
+                              <div className="flex items-start gap-2 p-2 bg-white/50 dark:bg-gray-800/50 rounded">
+                                {permissionDiagnostics.waba_catalog_connected ? (
+                                  <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+                                ) : (
+                                  <XCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                                )}
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium text-gray-900 dark:text-dark-text">
+                                    WABA-Catalog Connection
+                                  </p>
+                                  <p className="text-xs text-gray-500">
+                                    {permissionDiagnostics.waba_catalog_connected ? 'Connected in Meta' : 'Not connected in Meta'}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Errors */}
+                            {permissionDiagnostics.errors && permissionDiagnostics.errors.length > 0 && (
+                              <div className="p-3 bg-red-50 dark:bg-red-900/30 rounded-lg border border-red-200 dark:border-red-700">
+                                <p className="font-medium text-red-800 dark:text-red-200 text-sm mb-2">
+                                  Issues Found:
+                                </p>
+                                <ul className="space-y-1">
+                                  {permissionDiagnostics.errors.map((error, index) => (
+                                    <li key={index} className="text-xs text-red-700 dark:text-red-300 flex items-start gap-2">
+                                      <span className="text-red-500 font-bold mt-0.5">•</span>
+                                      <span>{error}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+
+                            {/* Recommendations */}
+                            {permissionDiagnostics.recommendations && permissionDiagnostics.recommendations.length > 0 && (
+                              <div className="p-3 bg-amber-50 dark:bg-amber-900/30 rounded-lg border border-amber-200 dark:border-amber-700">
+                                <p className="font-medium text-amber-800 dark:text-amber-200 text-sm mb-2 flex items-center gap-2">
+                                  <Lightbulb className="h-4 w-4" />
+                                  How to Fix:
+                                </p>
+                                <ul className="space-y-1">
+                                  {permissionDiagnostics.recommendations.map((rec, index) => (
+                                    <li key={index} className="text-xs text-amber-700 dark:text-amber-300 flex items-start gap-2">
+                                      <span className="text-amber-500 font-bold mt-0.5">→</span>
+                                      <span>{rec}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
 
                       {/* Share WhatsApp Link & QR Code Section */}
