@@ -80,9 +80,18 @@ export const whatsappService = {
     return response.data
   },
 
-  // Select/Link a catalog to the phone number
+  // Select/Link a catalog to the phone number (Updates DB only)
   async selectCatalog(wh_account_id, catalog_id) {
     const response = await api.post('/seller/whatsapp/select-catalog', {
+      wh_account_id,
+      catalog_id,
+    })
+    return response.data
+  },
+
+  // Connect catalog to phone number via Meta API (Automatic fix for Error 131009)
+  async connectCatalogInMeta(wh_account_id, catalog_id) {
+    const response = await api.post('/seller/whatsapp/connect-catalog', {
       wh_account_id,
       catalog_id,
     })

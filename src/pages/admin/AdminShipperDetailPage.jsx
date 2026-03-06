@@ -3022,30 +3022,55 @@ function WhatsAppTab({ shipperId, shipper }) {
                                 </a>
                               )}
                               {issue.fix === 'connect_in_meta' && (
-                                <div className="space-y-2">
-                                  <a
-                                    href={issue.metaUrl || 'https://business.facebook.com/latest/whatsapp_manager/catalog'}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg text-sm font-semibold hover:from-blue-700 hover:to-purple-700 shadow-lg"
-                                  >
-                                    <ExternalLink className="w-4 h-4" />
-                                    🔧 Connect Catalog in Meta (Opens WhatsApp Manager)
-                                  </a>
+                                <div className="space-y-3">
+                                  {/* Automatic Fix Button (Uses Meta API) */}
                                   {issue.catalogId && (
-                                    <p className="text-xs text-slate-600 dark:text-slate-400 ml-1">
-                                      📋 You'll need to select catalog: <span className="font-mono font-semibold">{issue.catalogId}</span>
-                                    </p>
+                                    <div>
+                                      <button
+                                        onClick={async () => {
+                                          try {
+                                            setIsSyncing(true)
+                                            const response = await whatsappService.connectCatalogInMeta(shipperId, issue.catalogId)
+                                            if (response.status === 1) {
+                                              toast.success('✅ Catalog connected successfully in Meta!')
+                                              fetchWhatsAppData()
+                                            } else {
+                                              toast.error(response.message || 'Failed to connect catalog')
+                                            }
+                                          } catch (error) {
+                                            console.error('Auto-fix error:', error)
+                                            toast.error('Auto-fix failed. Try manual method below.')
+                                          } finally {
+                                            setIsSyncing(false)
+                                          }
+                                        }}
+                                        disabled={isSyncing}
+                                        className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg text-sm font-bold hover:from-green-700 hover:to-emerald-700 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                                      >
+                                        {isSyncing ? (
+                                          <>⏳ Connecting...</>
+                                        ) : (
+                                          <>⚡ Fix Automatically (One Click)</>
+                                        )}
+                                      </button>
+                                      <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 ml-1">
+                                        📋 Will connect catalog: <span className="font-mono font-semibold">{issue.catalogId}</span>
+                                      </p>
+                                    </div>
                                   )}
-                                  <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-700">
-                                    <p className="text-xs font-semibold text-blue-900 dark:text-blue-100 mb-1">📝 Instructions:</p>
-                                    <ol className="text-xs text-blue-700 dark:text-blue-300 space-y-1 ml-4 list-decimal">
-                                      <li>Click button above to open Meta WhatsApp Manager</li>
-                                      <li>Click "Choose a Catalogue" button</li>
-                                      <li>Search and select your catalog</li>
-                                      <li>Click "Connect" to confirm</li>
-                                      <li>Return here and click "Reload Diagnostics"</li>
-                                    </ol>
+
+                                  {/* Manual Fix Option (Fallback) */}
+                                  <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">Or fix manually in Meta:</p>
+                                    <a
+                                      href={issue.metaUrl || 'https://business.facebook.com/latest/whatsapp_manager/catalog'}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+                                    >
+                                      <ExternalLink className="w-3 h-3" />
+                                      Open Meta WhatsApp Manager
+                                    </a>
                                   </div>
                                 </div>
                               )}
