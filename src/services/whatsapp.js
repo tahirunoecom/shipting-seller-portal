@@ -106,6 +106,14 @@ export const whatsappService = {
     return response.data
   },
 
+  // Check access token permissions
+  async checkPermissions(wh_account_id) {
+    const response = await api.post('/seller/whatsapp/check-permissions', {
+      wh_account_id,
+    })
+    return response.data
+  },
+
   // Get phone number status from Meta API
   async getPhoneStatus(wh_account_id) {
     const response = await api.post('/seller/whatsapp/phone-status', {
