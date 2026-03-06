@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Card,
   CardContent,
@@ -28,8 +28,12 @@ import {
   Shield,
   FileText,
   ExternalLink,
+  ArrowRight,
+  Loader2,
+  Share2,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { whatsappService } from '@/services/whatsapp'
 
 const ONBOARDING_STEPS = [
   {
@@ -113,6 +117,8 @@ export function AdminWhatsAppOnboarding({ shipperId, sellerEmail, sellerName }) 
   const [emailTemplate, setEmailTemplate] = useState({ subject: '', body: '' })
   const [currentStep, setCurrentStep] = useState(null)
   const [showNotesModal, setShowNotesModal] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [showNextStepModal, setShowNextStepModal] = useState(false)
 
   const getStatusIcon = (status) => {
     switch (status) {
@@ -254,11 +260,59 @@ Admin Team`,
     toast.success('Email template copied to clipboard!')
   }
 
-  const handleSaveData = () => {
-    // TODO: Save onboarding data to backend
-    console.log('Saving onboarding data:', onboardingData)
-    toast.success('Onboarding data saved!')
+  const handleSaveData = async () => {
+    // Validate required fields
+    if (!onboardingData.business_name || !onboardingData.business_category) {
+      toast.error('Please fill in Business Name and Category')
+      return
+    }
+
+    if (!onboardingData.phone_number) {
+      toast.error('Please enter a phone number')
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      // Save to localStorage for now (you can replace with backend API later)
+      const storageKey = `whatsapp_onboarding_${shipperId}`
+      localStorage.setItem(storageKey, JSON.stringify({
+        ...onboardingData,
+        savedAt: new Date().toISOString(),
+        shipperId,
+      }))
+
+      // Auto-complete Step 1
+      setStepStatus(prev => ({ ...prev, business_info: 'completed' }))
+
+      toast.success('Business information saved successfully!')
+
+      // Show next step guidance
+      setShowNextStepModal(true)
+
+    } catch (error) {
+      console.error('Error saving onboarding data:', error)
+      toast.error('Failed to save data')
+    } finally {
+      setIsSaving(false)
+    }
   }
+
+  // Load saved data on mount
+  useEffect(() => {
+    const storageKey = `whatsapp_onboarding_${shipperId}`
+    const saved = localStorage.getItem(storageKey)
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved)
+        setOnboardingData(parsed)
+        // If data was saved, mark Step 1 as completed
+        setStepStatus(prev => ({ ...prev, business_info: 'completed' }))
+      } catch (error) {
+        console.error('Error loading saved data:', error)
+      }
+    }
+  }, [shipperId])
 
   const handleMarkStepComplete = (stepId) => {
     setStepStatus(prev => ({ ...prev, [stepId]: 'completed' }))
@@ -443,9 +497,22 @@ Admin Team`,
               </div>
 
               <div className="mt-4 flex justify-end">
-                <Button onClick={handleSaveData} className="bg-purple-600 hover:bg-purple-700">
-                  <Save className="w-4 h-4 mr-2" />
-                  Save Information
+                <Button
+                  onClick={handleSaveData}
+                  disabled={isSaving}
+                  className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50"
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 mr-2" />
+                      Save Information
+                    </>
+                  )}
                 </Button>
               </div>
             </div>
@@ -606,6 +673,106 @@ Admin Team`,
                   Copy & Send
                 </Button>
               </div>
+            </div>
+          </div>
+        </Modal>
+
+        {/* Next Step Guidance Modal */}
+        <Modal
+          isOpen={showNextStepModal}
+          onClose={() => setShowNextStepModal(false)}
+          title="✅ Business Information Saved!"
+        >
+          <div className="space-y-4">
+            <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700 rounded-lg p-4">
+              <h4 className="font-semibold text-emerald-900 dark:text-emerald-100 flex items-center gap-2 mb-2">
+                <CheckCircle className="w-5 h-5" />
+                Step 1 Complete!
+              </h4>
+              <p className="text-sm text-emerald-700 dark:text-emerald-300">
+                Business information has been saved successfully.
+              </p>
+            </div>
+
+            <div className="border-t pt-4">
+              <h4 className="font-semibold text-slate-900 dark:text-white mb-3">
+                📋 What's Next? (Step 2: Facebook Login)
+              </h4>
+              <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+                The seller needs to connect their Facebook account. Choose how you'd like to proceed:
+              </p>
+
+              <div className="space-y-3">
+                <div className="bg-purple-50 dark:bg-purple-900/20 border-2 border-purple-200 dark:border-purple-700 rounded-lg p-4">
+                  <h5 className="font-semibold text-purple-900 dark:text-purple-100 mb-2 flex items-center gap-2">
+                    <Mail className="w-4 h-4" />
+                    Option 1: Email Seller (Recommended)
+                  </h5>
+                  <p className="text-sm text-purple-700 dark:text-purple-300 mb-3">
+                    Send the seller an email with login instructions. They'll complete this step themselves for security.
+                  </p>
+                  <Button
+                    onClick={() => {
+                      setShowNextStepModal(false)
+                      const fbStep = ONBOARDING_STEPS.find(s => s.id === 'facebook_login')
+                      handleSendEmail(fbStep)
+                    }}
+                    className="w-full bg-purple-600 hover:bg-purple-700"
+                  >
+                    <Mail className="w-4 h-4 mr-2" />
+                    Email Seller Instructions
+                  </Button>
+                </div>
+
+                <div className="bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-200 dark:border-amber-700 rounded-lg p-4">
+                  <h5 className="font-semibold text-amber-900 dark:text-amber-100 mb-2 flex items-center gap-2">
+                    <Users className="w-4 h-4" />
+                    Option 2: Complete on Their Behalf
+                  </h5>
+                  <p className="text-sm text-amber-700 dark:text-amber-300 mb-3">
+                    ⚠️ Only if seller has shared their Facebook credentials with you. Not recommended for security.
+                  </p>
+                  <Button
+                    onClick={() => {
+                      setShowNextStepModal(false)
+                      // Open seller portal in new tab
+                      window.open(`${window.location.origin}/whatsapp?seller=${shipperId}`, '_blank')
+                    }}
+                    variant="outline"
+                    className="w-full border-amber-300 text-amber-700 hover:bg-amber-100"
+                  >
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    Open Setup Page (Do It Myself)
+                  </Button>
+                </div>
+
+                <div className="bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg p-4">
+                  <h5 className="font-semibold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
+                    <Eye className="w-4 h-4" />
+                    Option 3: Guide Seller via Screen Share
+                  </h5>
+                  <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
+                    Walk the seller through the setup on a video call while they perform the actions.
+                  </p>
+                  <Button
+                    onClick={() => {
+                      setShowNextStepModal(false)
+                      toast.success('Share this link with seller for screen sharing session')
+                    }}
+                    variant="outline"
+                    className="w-full"
+                  >
+                    <Share2 className="w-4 h-4 mr-2" />
+                    I'll Guide Them
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4 border-t">
+              <Button variant="outline" onClick={() => setShowNextStepModal(false)}>
+                I'll Decide Later
+              </Button>
             </div>
           </div>
         </Modal>
