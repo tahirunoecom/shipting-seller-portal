@@ -1515,6 +1515,13 @@ function WhatsAppTab({ shipperId, shipper }) {
   const [loadingInbox, setLoadingInbox] = useState(false)
   const [showTwilioSection, setShowTwilioSection] = useState(false)
 
+  // Catalog health detection
+  const [catalogHealth, setCatalogHealth] = useState({
+    hasIssues: false,
+    issues: [],
+    checking: false,
+  })
+
   useEffect(() => {
     fetchWhatsAppData()
     loadTwilioNumber()
@@ -1567,6 +1574,106 @@ function WhatsAppTab({ shipperId, shipper }) {
       console.error('Error fetching WhatsApp data:', error)
     } finally {
       setIsLoading(false)
+      // Auto-check catalog health after loading data
+      checkCatalogHealth()
+    }
+  }
+
+  // Check catalog health using Meta's API validation logic
+  const checkCatalogHealth = async () => {
+    if (!whatsappStatus) return
+
+    setCatalogHealth(prev => ({ ...prev, checking: true }))
+    const issues = []
+
+    try {
+      const catalogId = whatsappStatus.catalog_id || whatsappStatus.catalogId
+      const phoneNumberId = whatsappStatus.phone_number_id || phoneStatus?.phone_number_id
+      const productCount = whatsappStatus.product_count ?? whatsappStatus.productCount
+
+      // Issue 1: No catalog linked to phone number
+      if (!catalogId) {
+        issues.push({
+          id: 'no_catalog',
+          severity: 'error',
+          title: 'No catalog linked to phone number',
+          description: 'The WhatsApp phone number does not have a catalog connected.',
+          fix: 'link_catalog',
+        })
+      }
+
+      // Issue 2: Check if catalog exists in available catalogs
+      if (catalogId && catalogs.length > 0) {
+        const linkedCatalog = catalogs.find(c => c.id === catalogId)
+
+        if (!linkedCatalog) {
+          issues.push({
+            id: 'catalog_not_found',
+            severity: 'error',
+            title: 'Linked catalog not found in available catalogs',
+            description: `Catalog ID ${catalogId} is set but not found in available catalogs.`,
+            fix: 'resync_catalog',
+          })
+        } else {
+          // Issue 3: Check catalog type (must be "Commerce")
+          const catalogType = linkedCatalog.type || linkedCatalog.vertical || linkedCatalog.catalogType || linkedCatalog.businessVertical
+          if (catalogType && catalogType.toLowerCase() !== 'commerce') {
+            issues.push({
+              id: 'wrong_catalog_type',
+              severity: 'error',
+              title: 'Wrong catalog type (must be "Commerce")',
+              description: `Catalog type is "${catalogType}". It must be "Commerce" for product features.`,
+              fix: 'change_in_meta',
+            })
+          }
+
+          // Issue 4: Check product count
+          const catProductCount = linkedCatalog.product_count ?? linkedCatalog.productCount ?? 0
+          if (catProductCount === 0) {
+            issues.push({
+              id: 'no_products',
+              severity: 'warning',
+              title: 'No products in catalog',
+              description: 'Catalog exists but has 0 products. Products need to be synced.',
+              fix: 'sync_products',
+            })
+          }
+        }
+      }
+
+      // Issue 5: Product count unknown or 0 from WhatsApp status
+      if (productCount === 0 || productCount === undefined) {
+        if (!issues.find(i => i.id === 'no_products')) {
+          issues.push({
+            id: 'product_count_zero',
+            severity: 'warning',
+            title: 'Product count is 0 or unknown',
+            description: 'WhatsApp reports no products or product count is unavailable.',
+            fix: 'resync_catalog',
+          })
+        }
+      }
+
+      // Issue 6: Multiple catalogs but none active
+      if (catalogs.length > 1 && !catalogId) {
+        issues.push({
+          id: 'multiple_catalogs_no_active',
+          severity: 'warning',
+          title: 'Multiple catalogs found but none is active',
+          description: 'You have multiple catalogs but haven\'t selected one.',
+          fix: 'select_catalog',
+        })
+      }
+
+      setCatalogHealth({
+        hasIssues: issues.length > 0,
+        issues,
+        checking: false,
+      })
+
+    } catch (error) {
+      console.error('Error checking catalog health:', error)
+      setCatalogHealth(prev => ({ ...prev, checking: false }))
     }
   }
 
@@ -2730,14 +2837,23 @@ function WhatsAppTab({ shipperId, shipper }) {
         </CardContent>
       </Card>
 
-      {/* Catalog Diagnostics */}
+      {/* Catalog Health Status - Always show but change color based on health */}
       {isConnected && (
-        <Card className="bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 border-2 border-orange-200 dark:border-orange-700">
+        <Card className={`border-2 ${catalogHealth.hasIssues ? 'bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 border-orange-200 dark:border-orange-700' : 'bg-gradient-to-br from-emerald-50 to-green-50 dark:from-emerald-900/20 dark:to-green-900/20 border-emerald-200 dark:border-emerald-700'}`}>
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-orange-900 dark:text-orange-100 flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-orange-500" />
-                Catalog Diagnostics
+              <h3 className={`text-lg font-semibold flex items-center gap-2 ${catalogHealth.hasIssues ? 'text-orange-900 dark:text-orange-100' : 'text-emerald-900 dark:text-emerald-100'}`}>
+                {catalogHealth.hasIssues ? (
+                  <>
+                    <AlertTriangle className="w-5 h-5 text-orange-500" />
+                    Catalog Diagnostics - {catalogHealth.issues.length} Issue(s) Detected
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="w-5 h-5 text-emerald-500" />
+                    Catalog Health - All Good ✅
+                  </>
+                )}
               </h3>
               <button
                 onClick={async () => {
@@ -2747,7 +2863,9 @@ function WhatsAppTab({ shipperId, shipper }) {
                     if (response.status === 1) {
                       const catalogData = response.data?.catalogs || response.data || []
                       setCatalogs(catalogData)
-                      toast.success('Catalogs reloaded!')
+                      // Re-check health after reloading
+                      await checkCatalogHealth()
+                      toast.success('Diagnostics reloaded!')
                     } else {
                       toast.error(response.message || 'Failed to reload catalogs')
                     }
@@ -2757,7 +2875,7 @@ function WhatsAppTab({ shipperId, shipper }) {
                     setIsLoadingCatalogs(false)
                   }
                 }}
-                className="text-sm text-orange-600 hover:text-orange-700 flex items-center gap-1"
+                className={`text-sm flex items-center gap-1 ${catalogHealth.hasIssues ? 'text-orange-600 hover:text-orange-700' : 'text-emerald-600 hover:text-emerald-700'}`}
               >
                 <RefreshCw className="w-4 h-4" />
                 Reload Diagnostics
@@ -2765,12 +2883,110 @@ function WhatsAppTab({ shipperId, shipper }) {
             </div>
 
             <div className="bg-white dark:bg-slate-800 rounded-lg p-4 space-y-4">
-              {/* Current Status */}
-              <div>
-                <h4 className="font-semibold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
-                  <ShieldCheck className="w-5 h-5 text-orange-500" />
-                  Current Catalog Status
-                </h4>
+              {/* Show healthy message if no issues */}
+              {!catalogHealth.hasIssues && (
+                <div className="text-center py-8">
+                  <CheckCircle className="w-16 h-16 text-emerald-500 mx-auto mb-4" />
+                  <h4 className="text-xl font-semibold text-emerald-900 dark:text-emerald-100 mb-2">
+                    Catalog is Healthy! 🎉
+                  </h4>
+                  <p className="text-sm text-emerald-700 dark:text-emerald-300 mb-4">
+                    All catalog checks passed. No issues detected.
+                  </p>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-2xl mx-auto mt-6">
+                    <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
+                      <p className="text-xs text-emerald-600 dark:text-emerald-400 mb-1">Catalog</p>
+                      <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">✓ Linked</p>
+                    </div>
+                    <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
+                      <p className="text-xs text-emerald-600 dark:text-emerald-400 mb-1">Type</p>
+                      <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">✓ Commerce</p>
+                    </div>
+                    <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
+                      <p className="text-xs text-emerald-600 dark:text-emerald-400 mb-1">Products</p>
+                      <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">✓ {whatsappStatus?.product_count ?? whatsappStatus?.productCount ?? '?'}</p>
+                    </div>
+                    <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
+                      <p className="text-xs text-emerald-600 dark:text-emerald-400 mb-1">Status</p>
+                      <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">✓ Active</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Show diagnostics if issues detected */}
+              {catalogHealth.hasIssues && (
+                <>
+                  {/* Detected Issues */}
+                  <div>
+                    <h4 className="font-semibold text-orange-900 dark:text-orange-100 mb-3 flex items-center gap-2">
+                      <AlertTriangle className="w-5 h-5 text-orange-500" />
+                      Detected Issues ({catalogHealth.issues.length})
+                    </h4>
+                    <div className="space-y-3">
+                      {catalogHealth.issues.map((issue, index) => (
+                        <div key={issue.id} className={`p-4 rounded-lg border-2 ${issue.severity === 'error' ? 'bg-red-50 dark:bg-red-900/20 border-red-300' : 'bg-amber-50 dark:bg-amber-900/20 border-amber-300'}`}>
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <p className={`font-semibold mb-1 ${issue.severity === 'error' ? 'text-red-900 dark:text-red-100' : 'text-amber-900 dark:text-amber-100'}`}>
+                                {index + 1}. {issue.title}
+                              </p>
+                              <p className={`text-sm mb-2 ${issue.severity === 'error' ? 'text-red-700 dark:text-red-300' : 'text-amber-700 dark:text-amber-300'}`}>
+                                {issue.description}
+                              </p>
+                              {issue.fix === 'resync_catalog' && (
+                                <button
+                                  onClick={handleSyncCatalog}
+                                  disabled={isSyncing}
+                                  className="px-3 py-1 bg-orange-600 text-white rounded text-xs hover:bg-orange-700 disabled:opacity-50"
+                                >
+                                  {isSyncing ? 'Syncing...' : 'Fix: Re-sync Catalog'}
+                                </button>
+                              )}
+                              {issue.fix === 'link_catalog' && catalogs.length > 0 && (
+                                <button
+                                  onClick={async () => {
+                                    const catalog = catalogs[0]
+                                    try {
+                                      const response = await whatsappService.selectCatalog(shipperId, catalog.id)
+                                      if (response.status === 1) {
+                                        toast.success('Catalog linked!')
+                                        fetchWhatsAppData()
+                                      } else {
+                                        toast.error(response.message || 'Failed to link catalog')
+                                      }
+                                    } catch (error) {
+                                      toast.error('Failed to link catalog')
+                                    }
+                                  }}
+                                  className="px-3 py-1 bg-orange-600 text-white rounded text-xs hover:bg-orange-700"
+                                >
+                                  Fix: Link Catalog
+                                </button>
+                              )}
+                              {issue.fix === 'change_in_meta' && (
+                                <a
+                                  href="https://business.facebook.com/commerce/catalogs"
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-block px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+                                >
+                                  Fix in Meta Business Manager →
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Current Status */}
+                  <div className="border-t border-orange-200 pt-4">
+                    <h4 className="font-semibold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
+                      <ShieldCheck className="w-5 h-5 text-orange-500" />
+                      Current Catalog Status
+                    </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
                     <p className="text-xs text-slate-500 dark:text-slate-400">Catalog ID (from WhatsApp)</p>
@@ -2927,29 +3143,31 @@ function WhatsAppTab({ shipperId, shipper }) {
                   </div>
                 </div>
               </div>
+                </>
+              )}
 
-              {/* Quick Actions */}
-              <div className="border-t border-orange-200 pt-4">
-                <h4 className="font-semibold text-slate-900 dark:text-white mb-3">Quick Fixes</h4>
+              {/* Quick Actions - Always show */}
+              <div className={catalogHealth.hasIssues ? "border-t border-orange-200 pt-4" : "border-t border-emerald-200 pt-4"}>
+                <h4 className="font-semibold text-slate-900 dark:text-white mb-3">{catalogHealth.hasIssues ? 'Quick Fixes' : 'Maintenance Actions'}</h4>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     onClick={handleLoadCatalogs}
                     disabled={isLoadingCatalogs}
-                    className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm disabled:opacity-50"
+                    className={`px-4 py-2 text-white rounded-lg text-sm disabled:opacity-50 ${catalogHealth.hasIssues ? 'bg-orange-500 hover:bg-orange-600' : 'bg-emerald-500 hover:bg-emerald-600'}`}
                   >
                     {isLoadingCatalogs ? 'Loading...' : 'Reload Catalogs'}
                   </button>
                   <button
                     onClick={handleSyncCatalog}
                     disabled={isSyncing}
-                    className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm disabled:opacity-50"
+                    className={`px-4 py-2 text-white rounded-lg text-sm disabled:opacity-50 ${catalogHealth.hasIssues ? 'bg-orange-500 hover:bg-orange-600' : 'bg-emerald-500 hover:bg-emerald-600'}`}
                   >
                     {isSyncing ? 'Syncing...' : 'Re-Sync Catalog'}
                   </button>
                   <button
                     onClick={handleCheckPhoneStatus}
                     disabled={isCheckingStatus}
-                    className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm disabled:opacity-50"
+                    className={`px-4 py-2 text-white rounded-lg text-sm disabled:opacity-50 ${catalogHealth.hasIssues ? 'bg-orange-500 hover:bg-orange-600' : 'bg-emerald-500 hover:bg-emerald-600'}`}
                   >
                     {isCheckingStatus ? 'Checking...' : 'Check Phone Status'}
                   </button>
