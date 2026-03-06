@@ -14,54 +14,65 @@
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
+            height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 20px;
+            padding: 15px;
+            margin: 0;
+            overflow: hidden;
         }
 
         .video-container {
             max-width: 1200px;
             width: 100%;
+            height: 95vh;
+            max-height: 95vh;
             background: white;
             border-radius: 20px;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
             overflow: hidden;
+            display: flex;
+            flex-direction: column;
         }
 
         .video-header {
             background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
             color: white;
-            padding: 30px;
+            padding: 20px 30px;
             text-align: center;
+            flex-shrink: 0;
         }
 
         .video-header h1 {
-            font-size: 28px;
-            margin-bottom: 10px;
+            font-size: 24px;
+            margin-bottom: 5px;
         }
 
         .video-header p {
             opacity: 0.9;
-            font-size: 16px;
+            font-size: 14px;
         }
 
         .slideshow-container {
             position: relative;
             background: #f5f5f5;
-            min-height: 600px;
+            flex: 1;
             display: flex;
             align-items: center;
             justify-content: center;
+            overflow: hidden;
         }
 
         .slide {
             display: none;
             flex-direction: column;
             align-items: center;
-            padding: 40px;
+            padding: 20px;
+            width: 100%;
+            height: 100%;
             animation: fadeIn 0.5s ease-in-out;
+            overflow-y: auto;
         }
 
         .slide.active {
@@ -75,10 +86,12 @@
 
         .slide-image {
             max-width: 100%;
-            max-height: 500px;
+            max-height: 45vh;
+            height: auto;
             border-radius: 10px;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-            margin-bottom: 30px;
+            margin-bottom: 20px;
+            object-fit: contain;
         }
 
         .slide-content {
@@ -98,25 +111,26 @@
         }
 
         .slide-title {
-            font-size: 24px;
+            font-size: 20px;
             color: #333;
-            margin-bottom: 15px;
+            margin-bottom: 10px;
             font-weight: 600;
         }
 
         .slide-description {
-            font-size: 16px;
+            font-size: 14px;
             color: #666;
-            line-height: 1.6;
+            line-height: 1.5;
         }
 
         .controls {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 30px;
+            padding: 15px 25px;
             background: white;
             border-top: 1px solid #e0e0e0;
+            flex-shrink: 0;
         }
 
         .control-buttons {
@@ -220,7 +234,8 @@
         @media (max-width: 768px) {
             .controls {
                 flex-direction: column;
-                gap: 20px;
+                gap: 15px;
+                padding: 15px;
             }
 
             .progress-container {
@@ -229,7 +244,27 @@
             }
 
             .slide-image {
-                max-height: 400px;
+                max-height: 35vh;
+            }
+
+            .slide {
+                padding: 15px;
+            }
+
+            .video-header {
+                padding: 15px;
+            }
+
+            .video-header h1 {
+                font-size: 20px;
+            }
+
+            .slide-title {
+                font-size: 18px;
+            }
+
+            .slide-description {
+                font-size: 13px;
             }
         }
     </style>

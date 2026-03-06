@@ -3504,7 +3504,7 @@ function WhatsAppPage() {
           </div>
 
           {/* Video Tutorial iframe */}
-          <div className="bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden" style={{ height: '600px' }}>
+          <div className="bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden" style={{ height: '75vh', maxHeight: '850px' }}>
             <iframe
               src="/whatsapp-setup-video.html"
               className="w-full h-full border-0"
