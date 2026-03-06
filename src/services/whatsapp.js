@@ -80,6 +80,23 @@ export const whatsappService = {
     return response.data
   },
 
+  // Select/Link a catalog to the phone number
+  async selectCatalog(wh_account_id, catalog_id) {
+    const response = await api.post('/seller/whatsapp/select-catalog', {
+      wh_account_id,
+      catalog_id,
+    })
+    return response.data
+  },
+
+  // Get commerce settings from Meta (checks if catalog is actually connected)
+  async getCommerceSettings(wh_account_id) {
+    const response = await api.post('/seller/whatsapp/commerce-settings', {
+      wh_account_id,
+    })
+    return response.data
+  },
+
   // Get phone number status from Meta API
   async getPhoneStatus(wh_account_id) {
     const response = await api.post('/seller/whatsapp/phone-status', {
