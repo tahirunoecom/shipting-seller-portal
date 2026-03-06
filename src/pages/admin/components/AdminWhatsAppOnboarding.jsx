@@ -735,8 +735,8 @@ Admin Team`,
                   <Button
                     onClick={() => {
                       setShowNextStepModal(false)
-                      // Open seller portal in new tab
-                      window.open(`${window.location.origin}/whatsapp?seller=${shipperId}`, '_blank')
+                      // Open seller portal in new tab with admin mode
+                      window.open(`${window.location.origin}/whatsapp?seller=${shipperId}&admin_mode=true&return_to=/admin/shipper/${shipperId}`, '_blank')
                     }}
                     variant="outline"
                     className="w-full border-amber-300 text-amber-700 hover:bg-amber-100"

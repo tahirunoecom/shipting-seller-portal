@@ -59,6 +59,7 @@ import {
   Hash,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
   Eye,
   ZoomIn,
   X,
@@ -78,6 +79,11 @@ function WhatsAppPage() {
   const [saving, setSaving] = useState(false)
   const [fbSDKLoaded, setFbSDKLoaded] = useState(false)
   const [showSetupGuide, setShowSetupGuide] = useState(true)
+
+  // Admin mode detection
+  const isAdminMode = searchParams.get('admin_mode') === 'true'
+  const adminReturnUrl = searchParams.get('return_to') || '/admin'
+  const sellerId = searchParams.get('seller')
   const [previewScreenshot, setPreviewScreenshot] = useState(null) // { src, alt } for fullscreen preview
   const [showVideoTutorial, setShowVideoTutorial] = useState(false) // Video tutorial modal
 
@@ -1262,6 +1268,45 @@ function WhatsAppPage() {
                     e.target.parentElement.innerHTML = '<div class="p-12 text-center text-gray-500"><p class="text-lg font-medium">Screenshot not yet added</p><p class="text-sm mt-2">Place the screenshot image at:<br/><code class="text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded mt-1 inline-block">' + previewScreenshot.src + '</code></p></div>'
                   }}
                 />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Mode Banner */}
+      {isAdminMode && (
+        <div className="sticky top-0 z-50 bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg">
+          <div className="px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
+                  <ShieldCheck className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-lg flex items-center gap-2">
+                    🔐 Admin Mode
+                    <Badge className="bg-white/30 text-white border-white/50">
+                      Acting as Seller #{sellerId}
+                    </Badge>
+                  </h3>
+                  <p className="text-sm text-white/90">
+                    You're completing WhatsApp setup on behalf of this seller. Complete the steps below and return to admin panel when done.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    if (confirm('Return to admin panel? Any unsaved changes will be lost.')) {
+                      window.location.href = adminReturnUrl
+                    }
+                  }}
+                  className="px-4 py-2 bg-white text-amber-600 font-semibold rounded-lg hover:bg-white/90 transition-colors flex items-center gap-2 shadow-md"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  Back to Admin Panel
+                </button>
               </div>
             </div>
           </div>
