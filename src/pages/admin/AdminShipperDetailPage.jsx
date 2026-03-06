@@ -1590,6 +1590,53 @@ function WhatsAppTab({ shipperId, shipper }) {
       const catalogId = whatsappStatus.catalog_id || whatsappStatus.catalogId
       const phoneNumberId = whatsappStatus.phone_number_id || phoneStatus?.phone_number_id
       const productCount = whatsappStatus.product_count ?? whatsappStatus.productCount
+      const wabaId = whatsappStatus.waba_id || whatsappStatus.wabaId
+      const businessId = whatsappStatus.business_id || whatsappStatus.businessId
+
+      // Issue 0: CRITICAL - Check Meta's commerce settings (catalog connected in Meta?)
+      // This is the most important check - validates against Meta's actual state
+      if (catalogId && phoneNumberId) {
+        try {
+          const commerceRes = await whatsappService.getCommerceSettings(shipperId)
+          if (commerceRes.status === 1) {
+            const metaCatalogId = commerceRes.data?.catalog_id
+            const isCatalogVisible = commerceRes.data?.is_catalog_visible
+
+            // CRITICAL: Catalog ID exists in our DB but NOT connected in Meta
+            if (!metaCatalogId || metaCatalogId !== catalogId) {
+              issues.push({
+                id: 'catalog_not_connected_in_meta',
+                severity: 'error',
+                title: '🔴 Catalog NOT connected in Meta Business Manager',
+                description: `Your database shows catalog ${catalogId}, but Meta's WhatsApp Manager shows no catalog connected to this phone number. This is Error 131009's root cause!`,
+                fix: 'connect_in_meta',
+                metaUrl: `https://business.facebook.com/latest/whatsapp_manager/catalog?business_id=${businessId}&asset_id=${wabaId}`,
+                catalogId: catalogId,
+              })
+            } else if (!isCatalogVisible) {
+              issues.push({
+                id: 'catalog_not_visible',
+                severity: 'warning',
+                title: 'Catalog not visible in Meta',
+                description: 'Catalog is connected but not set as visible.',
+                fix: 'connect_in_meta',
+                metaUrl: `https://business.facebook.com/latest/whatsapp_manager/catalog?business_id=${businessId}&asset_id=${wabaId}`,
+              })
+            }
+          }
+        } catch (error) {
+          console.error('Error checking Meta commerce settings:', error)
+          // If API fails, add a warning
+          issues.push({
+            id: 'cannot_verify_meta',
+            severity: 'warning',
+            title: 'Cannot verify catalog connection with Meta',
+            description: 'Unable to check if catalog is connected in Meta. API error.',
+            fix: 'connect_in_meta',
+            metaUrl: `https://business.facebook.com/latest/whatsapp_manager/catalog?business_id=${businessId}&asset_id=${wabaId}`,
+          })
+        }
+      }
 
       // Issue 1: No catalog linked to phone number
       if (!catalogId) {
@@ -2973,6 +3020,34 @@ function WhatsAppTab({ shipperId, shipper }) {
                                 >
                                   Fix in Meta Business Manager →
                                 </a>
+                              )}
+                              {issue.fix === 'connect_in_meta' && (
+                                <div className="space-y-2">
+                                  <a
+                                    href={issue.metaUrl || 'https://business.facebook.com/latest/whatsapp_manager/catalog'}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg text-sm font-semibold hover:from-blue-700 hover:to-purple-700 shadow-lg"
+                                  >
+                                    <ExternalLink className="w-4 h-4" />
+                                    🔧 Connect Catalog in Meta (Opens WhatsApp Manager)
+                                  </a>
+                                  {issue.catalogId && (
+                                    <p className="text-xs text-slate-600 dark:text-slate-400 ml-1">
+                                      📋 You'll need to select catalog: <span className="font-mono font-semibold">{issue.catalogId}</span>
+                                    </p>
+                                  )}
+                                  <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-700">
+                                    <p className="text-xs font-semibold text-blue-900 dark:text-blue-100 mb-1">📝 Instructions:</p>
+                                    <ol className="text-xs text-blue-700 dark:text-blue-300 space-y-1 ml-4 list-decimal">
+                                      <li>Click button above to open Meta WhatsApp Manager</li>
+                                      <li>Click "Choose a Catalogue" button</li>
+                                      <li>Search and select your catalog</li>
+                                      <li>Click "Connect" to confirm</li>
+                                      <li>Return here and click "Reload Diagnostics"</li>
+                                    </ol>
+                                  </div>
+                                </div>
                               )}
                             </div>
                           </div>
