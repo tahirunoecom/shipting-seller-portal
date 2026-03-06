@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Business API Setup Guide - Video Tutorial</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .video-container {
+            max-width: 1200px;
+            width: 100%;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .video-header {
+            background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .video-header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .video-header p {
+            opacity: 0.9;
+            font-size: 16px;
+        }
+
+        .slideshow-container {
+            position: relative;
+            background: #f5f5f5;
+            min-height: 600px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .slide {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        .slide.active {
+            display: flex;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .slide-image {
+            max-width: 100%;
+            max-height: 500px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            margin-bottom: 30px;
+        }
+
+        .slide-content {
+            text-align: center;
+            max-width: 800px;
+        }
+
+        .step-number {
+            display: inline-block;
+            background: #25D366;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+
+        .slide-title {
+            font-size: 24px;
+            color: #333;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .slide-description {
+            font-size: 16px;
+            color: #666;
+            line-height: 1.6;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 30px;
+            background: white;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .control-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: #25D366;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #1fb855;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(37, 211, 102, 0.3);
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .progress-container {
+            flex: 1;
+            margin: 0 30px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #e0e0e0;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #25D366 0%, #128C7E 100%);
+            transition: width 0.3s ease;
+        }
+
+        .progress-text {
+            text-align: center;
+            margin-top: 8px;
+            font-size: 13px;
+            color: #666;
+        }
+
+        .autoplay-toggle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 26px;
+            background: #ccc;
+            border-radius: 13px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .toggle-switch.active {
+            background: #25D366;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.3s;
+        }
+
+        .toggle-switch.active .toggle-slider {
+            transform: translateX(24px);
+        }
+
+        @media (max-width: 768px) {
+            .controls {
+                flex-direction: column;
+                gap: 20px;
+            }
+
+            .progress-container {
+                margin: 0;
+                width: 100%;
+            }
+
+            .slide-image {
+                max-height: 400px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="video-container">
+        <div class="video-header">
+            <h1>🎥 WhatsApp Business API Setup Guide</h1>
+            <p>Follow these steps to connect your WhatsApp Business account</p>
+        </div>
+
+        <div class="slideshow-container" id="slideshow">
+            <!-- Slide 1 -->
+            <div class="slide active">
+                <img src="/images/whatsapp-setup/step1-login-facebook.png" alt="Step 1" class="slide-image">
+                <div class="slide-content">
+                    <span class="step-number">Step 1 of 9</span>
+                    <h2 class="slide-title">Login with Facebook</h2>
+                    <p class="slide-description">
+                        Click "Login with Facebook" button to start the WhatsApp Business API setup process.
+                        You'll need an existing Facebook account to proceed.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Slide 2 -->
+            <div class="slide">
+                <img src="/images/whatsapp-setup/step2-continue-dialog.png" alt="Step 2" class="slide-image">
+                <div class="slide-content">
+                    <span class="step-number">Step 2 of 9</span>
+                    <h2 class="slide-title">Continue as Your Profile</h2>
+                    <p class="slide-description">
+                        Facebook will ask you to confirm your identity. Click "Continue" to proceed with your Facebook profile.
+                        This confirms you have permission to set up the business account.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Slide 3 -->
+            <div class="slide">
+                <img src="/images/whatsapp-setup/step3-business-assets.png" alt="Step 3" class="slide-image">
+                <div class="slide-content">
+                    <span class="step-number">Step 3 of 9</span>
+                    <h2 class="slide-title">Select Business Assets</h2>
+                    <p class="slide-description">
+                        Choose your Business Portfolio, WhatsApp Business account, and Product Catalog.
+                        If you don't have these set up yet, you can create new ones during this process.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Slide 4 -->
+            <div class="slide">
+                <img src="/images/whatsapp-setup/step4-business-info.png" alt="Step 4" class="slide-image">
+                <div class="slide-content">
+                    <span class="step-number">Step 4 of 9</span>
+                    <h2 class="slide-title">Enter Business Information</h2>
+                    <p class="slide-description">
+                        Fill in your business details including name, category, country, website, and time zone.
+                        <strong>Important:</strong> Make sure to select "Commerce" as your vertical for e-commerce features.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Slide 5 -->
+            <div class="slide">
+                <img src="/images/whatsapp-setup/step5-add-number.png" alt="Step 5" class="slide-image">
+                <div class="slide-content">
+                    <span class="step-number">Step 5 of 9</span>
+                    <h2 class="slide-title">Add Your WhatsApp Phone Number</h2>
+                    <p class="slide-description">
+                        Enter your business phone number. You can choose between "Add a new number" or "Use a display name only".
+                        For verification, select either Text message or Phone call.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Slide 6 -->
+            <div class="slide">
+                <img src="/images/whatsapp-setup/step5-number-error.png" alt="Step 5 Error" class="slide-image">
+                <div class="slide-content">
+                    <span class="step-number">Step 5 - Common Issue</span>
+                    <h2 class="slide-title">Number Already Exists Error</h2>
+                    <p class="slide-description">
+                        If you see this error, it means the phone number is already registered.
+                        You'll need to delete it from WhatsApp Manager or use a different number.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Slide 7 -->
+            <div class="slide">
+                <img src="/images/whatsapp-setup/step5-existing-number.png" alt="Step 5 Existing" class="slide-image">
+                <div class="slide-content">
+                    <span class="step-number">Step 5 - Alternative</span>
+                    <h2 class="slide-title">Use Existing WhatsApp Number</h2>
+                    <p class="slide-description">
+                        If you already have a WhatsApp Business number registered, you can select it from the dropdown
+                        instead of adding a new one.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Slide 8 -->
+            <div class="slide">
+                <img src="/images/whatsapp-setup/step6-review-permissions.png" alt="Step 6" class="slide-image">
+                <div class="slide-content">
+                    <span class="step-number">Step 6 of 9</span>
+                    <h2 class="slide-title">Review Permissions</h2>
+                    <p class="slide-description">
+                        Review what access your application will have to your Business, WhatsApp Business account, and Catalogs.
+                        Click "Confirm" if you agree with the permissions.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Slide 9 -->
+            <div class="slide">
+                <img src="/images/whatsapp-setup/step7-success.png" alt="Step 7" class="slide-image">
+                <div class="slide-content">
+                    <span class="step-number">Step 7 of 9</span>
+                    <h2 class="slide-title">Success! Account Connected</h2>
+                    <p class="slide-description">
+                        Congratulations! Your WhatsApp Business account is now connected.
+                        Meta will review your business to ensure compliance with WhatsApp's Commerce Policy.
+                        You'll hear back within 24 hours.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Slide 10 -->
+            <div class="slide">
+                <img src="/images/whatsapp-setup/step9-sync-catalog.png" alt="Step 9" class="slide-image">
+                <div class="slide-content">
+                    <span class="step-number">Step 9 of 9</span>
+                    <h2 class="slide-title">Sync Your Product Catalog</h2>
+                    <p class="slide-description">
+                        The final step is to sync your product catalog with WhatsApp.
+                        This allows customers to browse and purchase your products directly through WhatsApp.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <div class="control-buttons">
+                <button class="btn-secondary" id="prevBtn">← Previous</button>
+                <button class="btn-primary" id="nextBtn">Next →</button>
+            </div>
+
+            <div class="progress-container">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressBar"></div>
+                </div>
+                <div class="progress-text" id="progressText">Step 1 of 10</div>
+            </div>
+
+            <div class="autoplay-toggle">
+                <span>Auto-play</span>
+                <div class="toggle-switch" id="autoplayToggle">
+                    <div class="toggle-slider"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentSlide = 0;
+        let autoplayInterval = null;
+        let autoplayEnabled = false;
+        const slides = document.querySelectorAll('.slide');
+        const totalSlides = slides.length;
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const autoplayToggle = document.getElementById('autoplayToggle');
+
+        function showSlide(index) {
+            // Ensure index is within bounds
+            if (index < 0) index = 0;
+            if (index >= totalSlides) index = totalSlides - 1;
+
+            // Hide all slides
+            slides.forEach(slide => slide.classList.remove('active'));
+
+            // Show current slide
+            slides[index].classList.add('active');
+            currentSlide = index;
+
+            // Update progress
+            const progress = ((index + 1) / totalSlides) * 100;
+            progressBar.style.width = progress + '%';
+            progressText.textContent = `Step ${index + 1} of ${totalSlides}`;
+
+            // Update button states
+            prevBtn.disabled = index === 0;
+            nextBtn.disabled = index === totalSlides - 1;
+
+            // Update button styles
+            prevBtn.style.opacity = index === 0 ? '0.5' : '1';
+            nextBtn.style.opacity = index === totalSlides - 1 ? '0.5' : '1';
+        }
+
+        function nextSlide() {
+            if (currentSlide < totalSlides - 1) {
+                showSlide(currentSlide + 1);
+            } else if (autoplayEnabled) {
+                // Loop back to start in autoplay mode
+                showSlide(0);
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlide > 0) {
+                showSlide(currentSlide - 1);
+            }
+        }
+
+        function toggleAutoplay() {
+            autoplayEnabled = !autoplayEnabled;
+            autoplayToggle.classList.toggle('active');
+
+            if (autoplayEnabled) {
+                // Start autoplay - 5 seconds per slide
+                autoplayInterval = setInterval(nextSlide, 5000);
+            } else {
+                // Stop autoplay
+                if (autoplayInterval) {
+                    clearInterval(autoplayInterval);
+                    autoplayInterval = null;
+                }
+            }
+        }
+
+        // Event listeners
+        nextBtn.addEventListener('click', () => {
+            nextSlide();
+            // Restart autoplay timer if enabled
+            if (autoplayEnabled) {
+                clearInterval(autoplayInterval);
+                autoplayInterval = setInterval(nextSlide, 5000);
+            }
+        });
+
+        prevBtn.addEventListener('click', () => {
+            prevSlide();
+            // Restart autoplay timer if enabled
+            if (autoplayEnabled) {
+                clearInterval(autoplayInterval);
+                autoplayInterval = setInterval(nextSlide, 5000);
+            }
+        });
+
+        autoplayToggle.addEventListener('click', toggleAutoplay);
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight') {
+                nextSlide();
+            } else if (e.key === 'ArrowLeft') {
+                prevSlide();
+            } else if (e.key === ' ') {
+                e.preventDefault();
+                toggleAutoplay();
+            }
+        });
+
+        // Initialize
+        showSlide(0);
+    </script>
+</body>
+</html>
