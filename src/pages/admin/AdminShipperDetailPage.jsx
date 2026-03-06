@@ -1626,14 +1626,18 @@ function WhatsAppTab({ shipperId, shipper }) {
           }
         } catch (error) {
           console.error('Error checking Meta commerce settings:', error)
-          // If API fails, add a warning
+          // If API fails (404 = endpoint not implemented), still show fix option with catalog ID
           issues.push({
             id: 'cannot_verify_meta',
             severity: 'warning',
-            title: 'Cannot verify catalog connection with Meta',
-            description: 'Unable to check if catalog is connected in Meta. API error.',
+            title: 'Cannot verify catalog connection with Meta (Backend API needed)',
+            description: catalogId
+              ? `Unable to check if catalog ${catalogId} is connected in Meta. The backend endpoint /seller/whatsapp/commerce-settings needs to be implemented.`
+              : 'Unable to check catalog connection. API error.',
             fix: 'connect_in_meta',
             metaUrl: `https://business.facebook.com/latest/whatsapp_manager/catalog?business_id=${businessId}&asset_id=${wabaId}`,
+            catalogId: catalogId, // Include catalog ID for automatic fix
+            backendNeeded: true,
           })
         }
       }
@@ -3039,7 +3043,12 @@ function WhatsAppTab({ shipperId, shipper }) {
                                             }
                                           } catch (error) {
                                             console.error('Auto-fix error:', error)
-                                            toast.error('Auto-fix failed. Try manual method below.')
+                                            // Check if it's a 404 (endpoint not implemented)
+                                            if (error.response?.status === 404) {
+                                              toast.error('❌ Backend API not implemented yet. Use manual method below or check BACKEND_API_NEEDED.md')
+                                            } else {
+                                              toast.error('Auto-fix failed. Try manual method below.')
+                                            }
                                           } finally {
                                             setIsSyncing(false)
                                           }
@@ -3056,6 +3065,13 @@ function WhatsAppTab({ shipperId, shipper }) {
                                       <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 ml-1">
                                         📋 Will connect catalog: <span className="font-mono font-semibold">{issue.catalogId}</span>
                                       </p>
+                                      {issue.backendNeeded && (
+                                        <div className="mt-2 p-2 bg-amber-50 dark:bg-amber-900/20 rounded border border-amber-300 dark:border-amber-700">
+                                          <p className="text-xs text-amber-800 dark:text-amber-200">
+                                            ⚠️ <strong>Backend API needed:</strong> /seller/whatsapp/connect-catalog endpoint must be implemented. See <code className="bg-amber-100 dark:bg-amber-800 px-1 rounded">BACKEND_API_NEEDED.md</code>
+                                          </p>
+                                        </div>
+                                      )}
                                     </div>
                                   )}
 

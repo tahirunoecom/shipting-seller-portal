@@ -332,6 +332,153 @@ class WhatsAppController extends Controller
     }
 
     /**
+     * Get commerce settings from Meta (checks if catalog is connected)
+     * POST /api/seller/whatsapp/commerce-settings
+     */
+    public function getCommerceSettings(Request $request)
+    {
+        try {
+            $whAccountId = $request->input('wh_account_id');
+
+            if (!$whAccountId) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'wh_account_id is required'
+                ]);
+            }
+
+            $config = SellerWhatsappConfig::where('wh_account_id', $whAccountId)->first();
+
+            if (!$config || !$config->is_connected) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'WhatsApp not connected'
+                ]);
+            }
+
+            if (!$config->phone_number_id) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'No phone number ID found'
+                ]);
+            }
+
+            // Call Meta's WhatsApp Commerce Settings API
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $config->access_token
+            ])->get("https://graph.facebook.com/v21.0/{$config->phone_number_id}/whatsapp_commerce_settings", [
+                'fields' => 'catalog_id,is_catalog_visible'
+            ]);
+
+            if (!$response->successful()) {
+                Log::error('Meta commerce settings API error: ' . $response->body());
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'Failed to get commerce settings from Meta',
+                    'error' => $response->json()
+                ], $response->status());
+            }
+
+            $data = $response->json();
+
+            return response()->json([
+                'status' => 1,
+                'data' => [
+                    'catalog_id' => $data['catalog_id'] ?? null,
+                    'is_catalog_visible' => $data['is_catalog_visible'] ?? false,
+                ]
+            ]);
+        } catch (\Exception $e) {
+            Log::error('WhatsApp getCommerceSettings error: ' . $e->getMessage());
+            return response()->json([
+                'status' => 0,
+                'message' => 'Failed to get commerce settings: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Connect catalog to phone number via Meta API (Auto-fix for Error 131009)
+     * POST /api/seller/whatsapp/connect-catalog
+     */
+    public function connectCatalog(Request $request)
+    {
+        try {
+            $whAccountId = $request->input('wh_account_id');
+            $catalogId = $request->input('catalog_id');
+
+            if (!$whAccountId || !$catalogId) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'wh_account_id and catalog_id are required'
+                ]);
+            }
+
+            $config = SellerWhatsappConfig::where('wh_account_id', $whAccountId)->first();
+
+            if (!$config || !$config->is_connected) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'WhatsApp not connected'
+                ]);
+            }
+
+            if (!$config->phone_number_id) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'No phone number ID found'
+                ]);
+            }
+
+            Log::info("Connecting catalog {$catalogId} to phone number {$config->phone_number_id}");
+
+            // Call Meta's API to connect catalog to phone number
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $config->access_token
+            ])->post("https://graph.facebook.com/v21.0/{$config->phone_number_id}/whatsapp_commerce_settings", [
+                'catalog_id' => $catalogId,
+                'is_catalog_visible' => true
+            ]);
+
+            if (!$response->successful()) {
+                $errorData = $response->json();
+                Log::error('Meta connect catalog API error: ' . $response->body());
+
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'Failed to connect catalog in Meta: ' . ($errorData['error']['message'] ?? 'Unknown error'),
+                    'error' => $errorData
+                ], $response->status());
+            }
+
+            $data = $response->json();
+
+            // Update database
+            $config->update([
+                'catalog_id' => $catalogId,
+                'updated_at' => now()
+            ]);
+
+            Log::info("Successfully connected catalog {$catalogId} to phone number {$config->phone_number_id}");
+
+            return response()->json([
+                'status' => 1,
+                'message' => 'Catalog connected successfully in Meta',
+                'data' => [
+                    'catalog_id' => $catalogId,
+                    'success' => $data['success'] ?? true,
+                ]
+            ]);
+        } catch (\Exception $e) {
+            Log::error('WhatsApp connectCatalog error: ' . $e->getMessage());
+            return response()->json([
+                'status' => 0,
+                'message' => 'Failed to connect catalog: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Update bot settings
      * POST /api/seller/whatsapp/bot-settings
      */
