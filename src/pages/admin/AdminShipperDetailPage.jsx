@@ -3043,9 +3043,18 @@ function WhatsAppTab({ shipperId, shipper }) {
                                             }
                                           } catch (error) {
                                             console.error('Auto-fix error:', error)
+                                            const errorCode = error.response?.data?.error?.error?.code
+                                            const errorMessage = error.response?.data?.message || error.message
+
                                             // Check if it's a 404 (endpoint not implemented)
                                             if (error.response?.status === 404) {
                                               toast.error('❌ Backend API not implemented yet. Use manual method below or check BACKEND_API_NEEDED.md')
+                                            }
+                                            // Check if it's permission error (#10)
+                                            else if (errorCode === 10 || errorMessage?.includes('permission')) {
+                                              toast.error('❌ Permission denied! User needs to RECONNECT WhatsApp to get catalog_management permission. Ask user to disconnect and reconnect.', {
+                                                duration: 10000,
+                                              })
                                             } else {
                                               toast.error('Auto-fix failed. Try manual method below.')
                                             }
@@ -3072,6 +3081,22 @@ function WhatsAppTab({ shipperId, shipper }) {
                                           </p>
                                         </div>
                                       )}
+                                      {/* Permission Error Banner */}
+                                      <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border-2 border-red-300 dark:border-red-700">
+                                        <p className="text-sm font-bold text-red-900 dark:text-red-100 mb-2">
+                                          🔒 If you get "Permission Denied" error:
+                                        </p>
+                                        <div className="text-xs text-red-800 dark:text-red-200 space-y-1">
+                                          <p>Your access token is missing <code className="bg-red-100 dark:bg-red-800 px-1 rounded font-semibold">catalog_management</code> permission.</p>
+                                          <p className="font-semibold mt-2">✅ Quick Fix:</p>
+                                          <ol className="ml-4 list-decimal space-y-1">
+                                            <li>Ask user to <strong>Disconnect WhatsApp</strong></li>
+                                            <li>Then <strong>Reconnect WhatsApp</strong> again</li>
+                                            <li>New token will include catalog permission</li>
+                                            <li>Try automatic fix again</li>
+                                          </ol>
+                                        </div>
+                                      </div>
                                     </div>
                                   )}
 
