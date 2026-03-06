@@ -59,6 +59,8 @@ import {
   Hash,
   ChevronDown,
   ChevronUp,
+  Eye,
+  ZoomIn,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -74,6 +76,21 @@ function WhatsAppPage() {
   const [saving, setSaving] = useState(false)
   const [fbSDKLoaded, setFbSDKLoaded] = useState(false)
   const [showSetupGuide, setShowSetupGuide] = useState(true)
+  const [previewScreenshot, setPreviewScreenshot] = useState(null) // { src, alt } for fullscreen preview
+
+  // Setup guide screenshot paths
+  const setupScreenshots = {
+    step1: '/images/whatsapp-setup/step1-login-facebook.png',
+    step2: '/images/whatsapp-setup/step2-continue-dialog.png',
+    step3: '/images/whatsapp-setup/step3-business-assets.png',
+    step4: '/images/whatsapp-setup/step4-business-info.png',
+    step5: '/images/whatsapp-setup/step5-add-number.png',
+    step5error: '/images/whatsapp-setup/step5-number-error.png',
+    step5existing: '/images/whatsapp-setup/step5-existing-number.png',
+    step6: '/images/whatsapp-setup/step6-review-permissions.png',
+    step7: '/images/whatsapp-setup/step7-success.png',
+    step9: '/images/whatsapp-setup/step9-sync-catalog.png',
+  }
 
   // Connection state
   const [connectionData, setConnectionData] = useState({
@@ -1215,6 +1232,39 @@ function WhatsAppPage() {
 
   return (
     <div className="space-y-6">
+      {/* Screenshot Preview Modal */}
+      {previewScreenshot && (
+        <div
+          className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setPreviewScreenshot(null)}
+        >
+          <div className="relative max-w-3xl max-h-[90vh] w-full" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setPreviewScreenshot(null)}
+              className="absolute -top-3 -right-3 z-10 w-8 h-8 bg-white dark:bg-gray-800 rounded-full shadow-lg flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl overflow-hidden">
+              <div className="p-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 text-center">{previewScreenshot.alt}</p>
+              </div>
+              <div className="overflow-auto max-h-[80vh]">
+                <img
+                  src={previewScreenshot.src}
+                  alt={previewScreenshot.alt}
+                  className="w-full h-auto"
+                  onError={(e) => {
+                    e.target.style.display = 'none'
+                    e.target.parentElement.innerHTML = '<div class="p-12 text-center text-gray-500"><p class="text-lg font-medium">Screenshot not yet added</p><p class="text-sm mt-2">Place the screenshot image at:<br/><code class="text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded mt-1 inline-block">' + previewScreenshot.src + '</code></p></div>'
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -1345,8 +1395,15 @@ function WhatsAppPage() {
                                 <div className="flex-1">
                                   <p className="font-medium text-gray-800 dark:text-gray-200">Click "Login with Facebook"</p>
                                   <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                                    Use your Facebook account to authenticate with Meta Business tools.
+                                    Scroll down on this page and click the blue "Login with Facebook" button to authenticate with Meta Business tools.
                                   </p>
+                                  <button
+                                    onClick={() => setPreviewScreenshot({ src: setupScreenshots.step1, alt: 'Step 1: Click "Login with Facebook" button on our website' })}
+                                    className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 bg-blue-50 dark:bg-blue-900/30 px-3 py-1.5 rounded-lg border border-blue-200 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+                                  >
+                                    <Eye className="h-3.5 w-3.5" />
+                                    View Screenshot
+                                  </button>
                                 </div>
                               </div>
 
@@ -1365,6 +1422,13 @@ function WhatsAppPage() {
                                   <p className="text-xs text-gray-600 dark:text-gray-400 mt-2 font-medium">
                                     Click the blue "Continue" button.
                                   </p>
+                                  <button
+                                    onClick={() => setPreviewScreenshot({ src: setupScreenshots.step2, alt: 'Step 2: Click "Continue" on Meta permissions dialog' })}
+                                    className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 bg-blue-50 dark:bg-blue-900/30 px-3 py-1.5 rounded-lg border border-blue-200 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+                                  >
+                                    <Eye className="h-3.5 w-3.5" />
+                                    View Screenshot
+                                  </button>
                                 </div>
                               </div>
 
@@ -1393,6 +1457,13 @@ function WhatsAppPage() {
                                   <p className="text-xs text-blue-600 dark:text-blue-400 mt-2 font-medium">
                                     Click "Next" after making your selections.
                                   </p>
+                                  <button
+                                    onClick={() => setPreviewScreenshot({ src: setupScreenshots.step3, alt: 'Step 3: Select Business Portfolio, WhatsApp Account & Catalogue' })}
+                                    className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 bg-blue-50 dark:bg-blue-900/30 px-3 py-1.5 rounded-lg border border-blue-200 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+                                  >
+                                    <Eye className="h-3.5 w-3.5" />
+                                    View Screenshot
+                                  </button>
                                 </div>
                               </div>
 
@@ -1427,6 +1498,13 @@ function WhatsAppPage() {
                                   <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
                                     <strong>Business description</strong> is optional - you can add it now or skip it.
                                   </p>
+                                  <button
+                                    onClick={() => setPreviewScreenshot({ src: setupScreenshots.step4, alt: 'Step 4: Enter Business Info - Make sure to select "Commerce" for Vertical!' })}
+                                    className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-amber-700 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-100 bg-amber-50 dark:bg-amber-900/30 px-3 py-1.5 rounded-lg border border-amber-300 dark:border-amber-600 hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-colors"
+                                  >
+                                    <Eye className="h-3.5 w-3.5" />
+                                    View Screenshot - See "Commerce" Selection
+                                  </button>
                                 </div>
                               </div>
 
@@ -1480,6 +1558,16 @@ function WhatsAppPage() {
                                     </div>
                                   )}
 
+                                  <div className="mt-2 flex flex-wrap gap-2">
+                                    <button
+                                      onClick={() => setPreviewScreenshot({ src: setupScreenshots.step5, alt: 'Step 5: Select "Add a new number" and enter your phone number' })}
+                                      className="inline-flex items-center gap-1.5 text-xs font-medium text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 bg-red-50 dark:bg-red-900/30 px-3 py-1.5 rounded-lg border border-red-300 dark:border-red-600 hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors"
+                                    >
+                                      <Eye className="h-3.5 w-3.5" />
+                                      View Screenshot - Add Number
+                                    </button>
+                                  </div>
+
                                   <div className="mt-3 p-3 bg-orange-50 dark:bg-orange-900/30 rounded border border-orange-300 dark:border-orange-700">
                                     <p className="text-sm text-orange-800 dark:text-orange-200 font-bold mb-1">
                                       ⚠️ If you see an error message:
@@ -1488,13 +1576,30 @@ function WhatsAppPage() {
                                       "To use this phone number, you'll need to delete an existing one from WhatsApp Manager..."
                                     </p>
                                     <p className="text-xs text-orange-800 dark:text-orange-200 font-medium">
-                                      This means the number is already registered in your Meta account. You have two options:
+                                      This means the number is already registered in your Meta account. Do this:
                                     </p>
                                     <ul className="text-xs text-orange-600 dark:text-orange-400 mt-2 ml-4 space-y-1">
                                       <li>• Go back and select "Use a new or existing WhatsApp number"</li>
                                       <li>• Then select your already registered number from the dropdown</li>
+                                      <li>• Do NOT select any other options</li>
                                       <li>• Choose "Text message" or "Phone call" for verification</li>
                                     </ul>
+                                    <div className="mt-2 flex flex-wrap gap-2">
+                                      <button
+                                        onClick={() => setPreviewScreenshot({ src: setupScreenshots.step5error, alt: 'Phone number already registered error - Go back and select existing number' })}
+                                        className="inline-flex items-center gap-1.5 text-xs font-medium text-orange-700 dark:text-orange-300 hover:text-orange-900 bg-orange-100 dark:bg-orange-900/40 px-3 py-1.5 rounded-lg border border-orange-300 dark:border-orange-600 hover:bg-orange-200 transition-colors"
+                                      >
+                                        <Eye className="h-3.5 w-3.5" />
+                                        View Error Screenshot
+                                      </button>
+                                      <button
+                                        onClick={() => setPreviewScreenshot({ src: setupScreenshots.step5existing, alt: 'Select your already registered WhatsApp number from the dropdown' })}
+                                        className="inline-flex items-center gap-1.5 text-xs font-medium text-orange-700 dark:text-orange-300 hover:text-orange-900 bg-orange-100 dark:bg-orange-900/40 px-3 py-1.5 rounded-lg border border-orange-300 dark:border-orange-600 hover:bg-orange-200 transition-colors"
+                                      >
+                                        <Eye className="h-3.5 w-3.5" />
+                                        View Fix - Select Existing Number
+                                      </button>
+                                    </div>
                                   </div>
                                 </div>
                               </div>
@@ -1524,6 +1629,13 @@ function WhatsAppPage() {
                                   <p className="text-xs text-blue-600 dark:text-blue-400 mt-2 font-medium">
                                     Click the blue "Confirm" button to continue.
                                   </p>
+                                  <button
+                                    onClick={() => setPreviewScreenshot({ src: setupScreenshots.step6, alt: 'Step 6: Review what you\'ll share with AnythingInstantly - Click "Confirm"' })}
+                                    className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 bg-blue-50 dark:bg-blue-900/30 px-3 py-1.5 rounded-lg border border-blue-200 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+                                  >
+                                    <Eye className="h-3.5 w-3.5" />
+                                    View Screenshot
+                                  </button>
                                 </div>
                               </div>
 
@@ -1549,6 +1661,13 @@ function WhatsAppPage() {
                                       You do NOT need to click "Add payment method" - just click "Finish".
                                     </p>
                                   </div>
+                                  <button
+                                    onClick={() => setPreviewScreenshot({ src: setupScreenshots.step7, alt: 'Step 7: Your account is connected! Click "Finish" (skip Add payment method)' })}
+                                    className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 bg-green-50 dark:bg-green-900/30 px-3 py-1.5 rounded-lg border border-green-300 dark:border-green-600 hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors"
+                                  >
+                                    <Eye className="h-3.5 w-3.5" />
+                                    View Screenshot - Success Screen
+                                  </button>
                                 </div>
                               </div>
 
@@ -1614,6 +1733,13 @@ function WhatsAppPage() {
                                       <strong>✓ Result:</strong> Your products will appear in WhatsApp catalog, customers can browse and order them directly in chat!
                                     </p>
                                   </div>
+                                  <button
+                                    onClick={() => setPreviewScreenshot({ src: setupScreenshots.step9, alt: 'Step 9: Product Catalog section - Select Commerce catalog & click "Sync Products to Catalog"' })}
+                                    className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 bg-purple-50 dark:bg-purple-900/30 px-3 py-1.5 rounded-lg border border-purple-300 dark:border-purple-600 hover:bg-purple-100 dark:hover:bg-purple-900/50 transition-colors"
+                                  >
+                                    <Eye className="h-3.5 w-3.5" />
+                                    View Screenshot - Catalog & Sync Button
+                                  </button>
                                 </div>
                               </div>
                             </div>
