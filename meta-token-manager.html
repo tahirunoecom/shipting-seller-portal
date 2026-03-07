@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meta Access Token Manager</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+
+        .section h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        input[type="text"],
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 14px;
+            font-family: 'Courier New', monospace;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .results {
+            margin-top: 20px;
+            padding: 15px;
+            background: white;
+            border-radius: 6px;
+            border: 2px solid #e0e0e0;
+        }
+
+        .permission-item {
+            padding: 8px 12px;
+            margin: 5px 0;
+            background: #e8f5e9;
+            border-left: 3px solid #4caf50;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+
+        .permission-missing {
+            background: #ffebee;
+            border-left-color: #f44336;
+        }
+
+        .success {
+            color: #4caf50;
+            font-weight: 600;
+        }
+
+        .error {
+            color: #f44336;
+            font-weight: 600;
+        }
+
+        .warning {
+            color: #ff9800;
+            font-weight: 600;
+        }
+
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+
+        .info-box h3 {
+            color: #1976d2;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .info-box ul {
+            margin-left: 20px;
+            color: #555;
+        }
+
+        .info-box li {
+            margin: 5px 0;
+        }
+
+        .copy-btn {
+            background: #4caf50;
+            padding: 8px 16px;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+
+        .sql-output {
+            background: #263238;
+            color: #aed581;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            overflow-x: auto;
+            margin-top: 10px;
+        }
+
+        .loader {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .step-number {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 28px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔐 Meta Access Token Manager</h1>
+            <p>Test, verify, and update WhatsApp Business API tokens</p>
+        </div>
+
+        <div class="content">
+            <!-- Instructions -->
+            <div class="info-box">
+                <h3>📋 Required Permissions for WhatsApp Product Messages</h3>
+                <ul>
+                    <li><code>whatsapp_business_messaging</code> - Send messages</li>
+                    <li><strong><code>whatsapp_business_management</code> - Manage WABA & catalog connections</strong> ⚠️ CRITICAL!</li>
+                    <li><code>catalog_management</code> - Manage product catalogs</li>
+                    <li><code>business_management</code> - Manage business assets</li>
+                </ul>
+            </div>
+
+            <!-- Step 1: Test Token -->
+            <div class="section">
+                <h2><span class="step-number">1</span>Test Your Access Token</h2>
+                <div class="form-group">
+                    <label for="accessToken">Paste Your Access Token Here:</label>
+                    <textarea id="accessToken" placeholder="EAAWKfVA5uZCMB..."></textarea>
+                </div>
+                <button onclick="testToken()">
+                    🔍 Test Token Permissions
+                </button>
+                <div id="tokenResults"></div>
+            </div>
+
+            <!-- Step 2: Generate SQL -->
+            <div class="section">
+                <h2><span class="step-number">2</span>Generate Database Update SQL</h2>
+                <div class="form-group">
+                    <label for="newToken">New Access Token (if different):</label>
+                    <textarea id="newToken" placeholder="Paste new token here or leave empty to use token from Step 1"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="accountId">WhatsApp Account ID:</label>
+                    <input type="text" id="accountId" value="1035" placeholder="1035">
+                </div>
+                <button onclick="generateSQL()">
+                    📝 Generate SQL Update Statement
+                </button>
+                <div id="sqlResults"></div>
+            </div>
+
+            <!-- Step 3: Instructions -->
+            <div class="section">
+                <h2><span class="step-number">3</span>How to Get the Token from Meta</h2>
+                <ol style="margin-left: 20px; color: #555; line-height: 1.8;">
+                    <li>Go to <strong>Meta Business Settings → System Users</strong></li>
+                    <li>Select <strong>deardelhinj</strong> (ID: 6158498484418)</li>
+                    <li>Click <strong>"Generate token"</strong></li>
+                    <li><strong>IMPORTANT:</strong> Make sure to select these permissions:
+                        <ul style="margin-left: 20px; margin-top: 5px;">
+                            <li>✅ business_management</li>
+                            <li>✅ catalog_management</li>
+                            <li>✅ whatsapp_business_messaging</li>
+                            <li>✅ <strong>whatsapp_business_management</strong> ← Don't forget this!</li>
+                        </ul>
+                    </li>
+                    <li>When the token appears, <strong>quickly copy it</strong> before the page refreshes</li>
+                    <li>Paste it in Step 1 above to verify permissions</li>
+                    <li>Use Step 2 to generate the SQL update statement</li>
+                    <li>Run the SQL in your database</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function testToken() {
+            const token = document.getElementById('accessToken').value.trim();
+            const resultsDiv = document.getElementById('tokenResults');
+
+            if (!token) {
+                resultsDiv.innerHTML = '<div class="results"><p class="error">❌ Please paste an access token</p></div>';
+                return;
+            }
+
+            resultsDiv.innerHTML = '<div class="results"><p>🔄 Testing token... <span class="loader"></span></p></div>';
+
+            try {
+                // Get token debug info
+                const debugUrl = `https://graph.facebook.com/v21.0/debug_token?input_token=${token}&access_token=${token}`;
+                const debugResponse = await fetch(debugUrl);
+                const debugData = await debugResponse.json();
+
+                if (debugData.error) {
+                    resultsDiv.innerHTML = `
+                        <div class="results">
+                            <p class="error">❌ Error: ${debugData.error.message}</p>
+                            <p style="margin-top: 10px; color: #666;">Make sure the token is valid and not expired.</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                const tokenInfo = debugData.data;
+                const scopes = tokenInfo.scopes || [];
+
+                // Required permissions
+                const requiredPermissions = [
+                    'whatsapp_business_messaging',
+                    'whatsapp_business_management',
+                    'catalog_management',
+                    'business_management'
+                ];
+
+                const missingPermissions = requiredPermissions.filter(perm => !scopes.includes(perm));
+                const hasAllPermissions = missingPermissions.length === 0;
+
+                let html = '<div class="results">';
+
+                if (hasAllPermissions) {
+                    html += '<p class="success">✅ Token has all required permissions!</p>';
+                } else {
+                    html += '<p class="error">❌ Token is missing required permissions!</p>';
+                }
+
+                html += '<h3 style="margin-top: 20px; margin-bottom: 10px;">Token Info:</h3>';
+                html += `<p><strong>App ID:</strong> ${tokenInfo.app_id}</p>`;
+                html += `<p><strong>User ID:</strong> ${tokenInfo.user_id}</p>`;
+                html += `<p><strong>Valid:</strong> ${tokenInfo.is_valid ? '✅ Yes' : '❌ No'}</p>`;
+                html += `<p><strong>Expires:</strong> ${tokenInfo.expires_at === 0 ? '♾️ Never (Permanent)' : new Date(tokenInfo.expires_at * 1000).toLocaleString()}</p>`;
+
+                html += '<h3 style="margin-top: 20px; margin-bottom: 10px;">Granted Permissions:</h3>';
+
+                requiredPermissions.forEach(perm => {
+                    const hasPermission = scopes.includes(perm);
+                    const className = hasPermission ? 'permission-item' : 'permission-item permission-missing';
+                    const icon = hasPermission ? '✅' : '❌';
+                    html += `<div class="${className}">${icon} ${perm}</div>`;
+                });
+
+                if (missingPermissions.length > 0) {
+                    html += '<div style="margin-top: 20px; padding: 15px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">';
+                    html += '<p class="warning">⚠️ Missing Permissions:</p>';
+                    html += '<ul style="margin-left: 20px; margin-top: 10px;">';
+                    missingPermissions.forEach(perm => {
+                        html += `<li><code>${perm}</code></li>`;
+                    });
+                    html += '</ul>';
+                    html += '<p style="margin-top: 10px; color: #856404;">Please generate a new token with these permissions selected.</p>';
+                    html += '</div>';
+                }
+
+                html += '</div>';
+                resultsDiv.innerHTML = html;
+
+            } catch (error) {
+                resultsDiv.innerHTML = `
+                    <div class="results">
+                        <p class="error">❌ Error testing token: ${error.message}</p>
+                        <p style="margin-top: 10px; color: #666;">This might be a network error or CORS issue. The token might still be valid.</p>
+                    </div>
+                `;
+            }
+        }
+
+        function generateSQL() {
+            let token = document.getElementById('newToken').value.trim();
+            if (!token) {
+                token = document.getElementById('accessToken').value.trim();
+            }
+
+            const accountId = document.getElementById('accountId').value.trim();
+            const resultsDiv = document.getElementById('sqlResults');
+
+            if (!token) {
+                resultsDiv.innerHTML = '<div class="results"><p class="error">❌ Please provide an access token</p></div>';
+                return;
+            }
+
+            if (!accountId) {
+                resultsDiv.innerHTML = '<div class="results"><p class="error">❌ Please provide an account ID</p></div>';
+                return;
+            }
+
+            // Escape single quotes in token
+            const escapedToken = token.replace(/'/g, "''");
+
+            const sql = `UPDATE seller_whatsapp_config
+SET access_token = '${escapedToken}'
+WHERE wh_account_id = ${accountId};`;
+
+            const selectSql = `-- Verify the update:
+SELECT
+    wh_account_id,
+    seller_id,
+    LEFT(access_token, 20) || '...' as token_preview,
+    waba_id,
+    phone_number_id
+FROM seller_whatsapp_config
+WHERE wh_account_id = ${accountId};`;
+
+            let html = '<div class="results">';
+            html += '<p class="success">✅ SQL Generated Successfully!</p>';
+            html += '<p style="margin-top: 10px; color: #666;">Copy and run this in your database:</p>';
+            html += `<div class="sql-output">${sql}</div>`;
+            html += '<button class="copy-btn" onclick="copySQLToClipboard()">📋 Copy SQL</button>';
+            html += '<p style="margin-top: 20px; color: #666;">Then verify with:</p>';
+            html += `<div class="sql-output">${selectSql}</div>`;
+            html += '</div>';
+
+            resultsDiv.innerHTML = html;
+
+            // Store SQL for copying
+            window.generatedSQL = sql;
+        }
+
+        function copySQLToClipboard() {
+            const sql = window.generatedSQL;
+            if (!sql) return;
+
+            navigator.clipboard.writeText(sql).then(() => {
+                alert('✅ SQL copied to clipboard!');
+            }).catch(err => {
+                alert('❌ Failed to copy: ' + err.message);
+            });
+        }
+
+        // Auto-focus on first input
+        document.getElementById('accessToken').focus();
+    </script>
+</body>
+</html>
