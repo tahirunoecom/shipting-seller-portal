@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Send Test Product Message</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            padding: 32px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 { color: #1a202c; margin-bottom: 32px; }
+        .warning {
+            background: #fffaf0;
+            border-left: 4px solid #dd6b20;
+            padding: 16px;
+            margin-bottom: 24px;
+            border-radius: 4px;
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 8px;
+        }
+        input, select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: #f5576c;
+        }
+        button {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.3s;
+            box-shadow: 0 4px 14px rgba(245, 87, 108, 0.4);
+        }
+        button:hover { transform: translateY(-2px); }
+        button:disabled { opacity: 0.6; cursor: not-allowed; }
+        .result {
+            margin-top: 24px;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        .result.success { background: #c6f6d5; border: 2px solid #38a169; color: #22543d; }
+        .result.error { background: #fed7d7; border: 2px solid #e53e3e; color: #742a2a; }
+        pre {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 12px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 12px;
+            margin-top: 12px;
+        }
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .products {
+            background: #f7fafc;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .product-item {
+            padding: 8px;
+            margin: 4px 0;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+        .product-item:hover {
+            border-color: #f5576c;
+        }
+        .product-item.selected {
+            border-color: #38a169;
+            background: #c6f6d5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📱 Send Test Product Message</h1>
+
+        <div class="warning">
+            <strong>⚠️ IMPORTANT:</strong><br>
+            • Use YOUR OWN WhatsApp number for testing<br>
+            • Format: Country code + number (e.g., 919876543210 for India, 16195353981 for US)<br>
+            • Remove any + or spaces or dashes<br>
+            • You will receive this message on YOUR WhatsApp
+        </div>
+
+        <div class="input-group">
+            <label>Your WhatsApp Number (for testing)</label>
+            <input type="text" id="phoneNumber" placeholder="e.g., 919876543210 or 16195353981" />
+            <small style="color: #718096; margin-top: 4px; display: block;">
+                Format: [country code][number] - No + or spaces
+            </small>
+        </div>
+
+        <div class="products">
+            <label>Select Products to Send (click to select, max 30)</label>
+            <div id="productList">
+                <div class="product-item" data-id="777">
+                    <strong>Lamb Biryani</strong> - $14.95<br>
+                    <small>ID: 777</small>
+                </div>
+                <div class="product-item" data-id="778">
+                    <strong>Veg Biryani</strong> - $14.95<br>
+                    <small>ID: 778</small>
+                </div>
+                <div class="product-item" data-id="779">
+                    <strong>Gulab Jamun</strong> - $5.95<br>
+                    <small>ID: 779</small>
+                </div>
+                <div class="product-item" data-id="780">
+                    <strong>Rasmalai</strong> - $5.95<br>
+                    <small>ID: 780</small>
+                </div>
+                <div class="product-item" data-id="781">
+                    <strong>Kheer</strong> - $5.95<br>
+                    <small>ID: 781</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="input-group">
+            <label>Message Header</label>
+            <input type="text" id="headerText" value="🍽️ Restaurant Menu" />
+        </div>
+
+        <div class="input-group">
+            <label>Message Body</label>
+            <input type="text" id="bodyText" value="Check out our delicious menu items!" />
+        </div>
+
+        <button onclick="sendMessage()" id="sendBtn">
+            📤 Send Test Product Message
+        </button>
+
+        <div id="result"></div>
+    </div>
+
+    <script>
+        const PHONE_NUMBER_ID = '1042564822270979';
+        const CATALOG_ID = '894655139864702';
+        const ACCESS_TOKEN = 'EAAWKfVA5uZCMBQwmREZAu93O1ZBECdeoTjoW4k8xUkuXZCrBhbOPjZBwzZBRMyRuKSrSodgZBTlP8pK6wTCKrW05mPos67DrnxoJzoT4ICCLsVZAUyYtuetZBRzSZBf6qa36H0JRzVy6KrAQsMVUCMtvpMZCwZAf0laXwaFltqprBxtA9pZCiIla5keUASZCZCu1aWMLmssjDUSjPdnDxKQ3UNUJlKMArb5FZBxYuxTmzyBUZAOEg16SED4RBJq5Di91djr7IQKBLdHg0g40JfYKg4NgYTZAlxUSH3YzO6Yc5CdaOB';
+
+        let selectedProducts = [];
+
+        // Product selection
+        document.querySelectorAll('.product-item').forEach(item => {
+            item.addEventListener('click', function() {
+                const productId = this.getAttribute('data-id');
+
+                if (this.classList.contains('selected')) {
+                    this.classList.remove('selected');
+                    selectedProducts = selectedProducts.filter(id => id !== productId);
+                } else {
+                    if (selectedProducts.length < 30) {
+                        this.classList.add('selected');
+                        selectedProducts.push(productId);
+                    } else {
+                        alert('Maximum 30 products allowed');
+                    }
+                }
+            });
+        });
+
+        async function sendMessage() {
+            const btn = document.getElementById('sendBtn');
+            const result = document.getElementById('result');
+            const phoneNumber = document.getElementById('phoneNumber').value.trim();
+            const headerText = document.getElementById('headerText').value.trim();
+            const bodyText = document.getElementById('bodyText').value.trim();
+
+            if (!phoneNumber) {
+                result.innerHTML = `<div class="result error"><strong>❌ Error:</strong> Please enter your WhatsApp number</div>`;
+                return;
+            }
+
+            if (selectedProducts.length === 0) {
+                result.innerHTML = `<div class="result error"><strong>❌ Error:</strong> Please select at least one product</div>`;
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span> Sending...';
+
+            const payload = {
+                messaging_product: "whatsapp",
+                recipient_type: "individual",
+                to: phoneNumber,
+                type: "interactive",
+                interactive: {
+                    type: "product_list",
+                    header: {
+                        type: "text",
+                        text: headerText
+                    },
+                    body: {
+                        text: bodyText
+                    },
+                    action: {
+                        catalog_id: CATALOG_ID,
+                        sections: [
+                            {
+                                title: "Menu Items",
+                                product_items: selectedProducts.map(id => ({
+                                    product_retailer_id: id
+                                }))
+                            }
+                        ]
+                    }
+                }
+            };
+
+            try {
+                const response = await fetch(`https://graph.facebook.com/v21.0/${PHONE_NUMBER_ID}/messages`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${ACCESS_TOKEN}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.messages) {
+                    result.innerHTML = `
+                        <div class="result success">
+                            <h3 style="margin-bottom: 12px;">✅ SUCCESS!</h3>
+                            <p><strong>Message sent successfully!</strong></p>
+                            <p style="margin-top: 8px;">Message ID: ${data.messages[0].id}</p>
+                            <p style="margin-top: 8px;">To: ${phoneNumber}</p>
+                            <p style="margin-top: 16px; padding: 12px; background: white; border-radius: 6px;">
+                                <strong>🎉 CHECK YOUR WHATSAPP NOW!</strong><br>
+                                You should receive the product list message on your WhatsApp.
+                            </p>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `;
+                } else {
+                    const errorCode = data.error?.code;
+                    const errorMessage = data.error?.message || 'Unknown error';
+
+                    let helpText = '';
+                    if (errorCode === 131009 || errorMessage.includes('catalog')) {
+                        helpText = `
+                            <p style="margin-top: 16px; padding: 12px; background: white; border-radius: 6px;">
+                                <strong>❌ Error 131009: Catalog not connected</strong><br><br>
+                                This means Method 4 didn't fully connect the catalog.<br><br>
+                                <strong>Solution:</strong><br>
+                                1. Go to Business Manager<br>
+                                2. Manually connect catalog to WABA<br>
+                                3. Or submit for whatsapp_business_management permission approval
+                            </p>
+                        `;
+                    } else if (errorCode === 131047 || errorMessage.includes('Re-engagement')) {
+                        helpText = `
+                            <p style="margin-top: 16px; padding: 12px; background: #c6f6d5; border-radius: 6px;">
+                                <strong>⚠️ This is actually GOOD!</strong><br><br>
+                                Error 131047 means you need a 24-hour window to message this user.<br>
+                                But it means the CATALOG IS WORKING! ✅<br><br>
+                                The error is about messaging rules, not catalog connection!
+                            </p>
+                        `;
+                    }
+
+                    result.innerHTML = `
+                        <div class="result error">
+                            <strong>❌ Failed to send message</strong>
+                            <p style="margin-top: 8px;">Error Code: ${errorCode}</p>
+                            <p>Error Message: ${errorMessage}</p>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                            ${helpText}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                result.innerHTML = `
+                    <div class="result error">
+                        <strong>❌ Network Error</strong>
+                        <p style="margin-top: 8px;">${error.message}</p>
+                    </div>
+                `;
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '📤 Send Test Product Message';
+            }
+        }
+    </script>
+</body>
+</html>
