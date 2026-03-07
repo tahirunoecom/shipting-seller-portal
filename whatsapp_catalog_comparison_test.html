@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Catalog Comparison Test - 966 vs 1035</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .comparison-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .config-panel {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .config-panel.working {
+            border-top: 5px solid #10b981;
+        }
+
+        .config-panel.failing {
+            border-top: 5px solid #ef4444;
+        }
+
+        .config-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .config-header h2 {
+            font-size: 20px;
+            color: #333;
+        }
+
+        .status-badge {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .status-badge.working {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .status-badge.failing {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .info-group {
+            margin-bottom: 15px;
+        }
+
+        .info-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+
+        .info-value {
+            font-size: 13px;
+            color: #333;
+            background: #f9fafb;
+            padding: 10px;
+            border-radius: 8px;
+            word-break: break-all;
+            font-family: 'Courier New', monospace;
+        }
+
+        .test-section {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+        }
+
+        .test-section h3 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 18px;
+        }
+
+        .test-buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .test-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 25px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .test-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+
+        .test-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .results-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .result-panel {
+            background: #f9fafb;
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid #e5e7eb;
+        }
+
+        .result-panel h4 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+
+        .result-content {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .success {
+            color: #10b981;
+            background: #d1fae5;
+            padding: 3px 8px;
+            border-radius: 4px;
+        }
+
+        .error {
+            color: #ef4444;
+            background: #fee2e2;
+            padding: 3px 8px;
+            border-radius: 4px;
+        }
+
+        .loading {
+            color: #f59e0b;
+            background: #fef3c7;
+            padding: 3px 8px;
+            border-radius: 4px;
+        }
+
+        .diff-highlight {
+            background: #fef3c7;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-weight: bold;
+        }
+
+        .legend {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+        }
+
+        .legend h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+
+        .legend-items {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .legend-icon {
+            width: 30px;
+            height: 30px;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 WhatsApp Catalog Comparison Test</h1>
+            <p>Testing why wh_account_id 966 works but 1035 fails with Error 131009</p>
+        </div>
+
+        <div class="legend">
+            <h3>📋 Test Configuration</h3>
+            <div class="legend-items">
+                <div class="legend-item">
+                    <div class="legend-icon" style="background: #d1fae5; color: #065f46;">✓</div>
+                    <div>
+                        <strong>966 - WORKING</strong><br>
+                        <small>+1 715-882-6516</small>
+                    </div>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-icon" style="background: #fee2e2; color: #991b1b;">✗</div>
+                    <div>
+                        <strong>1035 - FAILING</strong><br>
+                        <small>+1 619-853-3981</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="comparison-container">
+            <!-- Working Config (966) -->
+            <div class="config-panel working">
+                <div class="config-header">
+                    <h2>✅ Working Config (966)</h2>
+                    <span class="status-badge working">WORKING</span>
+                </div>
+
+                <div class="info-group">
+                    <div class="info-label">Phone Number</div>
+                    <div class="info-value">+1 715-882-6516</div>
+                </div>
+
+                <div class="info-group">
+                    <div class="info-label">Business Name</div>
+                    <div class="info-value">Dear Delhi Restaurant</div>
+                </div>
+
+                <div class="info-group">
+                    <div class="info-label">Phone Number ID</div>
+                    <div class="info-value">850008814869854</div>
+                </div>
+
+                <div class="info-group">
+                    <div class="info-label">Catalog ID</div>
+                    <div class="info-value">1160420602911130</div>
+                </div>
+
+                <div class="info-group">
+                    <div class="info-label">WABA ID</div>
+                    <div class="info-value">1659914091647877</div>
+                </div>
+            </div>
+
+            <!-- Failing Config (1035) -->
+            <div class="config-panel failing">
+                <div class="config-header">
+                    <h2>❌ Failing Config (1035)</h2>
+                    <span class="status-badge failing">ERROR 131009</span>
+                </div>
+
+                <div class="info-group">
+                    <div class="info-label">Phone Number</div>
+                    <div class="info-value">+1 619-853-3981</div>
+                </div>
+
+                <div class="info-group">
+                    <div class="info-label">Business Name</div>
+                    <div class="info-value">Dear Delhi</div>
+                </div>
+
+                <div class="info-group">
+                    <div class="info-label">Phone Number ID</div>
+                    <div class="info-value">1042564822270979</div>
+                </div>
+
+                <div class="info-group">
+                    <div class="info-label">Catalog ID</div>
+                    <div class="info-value">894655139864702</div>
+                </div>
+
+                <div class="info-group">
+                    <div class="info-label">WABA ID</div>
+                    <div class="info-value">765231639686531</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>🧪 Comparison Tests</h3>
+            <div class="test-buttons">
+                <button class="test-btn" onclick="testWhatsAppProfile()">
+                    📱 Test WhatsApp Profile
+                </button>
+                <button class="test-btn" onclick="testCatalogInfo()">
+                    📦 Test Catalog Info
+                </button>
+                <button class="test-btn" onclick="testCatalogConnection()">
+                    🔗 Test Catalog Connection
+                </button>
+                <button class="test-btn" onclick="testProductList()">
+                    🛍️ Test Product List API
+                </button>
+                <button class="test-btn" onclick="compareAll()">
+                    🔍 Run All Tests
+                </button>
+                <button class="test-btn" onclick="clearResults()">
+                    🗑️ Clear Results
+                </button>
+            </div>
+
+            <div class="results-container">
+                <div class="result-panel">
+                    <h4>✅ Results for 966 (Working)</h4>
+                    <div class="result-content" id="results-966">
+                        Click a test button to start...
+                    </div>
+                </div>
+                <div class="result-panel">
+                    <h4>❌ Results for 1035 (Failing)</h4>
+                    <div class="result-content" id="results-1035">
+                        Click a test button to start...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration from database
+        const config966 = {
+            wh_account_id: 966,
+            phone_number_id: '850008814869854',
+            catalog_id: '1160420602911130',
+            waba_id: '1659914091647877',
+            access_token: 'EAAWKfVA5uZCMBQITVVfDyxdE1zbPcDCNSTfeMVtwZAGPtua3JV6ml10Y5MYmH5M0EFcKZChE2uEGJ3C94i4VdYwkj7Ns6FmqFMdE1wMRRRf75TqaspVE7LrR8PtE023RzngQcszhffrAX1J40S0UTZAV3fsKJN5393H4jZBoUzKrpAKGIAt9fSQu75ZBMfdQZDZD',
+            phone: '+1 715-882-6516',
+            name: 'Dear Delhi Restaurant'
+        };
+
+        const config1035 = {
+            wh_account_id: 1035,
+            phone_number_id: '1042564822270979',
+            catalog_id: '894655139864702',
+            waba_id: '765231639686531',
+            access_token: 'EAAWKfVA5uZCMBQx9XWJdVZBqEotUYZCWbgn5dpGefDtg1a4yZA6SlMBw3McXJAZBGQG3E1jSdKQeZBXPmJ8Mrjuli90TObfKf795fovCLcGbdNXER7ZCNZABHpaZA8vQ9WFQzEf8DyA3l2UPe1LmJIQuGnklyHohbZCTSIekAhyJuYGWz4X4qYgdoR3UbU9sup0bPVGoPTm2uyqiNe8LHfgZA39Kcj4ZBq1IQ645kyIn2BFqblpsrjT8SWFYNVEbU7dCxTIMOqMXqwybRKPTJIL16gNYfq8NcdgEwAYJbE6n',
+            phone: '+1 619-853-3981',
+            name: 'Dear Delhi'
+        };
+
+        function log966(message, type = 'info') {
+            const container = document.getElementById('results-966');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : type === 'loading' ? 'loading' : '';
+            container.innerHTML += `\n[${timestamp}] <span class="${className}">${message}</span>`;
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function log1035(message, type = 'info') {
+            const container = document.getElementById('results-1035');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : type === 'loading' ? 'loading' : '';
+            container.innerHTML += `\n[${timestamp}] <span class="${className}">${message}</span>`;
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function clearResults() {
+            document.getElementById('results-966').textContent = 'Cleared. Ready for new tests...';
+            document.getElementById('results-1035').textContent = 'Cleared. Ready for new tests...';
+        }
+
+        async function testWhatsAppProfile() {
+            log966('🔍 Testing WhatsApp Business Profile...', 'loading');
+            log1035('🔍 Testing WhatsApp Business Profile...', 'loading');
+
+            // Test 966
+            try {
+                const url966 = `https://graph.facebook.com/v22.0/${config966.phone_number_id}/whatsapp_business_profile?fields=about,address,description,email,profile_picture_url,websites,vertical,messaging_product,shopping_cart,is_business_account`;
+                log966(`\n📡 Calling: ${url966}`);
+
+                const response966 = await fetch(url966, {
+                    headers: {
+                        'Authorization': `Bearer ${config966.access_token}`
+                    }
+                });
+
+                const data966 = await response966.json();
+                log966(`\n✅ Status: ${response966.status}`);
+                log966(`\n📋 Response:\n${JSON.stringify(data966, null, 2)}`, response966.ok ? 'success' : 'error');
+            } catch (error) {
+                log966(`\n❌ Error: ${error.message}`, 'error');
+            }
+
+            // Test 1035
+            try {
+                const url1035 = `https://graph.facebook.com/v22.0/${config1035.phone_number_id}/whatsapp_business_profile?fields=about,address,description,email,profile_picture_url,websites,vertical,messaging_product,shopping_cart,is_business_account`;
+                log1035(`\n📡 Calling: ${url1035}`);
+
+                const response1035 = await fetch(url1035, {
+                    headers: {
+                        'Authorization': `Bearer ${config1035.access_token}`
+                    }
+                });
+
+                const data1035 = await response1035.json();
+                log1035(`\n✅ Status: ${response1035.status}`);
+                log1035(`\n📋 Response:\n${JSON.stringify(data1035, null, 2)}`, response1035.ok ? 'success' : 'error');
+            } catch (error) {
+                log1035(`\n❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testCatalogInfo() {
+            log966('🔍 Testing Catalog Information...', 'loading');
+            log1035('🔍 Testing Catalog Information...', 'loading');
+
+            // Test 966
+            try {
+                const url966 = `https://graph.facebook.com/v22.0/${config966.catalog_id}?fields=id,name,vertical,product_count,business`;
+                log966(`\n📡 Calling: ${url966}`);
+
+                const response966 = await fetch(url966, {
+                    headers: {
+                        'Authorization': `Bearer ${config966.access_token}`
+                    }
+                });
+
+                const data966 = await response966.json();
+                log966(`\n✅ Status: ${response966.status}`);
+                log966(`\n📋 Response:\n${JSON.stringify(data966, null, 2)}`, response966.ok ? 'success' : 'error');
+            } catch (error) {
+                log966(`\n❌ Error: ${error.message}`, 'error');
+            }
+
+            // Test 1035
+            try {
+                const url1035 = `https://graph.facebook.com/v22.0/${config1035.catalog_id}?fields=id,name,vertical,product_count,business`;
+                log1035(`\n📡 Calling: ${url1035}`);
+
+                const response1035 = await fetch(url1035, {
+                    headers: {
+                        'Authorization': `Bearer ${config1035.access_token}`
+                    }
+                });
+
+                const data1035 = await response1035.json();
+                log1035(`\n✅ Status: ${response1035.status}`);
+                log1035(`\n📋 Response:\n${JSON.stringify(data1035, null, 2)}`, response1035.ok ? 'success' : 'error');
+            } catch (error) {
+                log1035(`\n❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testCatalogConnection() {
+            log966('🔍 Testing WABA → Catalog Connection...', 'loading');
+            log1035('🔍 Testing WABA → Catalog Connection...', 'loading');
+
+            // Test 966
+            try {
+                const url966 = `https://graph.facebook.com/v22.0/${config966.waba_id}/product_catalogs`;
+                log966(`\n📡 Calling: ${url966}`);
+                log966(`\nThis shows which catalogs are connected to WABA ${config966.waba_id}`);
+
+                const response966 = await fetch(url966, {
+                    headers: {
+                        'Authorization': `Bearer ${config966.access_token}`
+                    }
+                });
+
+                const data966 = await response966.json();
+                log966(`\n✅ Status: ${response966.status}`);
+                log966(`\n📋 Response:\n${JSON.stringify(data966, null, 2)}`, response966.ok ? 'success' : 'error');
+
+                if (response966.ok && data966.data) {
+                    const hasCatalog = data966.data.some(cat => cat.id === config966.catalog_id);
+                    if (hasCatalog) {
+                        log966(`\n✅ Catalog ${config966.catalog_id} IS connected to this WABA!`, 'success');
+                    } else {
+                        log966(`\n⚠️ Catalog ${config966.catalog_id} NOT found in connected catalogs!`, 'error');
+                    }
+                }
+            } catch (error) {
+                log966(`\n❌ Error: ${error.message}`, 'error');
+            }
+
+            // Test 1035
+            try {
+                const url1035 = `https://graph.facebook.com/v22.0/${config1035.waba_id}/product_catalogs`;
+                log1035(`\n📡 Calling: ${url1035}`);
+                log1035(`\nThis shows which catalogs are connected to WABA ${config1035.waba_id}`);
+
+                const response1035 = await fetch(url1035, {
+                    headers: {
+                        'Authorization': `Bearer ${config1035.access_token}`
+                    }
+                });
+
+                const data1035 = await response1035.json();
+                log1035(`\n✅ Status: ${response1035.status}`);
+                log1035(`\n📋 Response:\n${JSON.stringify(data1035, null, 2)}`, response1035.ok ? 'success' : 'error');
+
+                if (response1035.ok && data1035.data) {
+                    const hasCatalog = data1035.data.some(cat => cat.id === config1035.catalog_id);
+                    if (hasCatalog) {
+                        log1035(`\n✅ Catalog ${config1035.catalog_id} IS connected to this WABA!`, 'success');
+                    } else {
+                        log1035(`\n⚠️ Catalog ${config1035.catalog_id} NOT found in connected catalogs!`, 'error');
+                        log1035(`\n🔧 THIS IS LIKELY THE ROOT CAUSE OF ERROR 131009!`, 'error');
+                    }
+                }
+            } catch (error) {
+                log1035(`\n❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testProductList() {
+            log966('🔍 Testing Product List Message API...', 'loading');
+            log1035('🔍 Testing Product List Message API...', 'loading');
+
+            const testRecipient = '1234567890'; // Dummy number - will fail but shows error
+
+            // Test 966
+            try {
+                const url966 = `https://graph.facebook.com/v22.0/${config966.phone_number_id}/messages`;
+                log966(`\n📡 Calling: ${url966}`);
+
+                const payload966 = {
+                    messaging_product: "whatsapp",
+                    recipient_type: "individual",
+                    to: testRecipient,
+                    type: "interactive",
+                    interactive: {
+                        type: "product_list",
+                        header: { type: "text", text: "Test Products" },
+                        body: { text: "Testing product list" },
+                        action: {
+                            catalog_id: config966.catalog_id,
+                            sections: [
+                                {
+                                    title: "Test Section",
+                                    product_items: [
+                                        { product_retailer_id: "test123" }
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                };
+
+                log966(`\n📦 Payload:\n${JSON.stringify(payload966, null, 2)}`);
+
+                const response966 = await fetch(url966, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${config966.access_token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload966)
+                });
+
+                const data966 = await response966.json();
+                log966(`\n✅ Status: ${response966.status}`);
+                log966(`\n📋 Response:\n${JSON.stringify(data966, null, 2)}`, response966.ok ? 'success' : 'error');
+            } catch (error) {
+                log966(`\n❌ Error: ${error.message}`, 'error');
+            }
+
+            // Test 1035
+            try {
+                const url1035 = `https://graph.facebook.com/v22.0/${config1035.phone_number_id}/messages`;
+                log1035(`\n📡 Calling: ${url1035}`);
+
+                const payload1035 = {
+                    messaging_product: "whatsapp",
+                    recipient_type: "individual",
+                    to: testRecipient,
+                    type: "interactive",
+                    interactive: {
+                        type: "product_list",
+                        header: { type: "text", text: "Test Products" },
+                        body: { text: "Testing product list" },
+                        action: {
+                            catalog_id: config1035.catalog_id,
+                            sections: [
+                                {
+                                    title: "Test Section",
+                                    product_items: [
+                                        { product_retailer_id: "test123" }
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                };
+
+                log1035(`\n📦 Payload:\n${JSON.stringify(payload1035, null, 2)}`);
+
+                const response1035 = await fetch(url1035, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${config1035.access_token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload1035)
+                });
+
+                const data1035 = await response1035.json();
+                log1035(`\n✅ Status: ${response1035.status}`);
+                log1035(`\n📋 Response:\n${JSON.stringify(data1035, null, 2)}`, response1035.ok ? 'success' : 'error');
+
+                if (data1035.error && data1035.error.code === 131009) {
+                    log1035(`\n⚠️ ERROR 131009 REPRODUCED! This confirms the catalog is not properly connected.`, 'error');
+                }
+            } catch (error) {
+                log1035(`\n❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function compareAll() {
+            clearResults();
+            log966('🚀 Starting comprehensive comparison...', 'loading');
+            log1035('🚀 Starting comprehensive comparison...', 'loading');
+
+            await testWhatsAppProfile();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            await testCatalogInfo();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            await testCatalogConnection();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            await testProductList();
+
+            log966('\n\n✅ All tests completed!', 'success');
+            log1035('\n\n✅ All tests completed!', 'success');
+        }
+    </script>
+</body>
+</html>
