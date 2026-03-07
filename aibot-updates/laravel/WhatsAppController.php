@@ -825,7 +825,7 @@ class WhatsAppController extends Controller
     private function getSellerProducts($whAccountId)
     {
         try {
-            $limit = 5; // Testing limit
+            $limit = 1000; // Sync up to 1000 products (increased from 5)
 
             $apiUrl = 'https://stageshipperapi.thedelivio.com/api/getMasterProducts';
 
