@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alternative Catalog Connection Methods</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            padding: 32px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 { color: #1a202c; margin-bottom: 32px; }
+        .method {
+            background: #f7fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+        .method h3 { color: #2d3748; margin-bottom: 16px; }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        button:hover { transform: translateY(-2px); }
+        button:disabled { opacity: 0.6; cursor: not-allowed; }
+        .result {
+            margin-top: 16px;
+            padding: 16px;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        .result.success { background: #c6f6d5; border: 2px solid #38a169; color: #22543d; }
+        .result.error { background: #fed7d7; border: 2px solid #e53e3e; color: #742a2a; }
+        .result.info { background: #bee3f8; border: 2px solid #3182ce; color: #2c5282; }
+        pre {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 12px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 12px;
+            margin-top: 12px;
+        }
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .warning {
+            background: #fffaf0;
+            border-left: 4px solid #dd6b20;
+            padding: 16px;
+            margin-bottom: 24px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Alternative Catalog Connection Methods</h1>
+
+        <div class="warning">
+            <strong>⚠️ Your Token Status:</strong><br>
+            ✓ catalog_management<br>
+            ✓ business_management<br>
+            ✗ whatsapp_business_management (MISSING)<br><br>
+            We'll try alternative endpoints that may work with your current permissions.
+        </div>
+
+        <div class="method">
+            <h3>Method 1: Via WABA Endpoint (Original - Likely to Fail)</h3>
+            <p>Endpoint: POST /v21.0/{WABA_ID}/product_catalogs</p>
+            <p>Required: whatsapp_business_management ❌</p>
+            <button onclick="testMethod1()" id="btn1">Test Method 1</button>
+            <div id="result1"></div>
+        </div>
+
+        <div class="method">
+            <h3>Method 2: Via Business Manager Endpoint</h3>
+            <p>Endpoint: POST /v21.0/{BUSINESS_ID}/owned_product_catalogs</p>
+            <p>Required: business_management ✓ (You have this!)</p>
+            <button onclick="testMethod2()" id="btn2">Test Method 2</button>
+            <div id="result2"></div>
+        </div>
+
+        <div class="method">
+            <h3>Method 3: Assign Catalog to Business Assets</h3>
+            <p>Endpoint: POST /v21.0/{CATALOG_ID}/whatsapp_channels</p>
+            <p>Required: catalog_management ✓ (You have this!)</p>
+            <button onclick="testMethod3()" id="btn3">Test Method 3</button>
+            <div id="result3"></div>
+        </div>
+
+        <div class="method">
+            <h3>Method 4: Update Phone Number Commerce Settings</h3>
+            <p>Endpoint: POST /v21.0/{PHONE_NUMBER_ID}</p>
+            <p>Update commerce settings with catalog_id</p>
+            <button onclick="testMethod4()" id="btn4">Test Method 4</button>
+            <div id="result4"></div>
+        </div>
+    </div>
+
+    <script>
+        const WABA_ID = '765231639686531';
+        const BUSINESS_ID = '1236154922033242';
+        const CATALOG_ID = '894655139864702';
+        const PHONE_NUMBER_ID = '1042564822270979';
+        const ACCESS_TOKEN = 'EAAWKfVA5uZCMBQwmREZAu93O1ZBECdeoTjoW4k8xUkuXZCrBhbOPjZBwzZBRMyRuKSrSodgZBTlP8pK6wTCKrW05mPos67DrnxoJzoT4ICCLsVZAUyYtuetZBRzSZBf6qa36H0JRzVy6KrAQsMVUCMtvpMZCwZAf0laXwaFltqprBxtA9pZCiIla5keUASZCZCu1aWMLmssjDUSjPdnDxKQ3UNUJlKMArb5FZBxYuxTmzyBUZAOEg16SED4RBJq5Di91djr7IQKBLdHg0g40JfYKg4NgYTZAlxUSH3YzO6Yc5CdaOB';
+
+        async function testMethod1() {
+            const btn = document.getElementById('btn1');
+            const result = document.getElementById('result1');
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span> Testing...';
+
+            try {
+                const response = await fetch(`https://graph.facebook.com/v21.0/${WABA_ID}/product_catalogs`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${ACCESS_TOKEN}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ catalog_id: CATALOG_ID })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    result.innerHTML = `<div class="result success"><strong>✅ SUCCESS!</strong><pre>${JSON.stringify(data, null, 2)}</pre></div>`;
+                } else {
+                    result.innerHTML = `<div class="result error"><strong>❌ Failed (Expected)</strong><br>Error: ${data.error?.message || 'Unknown'}<pre>${JSON.stringify(data, null, 2)}</pre></div>`;
+                }
+            } catch (error) {
+                result.innerHTML = `<div class="result error">Network error: ${error.message}</div>`;
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Test Method 1';
+            }
+        }
+
+        async function testMethod2() {
+            const btn = document.getElementById('btn2');
+            const result = document.getElementById('result2');
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span> Testing...';
+
+            try {
+                const response = await fetch(`https://graph.facebook.com/v21.0/${BUSINESS_ID}/owned_product_catalogs/${CATALOG_ID}`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${ACCESS_TOKEN}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        whatsapp_channel: WABA_ID
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    result.innerHTML = `<div class="result success"><strong>✅ SUCCESS!</strong><br>This method worked!<pre>${JSON.stringify(data, null, 2)}</pre></div>`;
+                } else {
+                    result.innerHTML = `<div class="result error"><strong>❌ Failed</strong><br>Error: ${data.error?.message || 'Unknown'}<pre>${JSON.stringify(data, null, 2)}</pre></div>`;
+                }
+            } catch (error) {
+                result.innerHTML = `<div class="result error">Network error: ${error.message}</div>`;
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Test Method 2';
+            }
+        }
+
+        async function testMethod3() {
+            const btn = document.getElementById('btn3');
+            const result = document.getElementById('result3');
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span> Testing...';
+
+            try {
+                const response = await fetch(`https://graph.facebook.com/v21.0/${CATALOG_ID}/whatsapp_channels`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${ACCESS_TOKEN}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        phone_number_id: PHONE_NUMBER_ID
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    result.innerHTML = `<div class="result success"><strong>✅ SUCCESS!</strong><br>This method worked!<pre>${JSON.stringify(data, null, 2)}</pre></div>`;
+                } else {
+                    result.innerHTML = `<div class="result error"><strong>❌ Failed</strong><br>Error: ${data.error?.message || 'Unknown'}<pre>${JSON.stringify(data, null, 2)}</pre></div>`;
+                }
+            } catch (error) {
+                result.innerHTML = `<div class="result error">Network error: ${error.message}</div>`;
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Test Method 3';
+            }
+        }
+
+        async function testMethod4() {
+            const btn = document.getElementById('btn4');
+            const result = document.getElementById('result4');
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span> Testing...';
+
+            try {
+                // First get current settings
+                const getResponse = await fetch(`https://graph.facebook.com/v21.0/${PHONE_NUMBER_ID}?fields=commerce_settings`, {
+                    headers: { 'Authorization': `Bearer ${ACCESS_TOKEN}` }
+                });
+
+                const currentSettings = await getResponse.json();
+
+                // Try to update with catalog_id
+                const response = await fetch(`https://graph.facebook.com/v21.0/${PHONE_NUMBER_ID}`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${ACCESS_TOKEN}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        commerce_settings: {
+                            catalog_id: CATALOG_ID,
+                            is_enabled: true
+                        }
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    result.innerHTML = `<div class="result success"><strong>✅ SUCCESS!</strong><br>Current settings:<pre>${JSON.stringify(currentSettings, null, 2)}</pre>Update result:<pre>${JSON.stringify(data, null, 2)}</pre></div>`;
+                } else {
+                    result.innerHTML = `<div class="result error"><strong>❌ Failed</strong><br>Error: ${data.error?.message || 'Unknown'}<pre>${JSON.stringify(data, null, 2)}</pre></div>`;
+                }
+            } catch (error) {
+                result.innerHTML = `<div class="result error">Network error: ${error.message}</div>`;
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Test Method 4';
+            }
+        }
+    </script>
+</body>
+</html>
