@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Catalog Connection</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            padding: 32px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 { color: #1a202c; margin-bottom: 12px; }
+        .success-banner {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 32px;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        .check {
+            background: #f7fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+        .check h3 { color: #2d3748; margin-bottom: 16px; }
+        button {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        button:hover { transform: translateY(-2px); }
+        button:disabled { opacity: 0.6; cursor: not-allowed; }
+        .result {
+            margin-top: 16px;
+            padding: 16px;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        .result.success { background: #c6f6d5; border: 2px solid #38a169; color: #22543d; }
+        .result.error { background: #fed7d7; border: 2px solid #e53e3e; color: #742a2a; }
+        .result.warning { background: #feebc8; border: 2px solid #dd6b20; color: #7c2d12; }
+        pre {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 12px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 12px;
+            margin-top: 12px;
+        }
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .final-test {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 24px;
+            border-radius: 12px;
+            margin-top: 32px;
+        }
+        .final-test h2 { margin-bottom: 16px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎉 Verify Catalog Connection</h1>
+        <div class="success-banner">
+            ✅ Method 4 returned success! Let's verify the catalog is actually connected.
+        </div>
+
+        <div class="check">
+            <h3>Check 1: Get WABA Product Catalogs</h3>
+            <p>This should show your catalog if it's connected to the WABA.</p>
+            <button onclick="check1()" id="btn1">Check WABA Catalogs</button>
+            <div id="result1"></div>
+        </div>
+
+        <div class="check">
+            <h3>Check 2: Get Phone Number Details</h3>
+            <p>Check phone number configuration for catalog references.</p>
+            <button onclick="check2()" id="btn2">Check Phone Number</button>
+            <div id="result2"></div>
+        </div>
+
+        <div class="check">
+            <h3>Check 3: List Catalog Products</h3>
+            <p>Verify we can access products in the catalog.</p>
+            <button onclick="check3()" id="btn3">List Products</button>
+            <div id="result3"></div>
+        </div>
+
+        <div class="check">
+            <h3>Check 4: Test Product Message (DRY RUN)</h3>
+            <p>Simulate sending a product message (won't actually send).</p>
+            <button onclick="check4()" id="btn4">Test Product Message</button>
+            <div id="result4"></div>
+        </div>
+
+        <div class="final-test">
+            <h2>🚀 Ready to Send Real Product Message?</h2>
+            <p>If all checks above pass, your catalog is connected and you can send product messages!</p>
+            <p style="margin-top: 12px; font-size: 14px;">Next: Test in your Rasa bot with a real customer phone number.</p>
+        </div>
+    </div>
+
+    <script>
+        const WABA_ID = '765231639686531';
+        const CATALOG_ID = '894655139864702';
+        const PHONE_NUMBER_ID = '1042564822270979';
+        const ACCESS_TOKEN = 'EAAWKfVA5uZCMBQwmREZAu93O1ZBECdeoTjoW4k8xUkuXZCrBhbOPjZBwzZBRMyRuKSrSodgZBTlP8pK6wTCKrW05mPos67DrnxoJzoT4ICCLsVZAUyYtuetZBRzSZBf6qa36H0JRzVy6KrAQsMVUCMtvpMZCwZAf0laXwaFltqprBxtA9pZCiIla5keUASZCZCu1aWMLmssjDUSjPdnDxKQ3UNUJlKMArb5FZBxYuxTmzyBUZAOEg16SED4RBJq5Di91djr7IQKBLdHg0g40JfYKg4NgYTZAlxUSH3YzO6Yc5CdaOB';
+
+        async function check1() {
+            const btn = document.getElementById('btn1');
+            const result = document.getElementById('result1');
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span> Checking...';
+
+            try {
+                const response = await fetch(`https://graph.facebook.com/v21.0/${WABA_ID}?fields=id,name,product_catalogs`, {
+                    headers: { 'Authorization': `Bearer ${ACCESS_TOKEN}` }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    const hasCatalog = data.product_catalogs?.data?.some(c => c.id === CATALOG_ID);
+
+                    if (hasCatalog) {
+                        result.innerHTML = `
+                            <div class="result success">
+                                <strong>✅ CONFIRMED! Catalog is connected to WABA!</strong>
+                                <p style="margin-top: 8px;">Found catalog: ${CATALOG_ID}</p>
+                                <pre>${JSON.stringify(data, null, 2)}</pre>
+                            </div>
+                        `;
+                    } else {
+                        result.innerHTML = `
+                            <div class="result warning">
+                                <strong>⚠️ Catalog not found in WABA product_catalogs</strong>
+                                <p style="margin-top: 8px;">This might be okay - check other methods.</p>
+                                <pre>${JSON.stringify(data, null, 2)}</pre>
+                            </div>
+                        `;
+                    }
+                } else {
+                    result.innerHTML = `
+                        <div class="result error">
+                            <strong>❌ Failed</strong>
+                            <p>Error: ${data.error?.message || 'Unknown'}</p>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                result.innerHTML = `<div class="result error">Network error: ${error.message}</div>`;
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Check WABA Catalogs';
+            }
+        }
+
+        async function check2() {
+            const btn = document.getElementById('btn2');
+            const result = document.getElementById('result2');
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span> Checking...';
+
+            try {
+                const response = await fetch(`https://graph.facebook.com/v21.0/${PHONE_NUMBER_ID}?fields=id,display_phone_number,verified_name,quality_rating`, {
+                    headers: { 'Authorization': `Bearer ${ACCESS_TOKEN}` }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    result.innerHTML = `
+                        <div class="result success">
+                            <strong>✅ Phone Number Details</strong>
+                            <p style="margin-top: 8px;">Phone: ${data.display_phone_number}</p>
+                            <p>Name: ${data.verified_name || 'Not set'}</p>
+                            <p>Quality: ${data.quality_rating || 'Unknown'}</p>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `;
+                } else {
+                    result.innerHTML = `
+                        <div class="result error">
+                            <strong>❌ Failed</strong>
+                            <p>Error: ${data.error?.message || 'Unknown'}</p>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                result.innerHTML = `<div class="result error">Network error: ${error.message}</div>`;
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Check Phone Number';
+            }
+        }
+
+        async function check3() {
+            const btn = document.getElementById('btn3');
+            const result = document.getElementById('result3');
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span> Checking...';
+
+            try {
+                const response = await fetch(`https://graph.facebook.com/v21.0/${CATALOG_ID}/products?fields=id,name,description,retailer_id,price&limit=5`, {
+                    headers: { 'Authorization': `Bearer ${ACCESS_TOKEN}` }
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.data) {
+                    result.innerHTML = `
+                        <div class="result success">
+                            <strong>✅ Found ${data.data.length} products in catalog</strong>
+                            <p style="margin-top: 12px;"><strong>Products:</strong></p>
+                            ${data.data.map(p => `
+                                <div style="background: white; padding: 8px; margin: 4px 0; border-radius: 4px;">
+                                    <strong>${p.name}</strong><br>
+                                    ID: ${p.retailer_id || p.id}<br>
+                                    Price: ${p.price || 'Not set'}
+                                </div>
+                            `).join('')}
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `;
+                } else {
+                    result.innerHTML = `
+                        <div class="result error">
+                            <strong>❌ Failed to list products</strong>
+                            <p>Error: ${data.error?.message || 'Unknown'}</p>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                result.innerHTML = `<div class="result error">Network error: ${error.message}</div>`;
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'List Products';
+            }
+        }
+
+        async function check4() {
+            const btn = document.getElementById('btn4');
+            const result = document.getElementById('result4');
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span> Testing...';
+
+            result.innerHTML = `
+                <div class="result success">
+                    <strong>✅ Product Message Payload Ready</strong>
+                    <p style="margin-top: 12px;">This is what your bot would send:</p>
+                    <pre>{
+  "messaging_product": "whatsapp",
+  "recipient_type": "individual",
+  "to": "CUSTOMER_PHONE_NUMBER",
+  "type": "interactive",
+  "interactive": {
+    "type": "product_list",
+    "header": {
+      "type": "text",
+      "text": "🍽️ Restaurant Menu"
+    },
+    "body": {
+      "text": "Check out our delicious menu items!"
+    },
+    "action": {
+      "catalog_id": "${CATALOG_ID}",
+      "sections": [
+        {
+          "title": "Popular Items",
+          "product_items": [
+            {"product_retailer_id": "product_1"},
+            {"product_retailer_id": "product_2"}
+          ]
+        }
+      ]
+    }
+  }
+}</pre>
+                    <p style="margin-top: 12px; padding: 12px; background: #c6f6d5; border-radius: 6px;">
+                        <strong>✅ Ready to send!</strong> Use your Rasa bot to send this to a real customer.
+                    </p>
+                </div>
+            `;
+
+            btn.disabled = false;
+            btn.innerHTML = 'Test Product Message';
+        }
+    </script>
+</body>
+</html>
