@@ -236,6 +236,8 @@
     </div>
 
     <script>
+        document.addEventListener('DOMContentLoaded', function() {
+        console.log('Script loaded - generating logos...');
         const logos = [
             {
                 id: 1,
@@ -899,6 +901,8 @@
             logoGrid.appendChild(card);
         });
 
+        console.log(`Generated ${logos.length} logos successfully!`);
+
         function downloadPNG(logoId) {
             const canvas = document.querySelectorAll('canvas')[logoId - 1];
             const link = document.createElement('a');
@@ -910,6 +914,11 @@
         function downloadSVG(logoId) {
             alert('PNG downloaded! For professional SVG files, you can convert the PNG or use design software like Adobe Illustrator or Figma to recreate based on the design.');
         }
+
+        // Make download functions global
+        window.downloadPNG = downloadPNG;
+        window.downloadSVG = downloadSVG;
+        });
     </script>
 </body>
 </html>
