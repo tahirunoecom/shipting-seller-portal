@@ -1,0 +1,36 @@
+# Partner Signup API .htaccess
+
+# Enable Rewrite Engine
+RewriteEngine On
+
+# API Routing
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+
+# Route API calls to partner-signup-api.php
+RewriteRule ^api/send-otp$ partner-signup-api.php [L,QSA]
+RewriteRule ^api/verify-otp$ partner-signup-api.php [L,QSA]
+RewriteRule ^api/partner-signup$ partner-signup-api.php [L,QSA]
+
+# Protect sensitive files
+<FilesMatch "^(config|config-local|composer\.(json|lock))">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Prevent directory listing
+Options -Indexes
+
+# Set security headers
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-XSS-Protection "1; mode=block"
+</IfModule>
+
+# Enable CORS (adjust for your domain)
+<IfModule mod_headers.c>
+    Header set Access-Control-Allow-Origin "https://www.shipting.com"
+    Header set Access-Control-Allow-Methods "GET, POST, OPTIONS"
+    Header set Access-Control-Allow-Headers "Content-Type, Authorization"
+</IfModule>

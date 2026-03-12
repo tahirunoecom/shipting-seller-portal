@@ -1,0 +1,28 @@
+# Add these to your Laravel .env file
+
+# Twilio Configuration
+TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_AUTH_TOKEN=your_twilio_auth_token
+TWILIO_PHONE_NUMBER=+1234567890
+
+# ElasticEmail Configuration
+ELASTICEMAIL_API_KEY=your_elasticemail_api_key
+
+# Admin Email
+ADMIN_EMAIL=admin@shipting.com
+
+# Then add to config/services.php:
+
+# 'twilio' => [
+#     'sid' => env('TWILIO_ACCOUNT_SID'),
+#     'token' => env('TWILIO_AUTH_TOKEN'),
+#     'phone' => env('TWILIO_PHONE_NUMBER'),
+# ],
+#
+# 'elasticemail' => [
+#     'key' => env('ELASTICEMAIL_API_KEY'),
+# ],
+
+# And in config/mail.php:
+
+# 'admin_email' => env('ADMIN_EMAIL', 'admin@shipting.com'),
