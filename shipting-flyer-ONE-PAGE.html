@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shipting Partners - One Page Flyer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        /* Print button */
+        .no-print {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+
+        .print-btn {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 18px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 10px 40px rgba(245, 87, 108, 0.5);
+            transition: all 0.3s;
+        }
+
+        .print-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 50px rgba(245, 87, 108, 0.7);
+        }
+
+        /* ONE PAGE FLYER */
+        .flyer {
+            width: 8.5in;
+            height: 11in;
+            background: white;
+            box-shadow: 0 20px 80px rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Header with gradient */
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 35px 30px;
+            text-align: center;
+            position: relative;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at 30% 50%, rgba(255,255,255,0.1) 0%, transparent 60%);
+        }
+
+        .header-content {
+            position: relative;
+            z-index: 1;
+        }
+
+        .logo {
+            font-size: 3.5rem;
+            font-weight: 900;
+            color: white;
+            margin-bottom: 8px;
+            letter-spacing: -1px;
+        }
+
+        .bolt {
+            color: #FFD700;
+            font-size: 4rem;
+        }
+
+        .tagline {
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: white;
+            margin-bottom: 12px;
+        }
+
+        .badges {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .badge {
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: white;
+        }
+
+        /* Main content */
+        .content {
+            padding: 25px 30px;
+        }
+
+        /* Stats */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .stat {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            padding: 20px 15px;
+            border-radius: 15px;
+            text-align: center;
+            color: white;
+            box-shadow: 0 8px 25px rgba(245, 87, 108, 0.3);
+        }
+
+        .stat-number {
+            font-size: 2.8rem;
+            font-weight: 900;
+            line-height: 1;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        /* Features */
+        .section-title {
+            text-align: center;
+            font-size: 1.5rem;
+            font-weight: 900;
+            margin-bottom: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .feature {
+            background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+            padding: 15px;
+            border-radius: 12px;
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        .feature-icon {
+            font-size: 2rem;
+            flex-shrink: 0;
+        }
+
+        .feature-text h4 {
+            font-size: 0.95rem;
+            font-weight: 800;
+            color: #333;
+            margin-bottom: 3px;
+        }
+
+        .feature-text p {
+            font-size: 0.75rem;
+            color: #666;
+            line-height: 1.3;
+        }
+
+        /* Pricing & CTA combined */
+        .bottom-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .pricing {
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            color: white;
+        }
+
+        .pricing h3 {
+            font-size: 1.1rem;
+            margin-bottom: 8px;
+            font-weight: 800;
+        }
+
+        .price {
+            font-size: 3rem;
+            font-weight: 900;
+            line-height: 1;
+            margin-bottom: 8px;
+        }
+
+        .price-small {
+            font-size: 1.2rem;
+        }
+
+        .pricing p {
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .cta {
+            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+        }
+
+        .cta h3 {
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .qr-box {
+            background: white;
+            padding: 12px;
+            border-radius: 10px;
+            display: inline-block;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            margin-bottom: 8px;
+        }
+
+        .url {
+            font-size: 1.2rem;
+            font-weight: 900;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .contact {
+            font-size: 0.75rem;
+            color: #666;
+        }
+
+        /* Footer */
+        .footer {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 15px;
+            text-align: center;
+            color: white;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        /* PRINT STYLES */
+        @media print {
+            @page {
+                size: letter portrait;
+                margin: 0;
+            }
+
+            body {
+                background: white;
+                padding: 0;
+                margin: 0;
+                display: block;
+            }
+
+            .no-print {
+                display: none !important;
+            }
+
+            .flyer {
+                width: 8.5in;
+                height: 11in;
+                box-shadow: none;
+                border-radius: 0;
+                margin: 0;
+                page-break-after: avoid;
+            }
+
+            /* Force colors to print */
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                color-adjust: exact !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- PRINT BUTTON -->
+    <div class="no-print">
+        <button class="print-btn" onclick="window.print()">🖨️ PRINT FLYER</button>
+    </div>
+
+    <!-- ONE PAGE FLYER -->
+    <div class="flyer">
+        <!-- HEADER -->
+        <div class="header">
+            <div class="header-content">
+                <div class="logo"><span class="bolt">⚡</span> SHIPTING</div>
+                <div class="tagline">WhatsApp Ordering Revolution</div>
+                <div class="badges">
+                    <span class="badge">💬 AI-Powered</span>
+                    <span class="badge">🚚 Smart Delivery</span>
+                    <span class="badge">📊 Analytics</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CONTENT -->
+        <div class="content">
+            <!-- STATS -->
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-number">40%</div>
+                    <div class="stat-label">Sales Increase</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-number">24/7</div>
+                    <div class="stat-label">AI Assistant</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-number">1-2</div>
+                    <div class="stat-label">Days Setup</div>
+                </div>
+            </div>
+
+            <!-- FEATURES -->
+            <h2 class="section-title">🚀 Transform Your Restaurant</h2>
+            <div class="features">
+                <div class="feature">
+                    <span class="feature-icon">💬</span>
+                    <div class="feature-text">
+                        <h4>WhatsApp Native</h4>
+                        <p>Customers order directly through WhatsApp. No app needed!</p>
+                    </div>
+                </div>
+                <div class="feature">
+                    <span class="feature-icon">🤖</span>
+                    <div class="feature-text">
+                        <h4>AI Assistant</h4>
+                        <p>Smart chatbot handles orders 24/7 automatically</p>
+                    </div>
+                </div>
+                <div class="feature">
+                    <span class="feature-icon">🚚</span>
+                    <div class="feature-text">
+                        <h4>Smart Delivery</h4>
+                        <p>Auto-dispatch to Uber, DoorDash, or your fleet</p>
+                    </div>
+                </div>
+                <div class="feature">
+                    <span class="feature-icon">💳</span>
+                    <div class="feature-text">
+                        <h4>Secure Payments</h4>
+                        <p>Stripe integration, PCI-DSS compliant & safe</p>
+                    </div>
+                </div>
+                <div class="feature">
+                    <span class="feature-icon">📦</span>
+                    <div class="feature-text">
+                        <h4>Auto Catalog</h4>
+                        <p>Menu syncs to all platforms automatically</p>
+                    </div>
+                </div>
+                <div class="feature">
+                    <span class="feature-icon">📊</span>
+                    <div class="feature-text">
+                        <h4>Analytics</h4>
+                        <p>Track sales and performance in real-time</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PRICING & CTA -->
+            <div class="bottom-section">
+                <div class="pricing">
+                    <h3>💰 Simple Pricing</h3>
+                    <div class="price">$20-$50<span class="price-small">/mo</span></div>
+                    <p>Based on order volume<br>No hidden fees</p>
+                </div>
+                <div class="cta">
+                    <h3>🎯 Get Started</h3>
+                    <div class="qr-box">
+                        <div id="qrcode"></div>
+                    </div>
+                    <div class="url">partners.shipting.com</div>
+                    <div class="contact">
+                        📧 partners@shipting.com<br>
+                        📱 +1 (555) 123-4567
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- FOOTER -->
+        <div class="footer">
+            Average ROI: 300% in 3 months • Transform Your Restaurant Today • www.shipting.com © 2026
+        </div>
+    </div>
+
+    <script>
+        // Generate QR Code
+        new QRCode(document.getElementById("qrcode"), {
+            text: "https://partners.shipting.com",
+            width: 110,
+            height: 110,
+            colorDark: "#667eea",
+            colorLight: "#ffffff",
+            correctLevel: QRCode.CorrectLevel.H
+        });
+    </script>
+</body>
+</html>
