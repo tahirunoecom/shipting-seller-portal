@@ -517,6 +517,19 @@
             min-height: 120px;
         }
 
+        /* Fix dropdown option styling */
+        .form-group select option {
+            background: var(--dark-light);
+            color: var(--text);
+            padding: 10px;
+        }
+
+        .form-group select option:hover,
+        .form-group select option:checked {
+            background: rgba(0, 255, 136, 0.2);
+            color: var(--primary);
+        }
+
         .phone-group {
             display: flex;
             gap: 15px;
