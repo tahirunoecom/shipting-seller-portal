@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shipting Partners - Professional Flyer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        /* RESET */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* SCREEN STYLES - SCROLLABLE */
+        html, body {
+            height: auto;
+            min-height: 100vh;
+            overflow-x: hidden;
+            overflow-y: auto; /* ALLOW SCROLLING ON SCREEN */
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: #e0e0e0;
+            padding: 20px;
+        }
+
+        .no-print {
+            text-align: center;
+            margin-bottom: 30px;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+
+        .print-btn {
+            background: linear-gradient(135deg, #00ff88, #00d4ff);
+            color: #0a0e27;
+            border: none;
+            padding: 18px 50px;
+            font-size: 18px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 10px 40px rgba(0, 255, 136, 0.4);
+            transition: all 0.3s;
+        }
+
+        .print-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 50px rgba(0, 255, 136, 0.6);
+        }
+
+        .info-text {
+            margin-top: 15px;
+            color: #666;
+            font-size: 1rem;
+        }
+
+        .flyer-page {
+            width: 8.5in;
+            height: 11in;
+            background: white;
+            margin: 0 auto 30px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            padding: 0.5in;
+            position: relative;
+            overflow: visible; /* IMPORTANT FOR SCREEN VIEW */
+        }
+
+        /* PRINT STYLES - NO SCROLLING */
+        @media print {
+            html, body {
+                height: auto;
+                overflow: visible;
+                margin: 0;
+                padding: 0;
+                background: white;
+            }
+
+            .no-print {
+                display: none !important;
+            }
+
+            .flyer-page {
+                width: 8.5in;
+                height: 11in;
+                page-break-after: always;
+                margin: 0;
+                padding: 0.5in;
+                background: white;
+                box-shadow: none;
+                overflow: visible;
+            }
+
+            .flyer-page:last-child {
+                page-break-after: avoid;
+            }
+
+            /* Ensure everything prints */
+            .header, .stats, .features-grid, .cta-box, .footer,
+            .price-box, .features-compact, .bottom-banner {
+                page-break-inside: avoid;
+            }
+        }
+
+        /* LAYOUT STYLES */
+        .header {
+            text-align: center;
+            padding: 20px 0 25px;
+            border-bottom: 3px solid #00ff88;
+            margin-bottom: 25px;
+        }
+
+        .logo {
+            font-size: 3rem;
+            font-weight: 900;
+            color: #00d4ff;
+            margin-bottom: 8px;
+            letter-spacing: -1px;
+        }
+
+        .logo .bolt {
+            color: #ff9500;
+            font-size: 3.5rem;
+        }
+
+        .tagline {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #0a0e27;
+            margin-bottom: 8px;
+        }
+
+        .badges {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
+
+        .badge {
+            background: #f0f0f0;
+            border: 2px solid #00ff88;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .stat-box {
+            text-align: center;
+            padding: 20px 10px;
+            border: 3px solid #00ff88;
+            border-radius: 12px;
+            background: #f8fff8;
+        }
+
+        .stat-number {
+            font-size: 3rem;
+            font-weight: 900;
+            color: #00d4ff;
+            line-height: 1;
+            margin-bottom: 6px;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .section-title {
+            text-align: center;
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: #0a0e27;
+            margin-bottom: 20px;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 25px;
+        }
+
+        .feature-box {
+            border: 2px solid #e0e0e0;
+            border-left: 5px solid #00ff88;
+            border-radius: 10px;
+            padding: 15px;
+            background: #fafafa;
+        }
+
+        .feature-icon {
+            font-size: 1.8rem;
+            margin-bottom: 8px;
+        }
+
+        .feature-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #0a0e27;
+            margin-bottom: 4px;
+        }
+
+        .feature-desc {
+            font-size: 0.8rem;
+            color: #666;
+            line-height: 1.3;
+        }
+
+        .cta-box {
+            text-align: center;
+            padding: 20px;
+            border: 3px solid #00d4ff;
+            border-radius: 15px;
+            background: #f0f9ff;
+            margin-top: 20px;
+        }
+
+        .cta-title {
+            font-size: 1.6rem;
+            font-weight: 800;
+            color: #00d4ff;
+            margin-bottom: 15px;
+        }
+
+        .qr-code {
+            background: white;
+            padding: 12px;
+            border-radius: 10px;
+            display: inline-block;
+            border: 2px solid #ddd;
+            margin: 10px 0;
+        }
+
+        .url {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: #0a0e27;
+            margin: 12px 0;
+        }
+
+        .contact {
+            font-size: 0.9rem;
+            color: #666;
+            margin-top: 12px;
+            line-height: 1.6;
+        }
+
+        .contact strong {
+            color: #00ff88;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 15px 0;
+            border-top: 2px solid #e0e0e0;
+            margin-top: 20px;
+            font-size: 0.8rem;
+            color: #666;
+        }
+
+        /* PAGE 2 STYLES */
+        .price-box {
+            text-align: center;
+            padding: 30px;
+            border: 4px solid #00ff88;
+            border-radius: 15px;
+            background: #f0fff4;
+            margin-bottom: 25px;
+        }
+
+        .price {
+            font-size: 4rem;
+            font-weight: 900;
+            color: #00ff88;
+            line-height: 1;
+        }
+
+        .price-small {
+            font-size: 1.8rem;
+            color: #666;
+        }
+
+        .price-note {
+            font-size: 1rem;
+            color: #666;
+            margin-top: 12px;
+        }
+
+        .features-compact {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 25px;
+        }
+
+        .feature-compact {
+            border: 2px solid #e0e0e0;
+            border-left: 4px solid #00d4ff;
+            border-radius: 10px;
+            padding: 14px;
+            background: #fafafa;
+        }
+
+        .feature-compact-title {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: #0a0e27;
+            margin-bottom: 4px;
+        }
+
+        .feature-compact span {
+            font-size: 1.4rem;
+            margin-right: 6px;
+        }
+
+        .feature-compact-desc {
+            font-size: 0.75rem;
+            color: #666;
+            line-height: 1.3;
+        }
+
+        .bottom-banner {
+            text-align: center;
+            padding: 25px;
+            border: 3px solid #ff00ff;
+            border-radius: 15px;
+            background: #fff5ff;
+        }
+
+        .bottom-banner h3 {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: #ff00ff;
+            margin-bottom: 12px;
+        }
+
+        /* Scrollbar styling for screen */
+        @media screen {
+            ::-webkit-scrollbar {
+                width: 12px;
+            }
+
+            ::-webkit-scrollbar-track {
+                background: #f1f1f1;
+            }
+
+            ::-webkit-scrollbar-thumb {
+                background: linear-gradient(135deg, #00ff88, #00d4ff);
+                border-radius: 6px;
+            }
+
+            ::-webkit-scrollbar-thumb:hover {
+                background: linear-gradient(135deg, #00d4ff, #ff00ff);
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- PRINT BUTTON - STICKY AT TOP -->
+    <div class="no-print">
+        <button class="print-btn" onclick="window.print()">🖨️ PRINT FLYER</button>
+        <p class="info-text">
+            ✅ <strong>On Screen:</strong> Scroll down to see both pages<br>
+            ✅ <strong>Print:</strong> Both pages print perfectly on separate sheets
+        </p>
+    </div>
+
+    <!-- PAGE 1 -->
+    <div class="flyer-page">
+        <!-- HEADER -->
+        <div class="header">
+            <div class="logo"><span class="bolt">⚡</span> SHIPTING</div>
+            <div class="tagline">WhatsApp Ordering Revolution</div>
+            <div class="badges">
+                <span class="badge">💬 AI-Powered</span>
+                <span class="badge">🚚 Smart Delivery</span>
+                <span class="badge">📊 Analytics</span>
+            </div>
+        </div>
+
+        <!-- STATS -->
+        <div class="stats">
+            <div class="stat-box">
+                <div class="stat-number">40%</div>
+                <div class="stat-label">Sales Increase</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number">24/7</div>
+                <div class="stat-label">AI Assistant</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number">1-2</div>
+                <div class="stat-label">Days Setup</div>
+            </div>
+        </div>
+
+        <!-- FEATURES -->
+        <h2 class="section-title">🚀 What Makes Us Different</h2>
+        <div class="features-grid">
+            <div class="feature-box">
+                <div class="feature-icon">💬</div>
+                <div class="feature-title">WhatsApp Native</div>
+                <div class="feature-desc">Order directly through WhatsApp. No app needed!</div>
+            </div>
+            <div class="feature-box">
+                <div class="feature-icon">🤖</div>
+                <div class="feature-title">AI Assistant</div>
+                <div class="feature-desc">Smart chatbot handles orders 24/7 automatically</div>
+            </div>
+            <div class="feature-box">
+                <div class="feature-icon">🚚</div>
+                <div class="feature-title">Smart Delivery</div>
+                <div class="feature-desc">Auto-dispatch to Uber, DoorDash, or your fleet</div>
+            </div>
+            <div class="feature-box">
+                <div class="feature-icon">📊</div>
+                <div class="feature-title">Real-Time Analytics</div>
+                <div class="feature-desc">Track sales and performance instantly</div>
+            </div>
+        </div>
+
+        <!-- CTA -->
+        <div class="cta-box">
+            <div class="cta-title">🎯 Get Started Today</div>
+            <div class="qr-code">
+                <div id="qrcode"></div>
+            </div>
+            <div class="url">partners.shipting.com</div>
+            <div class="contact">
+                <strong>📧</strong> partners@shipting.com<br>
+                <strong>📱</strong> +1 (555) 123-4567
+            </div>
+        </div>
+
+        <!-- FOOTER -->
+        <div class="footer">
+            Transform Your Restaurant • www.shipting.com • © 2026 Shipting
+        </div>
+    </div>
+
+    <!-- PAGE 2 -->
+    <div class="flyer-page">
+        <!-- HEADER -->
+        <div class="header">
+            <div class="logo"><span class="bolt">⚡</span> SHIPTING</div>
+            <div class="tagline">Pricing & Complete Features</div>
+        </div>
+
+        <!-- PRICING -->
+        <h2 class="section-title">💰 Simple Transparent Pricing</h2>
+        <div class="price-box">
+            <div class="price">$20-$50<span class="price-small">/mo</span></div>
+            <div class="price-note">Based on order volume • No hidden fees • Cancel anytime</div>
+        </div>
+
+        <!-- FEATURES LIST -->
+        <h2 class="section-title">✨ Complete Feature Set</h2>
+        <div class="features-compact">
+            <div class="feature-compact">
+                <div class="feature-compact-title"><span>⚡</span> Quick Setup</div>
+                <div class="feature-compact-desc">Get started in 1-2 days with our team's help</div>
+            </div>
+            <div class="feature-compact">
+                <div class="feature-compact-title"><span>💳</span> Secure Payments</div>
+                <div class="feature-compact-desc">Stripe integration, PCI-DSS compliant</div>
+            </div>
+            <div class="feature-compact">
+                <div class="feature-compact-title"><span>📦</span> Auto Catalog Sync</div>
+                <div class="feature-compact-desc">Menu syncs to all platforms automatically</div>
+            </div>
+            <div class="feature-compact">
+                <div class="feature-compact-title"><span>🔔</span> Smart Notifications</div>
+                <div class="feature-compact-desc">Automated order updates and tracking</div>
+            </div>
+            <div class="feature-compact">
+                <div class="feature-compact-title"><span>💰</span> Promo Codes</div>
+                <div class="feature-compact-desc">Create discounts and loyalty rewards</div>
+            </div>
+            <div class="feature-compact">
+                <div class="feature-compact-title"><span>🌍</span> Multi-Language</div>
+                <div class="feature-compact-desc">AI chatbot speaks multiple languages</div>
+            </div>
+            <div class="feature-compact">
+                <div class="feature-compact-title"><span>📈</span> Growth Tools</div>
+                <div class="feature-compact-desc">Marketing campaigns & re-engagement</div>
+            </div>
+            <div class="feature-compact">
+                <div class="feature-compact-title"><span>🤝</span> Integrations</div>
+                <div class="feature-compact-desc">Connect with POS & accounting software</div>
+            </div>
+        </div>
+
+        <!-- BOTTOM CTA -->
+        <div class="bottom-banner">
+            <h3>🚀 Ready to 3X Your Orders?</h3>
+            <div class="qr-code">
+                <div id="qrcode2"></div>
+            </div>
+            <div class="url">partners.shipting.com</div>
+            <div class="contact">
+                <strong>📞</strong> +1 (555) 123-4567 • <strong>📧</strong> partners@shipting.com
+            </div>
+        </div>
+
+        <!-- FOOTER -->
+        <div class="footer">
+            Average ROI: 300% in first 3 months • Most restaurants see 40% increase within 60 days
+        </div>
+    </div>
+
+    <script>
+        // Generate QR Codes
+        new QRCode(document.getElementById("qrcode"), {
+            text: "https://partners.shipting.com",
+            width: 130,
+            height: 130,
+            colorDark: "#0a0e27",
+            colorLight: "#ffffff",
+            correctLevel: QRCode.CorrectLevel.H
+        });
+
+        new QRCode(document.getElementById("qrcode2"), {
+            text: "https://partners.shipting.com",
+            width: 110,
+            height: 110,
+            colorDark: "#0a0e27",
+            colorLight: "#ffffff",
+            correctLevel: QRCode.CorrectLevel.H
+        });
+    </script>
+</body>
+</html>
