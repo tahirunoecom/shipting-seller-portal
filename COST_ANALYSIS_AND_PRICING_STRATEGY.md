@@ -205,22 +205,22 @@ Based on comprehensive research:
 
 | Tier | Monthly Fee | Commission | Best For | Features |
 |------|-------------|------------|----------|----------|
-| **Starter** | ₹0 (FREE) | 5% per order | New sellers testing platform | - Max 50 orders/month<br>- Basic WhatsApp bot<br>- Manual payouts<br>- Email support |
-| **Growth** | ₹999/month | 3% per order | Growing businesses | - Unlimited orders<br>- Priority WhatsApp bot<br>- Auto payouts (weekly)<br>- Phone + email support<br>- Analytics dashboard |
-| **Pro** | ₹2,499/month | 2% per order | High-volume sellers | - Everything in Growth<br>- API access<br>- Custom integrations<br>- Daily auto payouts<br>- Dedicated account manager |
+| **Starter** | $0 (FREE) | 5% per order | New sellers testing platform | - Max 50 orders/month<br>- Basic WhatsApp bot<br>- Manual payouts<br>- Email support |
+| **Growth** | $12/month | 3% per order | Growing businesses | - Unlimited orders<br>- Priority WhatsApp bot<br>- Auto payouts (weekly)<br>- Phone + email support<br>- Analytics dashboard |
+| **Pro** | $30/month | 2% per order | High-volume sellers | - Everything in Growth<br>- API access<br>- Custom integrations<br>- Daily auto payouts<br>- Dedicated account manager |
 | **Enterprise** | Custom | 1.5% per order | Large businesses | - White-label options<br>- Custom features<br>- Priority support 24/7<br>- SLA guarantee |
 
 **Revenue Math (100 sellers):**
-- 20 Free tier: ₹0 subscription + (20 × 150 orders × ₹100 avg × 5%) = ₹150,000/month
-- 50 Growth: (50 × ₹999) + (50 × 150 × ₹100 × 3%) = ₹49,950 + ₹225,000 = ₹274,950
-- 25 Pro: (25 × ₹2,499) + (25 × 150 × ₹100 × 2%) = ₹62,475 + ₹75,000 = ₹137,475
-- 5 Enterprise: (5 × ₹10,000) + (5 × 150 × ₹100 × 1.5%) = ₹50,000 + ₹11,250 = ₹61,250
+- 20 Free tier: $0 subscription + (20 × 150 orders × $10 avg × 5%) = $1,500/month
+- 50 Growth: (50 × $12) + (50 × 150 × $10 × 3%) = $600 + $2,250 = $2,850
+- 25 Pro: (25 × $30) + (25 × 150 × $10 × 2%) = $750 + $750 = $1,500
+- 5 Enterprise: (5 × $120) + (5 × 150 × $10 × 1.5%) = $600 + $112.50 = $712.50
 
-**Total Revenue: ₹623,675/month (~$7,500/month at ₹83/$1)**
+**Total Revenue: $6,562.50/month**
 
-**Operational Cost: ₹85,000/month (~$1,029)**
+**Operational Cost: $1,029/month**
 
-**Profit Margin: 86% 🎉**
+**Profit Margin: 84% 🎉**
 
 ---
 
@@ -228,9 +228,9 @@ Based on comprehensive research:
 
 | Volume | Commission Rate |
 |--------|-----------------|
-| First ₹50,000/month | 4% |
-| ₹50,001 - ₹2,00,000 | 3% |
-| Above ₹2,00,000 | 2% |
+| First $500/month | 4% |
+| $501 - $2,000 | 3% |
+| Above $2,000 | 2% |
 
 **Pros:**
 - No upfront cost for sellers
@@ -248,9 +248,9 @@ Based on comprehensive research:
 
 | Tier | Monthly Fee | Orders Included |
 |------|-------------|-----------------|
-| Basic | ₹499 | Up to 100 orders |
-| Standard | ₹1,499 | Up to 500 orders |
-| Premium | ₹3,999 | Unlimited |
+| Basic | $6 | Up to 100 orders |
+| Standard | $18 | Up to 500 orders |
+| Premium | $48 | Unlimited |
 
 **Why Not Recommended:**
 - Sellers prefer paying when they succeed (commission model)
@@ -272,15 +272,15 @@ Based on comprehensive research:
 
 ### **Pricing Strategy:**
 - **FREE TIER**: Attract sellers, prove value, convert to paid when they hit 50 orders
-- **₹999 Growth**: Sweet spot for most sellers (₹33/day = cost of 1-2 orders)
-- **₹2,499 Pro**: Premium features for high-volume sellers
+- **$12 Growth**: Sweet spot for most sellers ($0.40/day = cost of 1-2 orders)
+- **$30 Pro**: Premium features for high-volume sellers
 - **Commission**: Reduces as subscription increases (encourages upgrades)
 
 ### **Additional Revenue Streams:**
-1. **Featured Listings**: ₹499/month to appear at top of search
-2. **Premium Analytics**: ₹299/month for advanced insights
-3. **Custom Domain**: ₹999 one-time setup + ₹299/month
-4. **Marketing Tools**: ₹499/month for automated WhatsApp campaigns
+1. **Featured Listings**: $6/month to appear at top of search
+2. **Premium Analytics**: $4/month for advanced insights
+3. **Custom Domain**: $12 one-time setup + $4/month
+4. **Marketing Tools**: $6/month for automated WhatsApp campaigns
 5. **Stripe Connect**: You earn 0.5-1% on top of Stripe's fees as a platform fee
 
 ---
@@ -288,27 +288,27 @@ Based on comprehensive research:
 ## 📊 BREAKEVEN ANALYSIS
 
 ### Current State (10 sellers)
-- **Revenue**: ₹40,000/month (~5 on Growth tier)
-- **Costs**: ₹34,000/month ($414)
-- **Profit**: ₹6,000/month
+- **Revenue**: $500/month (~5 on Growth tier)
+- **Costs**: $414/month
+- **Profit**: $86/month
 - **Breakeven**: ✅ Already profitable
 
 ### At 100 Sellers
-- **Revenue**: ₹6,23,675/month
-- **Costs**: ₹85,000/month
-- **Profit**: ₹5,38,675/month ($6,500)
-- **Margin**: 86%
+- **Revenue**: $6,562.50/month
+- **Costs**: $1,029/month
+- **Profit**: $5,533.50/month
+- **Margin**: 84%
 
 ### At 1,000 Sellers
-- **Revenue**: ₹62,36,750/month ($75,000)
-- **Costs**: ₹2,90,000/month ($3,500)
-- **Profit**: ₹59,46,750/month ($71,500)
+- **Revenue**: $65,625/month
+- **Costs**: $3,502/month
+- **Profit**: $62,123/month
 - **Margin**: 95%
 
 ### At 5,000 Sellers
-- **Revenue**: ₹3,11,83,750/month ($375,000)
-- **Costs**: ₹12,22,000/month ($14,735)
-- **Profit**: ₹2,99,61,750/month ($360,265)
+- **Revenue**: $328,125/month
+- **Costs**: $14,735/month
+- **Profit**: $313,390/month
 - **Margin**: 96%
 
 ---
@@ -363,9 +363,9 @@ Based on comprehensive research:
 | Metric | Current | At 100 Sellers | At 1,000 Sellers | At 5,000 Sellers |
 |--------|---------|----------------|------------------|------------------|
 | **Monthly Cost** | $290 | $1,029 | $3,502 | $14,735 |
-| **Monthly Revenue** | ~$500 | $7,500 | $75,000 | $375,000 |
-| **Profit** | $210 | $6,471 | $71,498 | $360,265 |
-| **Profit Margin** | 42% | 86% | 95% | 96% |
+| **Monthly Revenue** | ~$500 | $6,563 | $65,625 | $328,125 |
+| **Profit** | $210 | $5,534 | $62,123 | $313,390 |
+| **Profit Margin** | 42% | 84% | 95% | 96% |
 | **Cost per Seller** | $29 | $10.29 | $3.50 | $2.95 |
 
 ---
@@ -374,11 +374,11 @@ Based on comprehensive research:
 
 1. **You're Already Profitable** at 10 sellers with current $290 costs
 2. **Hybrid Pricing** (subscription + commission) is the winning strategy
-3. **Profit margins improve dramatically** at scale (86% at 100 sellers, 96% at 5,000)
+3. **Profit margins improve dramatically** at scale (84% at 100 sellers, 96% at 5,000)
 4. **WhatsApp API is FREE** for service conversations (huge cost advantage!)
 5. **Start with FREE tier** to attract sellers, convert them as they grow
 6. **Commission sweet spot**: 2-5% based on volume
-7. **Subscription sweet spot**: ₹999-2,499/month for most sellers
+7. **Subscription sweet spot**: $12-30/month for most sellers
 8. **Cost per seller drops** from $29 to $2.95 as you scale
 
 ---
