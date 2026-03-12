@@ -1,0 +1,21 @@
+{
+  "name": "shipting/partner-signup-api",
+  "description": "Partner Signup API with OTP verification",
+  "type": "project",
+  "require": {
+    "php": ">=7.4",
+    "twilio/sdk": "^6.44",
+    "ext-pdo": "*",
+    "ext-curl": "*",
+    "ext-json": "*"
+  },
+  "autoload": {
+    "psr-4": {
+      "Shipting\\Partner\\": "src/"
+    }
+  },
+  "config": {
+    "optimize-autoloader": true
+  },
+  "minimum-stability": "stable"
+}
