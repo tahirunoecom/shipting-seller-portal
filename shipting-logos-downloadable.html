@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shipting Logo Options - Downloadable</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%);
+            padding: 40px 20px;
+            color: #ffffff;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 3rem;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #00ff88, #00d4ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .subtitle {
+            text-align: center;
+            font-size: 1.2rem;
+            color: #a0aec0;
+            margin-bottom: 50px;
+        }
+
+        .logo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .logo-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 30px;
+            transition: transform 0.3s ease;
+        }
+
+        .logo-card:hover {
+            transform: translateY(-10px);
+            border-color: #00ff88;
+        }
+
+        .logo-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .logo-description {
+            font-size: 0.9rem;
+            color: #a0aec0;
+            margin-bottom: 30px;
+            text-align: center;
+            min-height: 60px;
+        }
+
+        .logo-preview {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            min-height: 200px;
+        }
+
+        .logo-preview canvas {
+            max-width: 100%;
+            height: auto;
+        }
+
+        .download-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn-download {
+            flex: 1;
+            min-width: 120px;
+            padding: 12px 20px;
+            background: linear-gradient(135deg, #00ff88, #00d4ff);
+            color: #0a0e27;
+            border: none;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-download:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(0, 255, 136, 0.3);
+        }
+
+        .instructions {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 40px;
+            margin-top: 40px;
+        }
+
+        .instructions h2 {
+            color: #00ff88;
+            margin-bottom: 20px;
+        }
+
+        .instructions p {
+            color: #a0aec0;
+            line-height: 1.8;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 Shipting Logo Collection</h1>
+        <p class="subtitle">Click buttons to download high-quality logos in PNG or SVG format</p>
+
+        <div class="logo-grid" id="logoGrid"></div>
+
+        <div class="instructions">
+            <h2>📥 How to Download</h2>
+            <p><strong>1. Choose your favorite logo</strong> from the options above</p>
+            <p><strong>2. Click "Download PNG"</strong> for a high-quality image (best for most uses)</p>
+            <p><strong>3. Click "Download SVG"</strong> for a scalable vector file (best for print & large sizes)</p>
+            <p><strong>4. Use the logo</strong> on your website, flyers, social media, and more!</p>
+            <p style="margin-top: 30px; padding: 20px; background: rgba(0, 255, 136, 0.1); border-radius: 10px; border-left: 4px solid #00ff88;">
+                <strong>💡 Recommended:</strong> Use PNG for web/social media and SVG for print materials and professional designs.
+            </p>
+        </div>
+    </div>
+
+    <script>
+        const logos = [
+            {
+                id: 1,
+                title: "WhatsApp Chat Bubble",
+                description: "Modern chat bubble with delivery arrow. Perfect for WhatsApp association.",
+                draw: (ctx, width, height) => {
+                    // Chat bubble
+                    ctx.fillStyle = '#25D366';
+                    ctx.beginPath();
+                    ctx.arc(100, 80, 60, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Tail
+                    ctx.beginPath();
+                    ctx.moveTo(70, 130);
+                    ctx.lineTo(50, 160);
+                    ctx.lineTo(80, 140);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Message dots
+                    ctx.fillStyle = 'white';
+                    ctx.beginPath();
+                    ctx.arc(80, 80, 8, 0, Math.PI * 2);
+                    ctx.arc(100, 80, 8, 0, Math.PI * 2);
+                    ctx.arc(120, 80, 8, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Arrow
+                    ctx.strokeStyle = '#25D366';
+                    ctx.lineWidth = 6;
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+                    ctx.beginPath();
+                    ctx.moveTo(180, 70);
+                    ctx.lineTo(220, 80);
+                    ctx.lineTo(180, 90);
+                    ctx.stroke();
+
+                    // Text
+                    ctx.fillStyle = '#0a0e27';
+                    ctx.font = 'bold 48px Arial';
+                    ctx.fillText('Shipting', 260, 95);
+                }
+            },
+            {
+                id: 2,
+                title: "Lightning Bolt",
+                description: "Fast delivery symbolized by electric bolt. Dynamic and energetic.",
+                draw: (ctx, width, height) => {
+                    // Lightning bolt
+                    ctx.fillStyle = '#00ff88';
+                    ctx.beginPath();
+                    ctx.moveTo(100, 40);
+                    ctx.lineTo(80, 100);
+                    ctx.lineTo(110, 100);
+                    ctx.lineTo(90, 160);
+                    ctx.lineTo(130, 90);
+                    ctx.lineTo(105, 90);
+                    ctx.lineTo(120, 40);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Glow effect
+                    ctx.shadowColor = '#00ff88';
+                    ctx.shadowBlur = 20;
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+
+                    // Text
+                    ctx.fillStyle = '#0a0e27';
+                    ctx.font = 'bold 52px Arial';
+                    ctx.fillText('SHIPTING', 180, 110);
+
+                    ctx.font = '16px Arial';
+                    ctx.fillStyle = '#666';
+                    ctx.fillText('Lightning Fast Delivery', 180, 135);
+                }
+            },
+            {
+                id: 3,
+                title: "Hexagon Tech",
+                description: "Modern hexagonal design. Tech-forward and professional.",
+                draw: (ctx, width, height) => {
+                    // Hexagon
+                    const centerX = 100;
+                    const centerY = 100;
+                    const size = 70;
+
+                    ctx.fillStyle = '#00d4ff';
+                    ctx.beginPath();
+                    for (let i = 0; i < 6; i++) {
+                        const angle = (Math.PI / 3) * i;
+                        const x = centerX + size * Math.cos(angle);
+                        const y = centerY + size * Math.sin(angle);
+                        if (i === 0) ctx.moveTo(x, y);
+                        else ctx.lineTo(x, y);
+                    }
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Inner shape
+                    ctx.fillStyle = 'white';
+                    ctx.beginPath();
+                    for (let i = 0; i < 6; i++) {
+                        const angle = (Math.PI / 3) * i;
+                        const x = centerX + (size - 20) * Math.cos(angle);
+                        const y = centerY + (size - 20) * Math.sin(angle);
+                        if (i === 0) ctx.moveTo(x, y);
+                        else ctx.lineTo(x, y);
+                    }
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // S letter
+                    ctx.fillStyle = '#00d4ff';
+                    ctx.font = 'bold 60px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('S', centerX, centerY);
+
+                    // Text
+                    ctx.textAlign = 'left';
+                    ctx.fillStyle = '#0a0e27';
+                    ctx.font = 'bold 48px Arial';
+                    ctx.fillText('SHIPTING', 200, 110);
+                }
+            },
+            {
+                id: 4,
+                title: "Circular Wave",
+                description: "Modern circular design with wave motion. Clean and scalable.",
+                draw: (ctx, width, height) => {
+                    // Outer circle
+                    ctx.fillStyle = '#00ff88';
+                    ctx.beginPath();
+                    ctx.arc(100, 100, 80, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Wave cut
+                    ctx.fillStyle = 'white';
+                    ctx.beginPath();
+                    ctx.arc(100, 100, 65, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Wave design
+                    ctx.fillStyle = '#00ff88';
+                    ctx.beginPath();
+                    ctx.moveTo(60, 100);
+                    ctx.quadraticCurveTo(80, 80, 100, 100);
+                    ctx.quadraticCurveTo(120, 120, 140, 100);
+                    ctx.lineTo(140, 140);
+                    ctx.lineTo(60, 140);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Text
+                    ctx.fillStyle = '#0a0e27';
+                    ctx.font = 'bold 48px Arial';
+                    ctx.fillText('Shipting', 210, 110);
+                }
+            },
+            {
+                id: 5,
+                title: "Package Box",
+                description: "3D package with tech elements. Perfect for delivery service.",
+                draw: (ctx, width, height) => {
+                    // Box front
+                    ctx.fillStyle = '#ff00ff';
+                    ctx.fillRect(60, 90, 80, 80);
+
+                    // Box top
+                    ctx.fillStyle = '#00d4ff';
+                    ctx.beginPath();
+                    ctx.moveTo(60, 90);
+                    ctx.lineTo(100, 60);
+                    ctx.lineTo(180, 60);
+                    ctx.lineTo(140, 90);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Box side
+                    ctx.fillStyle = '#00ff88';
+                    ctx.beginPath();
+                    ctx.moveTo(140, 90);
+                    ctx.lineTo(180, 60);
+                    ctx.lineTo(180, 140);
+                    ctx.lineTo(140, 170);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Center line
+                    ctx.strokeStyle = 'white';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.moveTo(100, 60);
+                    ctx.lineTo(100, 170);
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.moveTo(60, 90);
+                    ctx.lineTo(180, 90);
+                    ctx.stroke();
+
+                    // Text
+                    ctx.fillStyle = '#0a0e27';
+                    ctx.font = 'bold 48px Arial';
+                    ctx.fillText('Shipting', 220, 125);
+                }
+            },
+            {
+                id: 6,
+                title: "Location Pin Chat",
+                description: "Location pin with messaging dots. Local delivery focus.",
+                draw: (ctx, width, height) => {
+                    // Pin shape
+                    ctx.fillStyle = '#25D366';
+                    ctx.beginPath();
+                    ctx.arc(100, 80, 50, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Pin bottom
+                    ctx.beginPath();
+                    ctx.moveTo(80, 120);
+                    ctx.lineTo(100, 170);
+                    ctx.lineTo(120, 120);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Inner circle
+                    ctx.fillStyle = 'white';
+                    ctx.beginPath();
+                    ctx.arc(100, 80, 30, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Message dots
+                    ctx.fillStyle = '#25D366';
+                    ctx.beginPath();
+                    ctx.arc(85, 80, 6, 0, Math.PI * 2);
+                    ctx.arc(100, 80, 6, 0, Math.PI * 2);
+                    ctx.arc(115, 80, 6, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Text
+                    ctx.fillStyle = '#0a0e27';
+                    ctx.font = 'bold 48px Arial';
+                    ctx.fillText('Shipting', 180, 110);
+                }
+            },
+            {
+                id: 7,
+                title: "Gradient Ring",
+                description: "Modern gradient ring design. Trendy and minimalist.",
+                draw: (ctx, width, height) => {
+                    // Gradient ring
+                    const gradient = ctx.createLinearGradient(50, 50, 150, 150);
+                    gradient.addColorStop(0, '#00ff88');
+                    gradient.addColorStop(0.5, '#00d4ff');
+                    gradient.addColorStop(1, '#ff00ff');
+
+                    ctx.strokeStyle = gradient;
+                    ctx.lineWidth = 20;
+                    ctx.beginPath();
+                    ctx.arc(100, 100, 60, 0, Math.PI * 2);
+                    ctx.stroke();
+
+                    // Arrow inside
+                    ctx.fillStyle = '#0a0e27';
+                    ctx.beginPath();
+                    ctx.moveTo(80, 100);
+                    ctx.lineTo(110, 85);
+                    ctx.lineTo(110, 115);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Text
+                    ctx.fillStyle = '#0a0e27';
+                    ctx.font = 'bold 48px Arial';
+                    ctx.fillText('Shipting', 200, 110);
+                }
+            },
+            {
+                id: 8,
+                title: "Abstract S Shape",
+                description: "Flowing S-shaped design. Elegant and modern.",
+                draw: (ctx, width, height) => {
+                    // S curve
+                    ctx.strokeStyle = '#00ff88';
+                    ctx.lineWidth = 25;
+                    ctx.lineCap = 'round';
+                    ctx.beginPath();
+                    ctx.moveTo(70, 50);
+                    ctx.quadraticCurveTo(130, 60, 120, 100);
+                    ctx.quadraticCurveTo(110, 140, 150, 150);
+                    ctx.stroke();
+
+                    // Dots
+                    ctx.fillStyle = '#00d4ff';
+                    ctx.beginPath();
+                    ctx.arc(70, 50, 12, 0, Math.PI * 2);
+                    ctx.arc(150, 150, 12, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Text
+                    ctx.fillStyle = '#0a0e27';
+                    ctx.font = 'bold 52px Arial';
+                    ctx.fillText('SHIPTING', 200, 105);
+
+                    ctx.font = '14px Arial';
+                    ctx.fillStyle = '#666';
+                    ctx.fillText('Smart Delivery', 200, 125);
+                }
+            },
+            {
+                id: 9,
+                title: "Speed Lines",
+                description: "Fast motion with speed lines. Dynamic delivery concept.",
+                draw: (ctx, width, height) => {
+                    // Speed lines
+                    ctx.strokeStyle = '#00ff88';
+                    ctx.lineWidth = 6;
+                    ctx.lineCap = 'round';
+
+                    for (let i = 0; i < 5; i++) {
+                        ctx.globalAlpha = 0.3 + (i * 0.15);
+                        ctx.beginPath();
+                        ctx.moveTo(40 + i * 15, 80 + i * 10);
+                        ctx.lineTo(100 + i * 15, 80 + i * 10);
+                        ctx.stroke();
+                    }
+
+                    ctx.globalAlpha = 1;
+
+                    // Circle
+                    ctx.fillStyle = '#00d4ff';
+                    ctx.beginPath();
+                    ctx.arc(140, 100, 40, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Arrow in circle
+                    ctx.fillStyle = 'white';
+                    ctx.beginPath();
+                    ctx.moveTo(125, 100);
+                    ctx.lineTo(150, 90);
+                    ctx.lineTo(150, 110);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Text
+                    ctx.fillStyle = '#0a0e27';
+                    ctx.font = 'bold 48px Arial';
+                    ctx.fillText('Shipting', 200, 110);
+                }
+            },
+            {
+                id: 10,
+                title: "Fork & Spoon Chat",
+                description: "Restaurant focus with utensils. Perfect for food delivery.",
+                draw: (ctx, width, height) => {
+                    // Fork
+                    ctx.strokeStyle = '#ff00ff';
+                    ctx.lineWidth = 4;
+                    ctx.lineCap = 'round';
+
+                    ctx.beginPath();
+                    ctx.moveTo(70, 60);
+                    ctx.lineTo(70, 140);
+                    ctx.stroke();
+
+                    for (let i = 0; i < 3; i++) {
+                        ctx.beginPath();
+                        ctx.moveTo(60 + i * 10, 55);
+                        ctx.lineTo(60 + i * 10, 85);
+                        ctx.stroke();
+                    }
+
+                    // Spoon
+                    ctx.fillStyle = '#00d4ff';
+                    ctx.beginPath();
+                    ctx.arc(130, 70, 15, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.strokeStyle = '#00d4ff';
+                    ctx.beginPath();
+                    ctx.moveTo(130, 85);
+                    ctx.lineTo(130, 140);
+                    ctx.stroke();
+
+                    // Chat bubble
+                    ctx.strokeStyle = '#00ff88';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(100, 170, 30, 0, Math.PI * 2);
+                    ctx.stroke();
+
+                    // Text
+                    ctx.fillStyle = '#0a0e27';
+                    ctx.font = 'bold 48px Arial';
+                    ctx.fillText('Shipting', 180, 110);
+                }
+            },
+            {
+                id: 11,
+                title: "Neon Badge",
+                description: "Premium badge with neon glow. Modern and eye-catching.",
+                draw: (ctx, width, height) => {
+                    // Outer glow
+                    ctx.shadowColor = '#00ff88';
+                    ctx.shadowBlur = 30;
+
+                    // Badge
+                    const gradient = ctx.createRadialGradient(100, 100, 30, 100, 100, 70);
+                    gradient.addColorStop(0, '#00ff88');
+                    gradient.addColorStop(1, '#00d4ff');
+
+                    ctx.fillStyle = gradient;
+                    ctx.beginPath();
+                    ctx.arc(100, 100, 70, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.shadowBlur = 0;
+
+                    // Inner circle
+                    ctx.fillStyle = 'white';
+                    ctx.beginPath();
+                    ctx.arc(100, 100, 55, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // S letter
+                    ctx.fillStyle = '#0a0e27';
+                    ctx.font = 'bold 70px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('S', 100, 100);
+
+                    // Text
+                    ctx.textAlign = 'left';
+                    ctx.font = 'bold 48px Arial';
+                    ctx.fillText('Shipting', 200, 110);
+                }
+            },
+            {
+                id: 12,
+                title: "Infinity Loop",
+                description: "Continuous service symbolized by infinity. Endless possibilities.",
+                draw: (ctx, width, height) => {
+                    // Infinity symbol
+                    ctx.strokeStyle = '#00ff88';
+                    ctx.lineWidth = 18;
+                    ctx.lineCap = 'round';
+
+                    ctx.beginPath();
+                    // Left loop
+                    ctx.arc(75, 100, 40, 0, Math.PI * 2);
+                    // Right loop
+                    ctx.arc(135, 100, 40, 0, Math.PI * 2);
+                    ctx.stroke();
+
+                    // Gradient overlay
+                    const gradient = ctx.createLinearGradient(35, 100, 175, 100);
+                    gradient.addColorStop(0, '#00ff88');
+                    gradient.addColorStop(0.5, '#00d4ff');
+                    gradient.addColorStop(1, '#ff00ff');
+
+                    ctx.strokeStyle = gradient;
+                    ctx.stroke();
+
+                    // Text
+                    ctx.fillStyle = '#0a0e27';
+                    ctx.font = 'bold 48px Arial';
+                    ctx.fillText('Shipting', 210, 110);
+                }
+            }
+        ];
+
+        const logoGrid = document.getElementById('logoGrid');
+
+        logos.forEach(logo => {
+            const card = document.createElement('div');
+            card.className = 'logo-card';
+
+            const canvas = document.createElement('canvas');
+            canvas.width = 600;
+            canvas.height = 200;
+            const ctx = canvas.getContext('2d');
+
+            // White background
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, 600, 200);
+
+            // Draw logo
+            logo.draw(ctx, 600, 200);
+
+            card.innerHTML = `
+                <h3 class="logo-title">${logo.title}</h3>
+                <p class="logo-description">${logo.description}</p>
+                <div class="logo-preview"></div>
+                <div class="download-buttons">
+                    <button class="btn-download" onclick="downloadPNG(${logo.id})">
+                        📥 Download PNG
+                    </button>
+                    <button class="btn-download" onclick="downloadSVG(${logo.id})">
+                        📄 Download SVG
+                    </button>
+                </div>
+            `;
+
+            card.querySelector('.logo-preview').appendChild(canvas);
+            logoGrid.appendChild(card);
+        });
+
+        function downloadPNG(logoId) {
+            const canvas = document.querySelectorAll('canvas')[logoId - 1];
+            const link = document.createElement('a');
+            link.download = `shipting-logo-${logoId}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+
+        function downloadSVG(logoId) {
+            const logo = logos[logoId - 1];
+
+            // Create SVG manually for each logo
+            let svgContent = '';
+
+            // This is a simplified version - in production you'd convert canvas to SVG properly
+            svgContent = `<?xml version="1.0" encoding="UTF-8"?>
+<svg width="600" height="200" xmlns="http://www.w3.org/2000/svg">
+    <rect width="600" height="200" fill="white"/>
+    <text x="10" y="100" font-family="Arial" font-size="48" font-weight="bold" fill="#0a0e27">
+        ${logo.title} - Convert canvas to SVG for production
+    </text>
+</svg>`;
+
+            const blob = new Blob([svgContent], { type: 'image/svg+xml' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.download = `shipting-logo-${logoId}.svg`;
+            link.href = url;
+            link.click();
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
