@@ -1046,6 +1046,12 @@
                     <div id="selectedDeliveryTypes" class="selected-items"></div>
                 </div>
 
+                <!-- Hidden field for Other Third Party Name -->
+                <div class="form-group" id="otherDeliveryNameGroup" style="display: none;">
+                    <label for="otherDeliveryName">Other Delivery Service Name *</label>
+                    <input type="text" id="otherDeliveryName" name="otherDeliveryName" placeholder="e.g., SkipTheDishes, Menulog, etc.">
+                </div>
+
                 <div class="form-group">
                     <label for="comments">Additional Comments</label>
                     <textarea id="comments" name="comments" placeholder="Tell us about your business, current ordering system, goals, etc."></textarea>
@@ -1163,6 +1169,19 @@
                     }
                 });
             });
+
+            // Show/hide "Other Third Party Name" field
+            const otherDeliveryNameGroup = document.getElementById('otherDeliveryNameGroup');
+            const otherDeliveryNameInput = document.getElementById('otherDeliveryName');
+
+            if (selected.includes('other')) {
+                otherDeliveryNameGroup.style.display = 'block';
+                otherDeliveryNameInput.required = true;
+            } else {
+                otherDeliveryNameGroup.style.display = 'none';
+                otherDeliveryNameInput.required = false;
+                otherDeliveryNameInput.value = ''; // Clear value when hidden
+            }
         }
 
         // Phone verification
