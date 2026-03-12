@@ -25,9 +25,34 @@
 
         h1 {
             text-align: center;
-            font-size: 3.5rem;
+            font-size: 4.5rem;
             margin-bottom: 15px;
-            text-shadow: 0 5px 20px rgba(0,0,0,0.3);
+            background: linear-gradient(135deg, #00ff88 0%, #00d4ff 50%, #ff00ff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 900;
+            letter-spacing: 3px;
+            text-shadow: none;
+            position: relative;
+            display: inline-block;
+            width: 100%;
+        }
+
+        h1::before {
+            content: '⚡';
+            position: absolute;
+            left: 50%;
+            transform: translateX(-280px);
+            -webkit-text-fill-color: #FFD700;
+            background: none;
+            font-size: 4rem;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: translateX(-280px) scale(1); }
+            50% { transform: translateX(-280px) scale(1.1); }
         }
 
         .subtitle {
@@ -173,7 +198,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>🚀 SHIPTING</h1>
+        <h1>SHIPTING</h1>
         <p class="subtitle">Complete E-commerce Technology Solutions</p>
         <div class="tagline">
             ⚡ We Solve Every E-commerce Challenge Using Technology
@@ -771,8 +796,8 @@
             },
             {
                 id: 10,
-                title: "Ecosystem Circle",
-                description: "Circular ecosystem showing complete solution cycle",
+                title: "Ecommerce Circle",
+                description: "Complete e-commerce technology platform - all services in one ecosystem",
                 draw: (ctx, width, height) => {
                     // Large circle
                     const gradient = ctx.createLinearGradient(50, 50, 150, 150);
@@ -816,15 +841,24 @@
                         ctx.fillText(icon, x, y);
                     });
 
-                    // Text
-                    ctx.fillStyle = '#333';
-                    ctx.font = 'bold 48px Arial';
-                    ctx.textAlign = 'left';
-                    ctx.fillText('Shipting', 220, 105);
+                    // Text with gradient and better spacing
+                    const gradient = ctx.createLinearGradient(250, 90, 450, 90);
+                    gradient.addColorStop(0, '#667eea');
+                    gradient.addColorStop(0.5, '#764ba2');
+                    gradient.addColorStop(1, '#00d4ff');
 
-                    ctx.font = '14px Arial';
+                    ctx.fillStyle = gradient;
+                    ctx.font = 'bold 56px Arial';
+                    ctx.textAlign = 'left';
+                    ctx.fillText('SHIPTING', 250, 95);
+
+                    // Lightning bolt emoji
+                    ctx.font = '42px Arial';
+                    ctx.fillText('⚡', 205, 95);
+
+                    ctx.font = '16px Arial';
                     ctx.fillStyle = '#666';
-                    ctx.fillText('Complete Ecosystem', 220, 130);
+                    ctx.fillText('Ecommerce Circle', 250, 125);
                 }
             }
         ];
