@@ -80,6 +80,25 @@ export const whatsappService = {
     return response.data
   },
 
+  // Import products from Meta catalog to Shipting
+  async importCatalogProducts(wh_account_id, catalog_id, options = {}) {
+    const response = await api.post('/seller/whatsapp/import-catalog-products', {
+      wh_account_id,
+      catalog_id,
+      overwrite_existing: options.overwriteExisting || false,
+      auto_create_categories: options.autoCreateCategories || true,
+    })
+    return response.data
+  },
+
+  // Get products from Meta catalog
+  async getCatalogProducts(wh_account_id) {
+    const response = await api.post('/seller/whatsapp/get-catalog-products', {
+      wh_account_id,
+    })
+    return response.data
+  },
+
   // Select/Link a catalog to the phone number (Updates DB only)
   async selectCatalog(wh_account_id, catalog_id) {
     const response = await api.post('/seller/whatsapp/select-catalog', {
