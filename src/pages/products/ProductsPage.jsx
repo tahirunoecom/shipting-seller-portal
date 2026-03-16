@@ -465,7 +465,61 @@ function ProductsPage() {
       {/* Filters */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex flex-col md:flex-row gap-4">
+          <div className="flex flex-col md:flex-row gap-4 items-stretch">
+            {/* Search - Clean, explicit light mode, NO CLASSES */}
+            <div style={{ position: 'relative', flex: '1', minWidth: '250px' }}>
+              <Search
+                style={{
+                  position: 'absolute',
+                  left: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: '20px',
+                  height: '20px',
+                  color: '#9ca3af',
+                  pointerEvents: 'none',
+                  zIndex: 10
+                }}
+              />
+              <input
+                type="text"
+                placeholder="Search products..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{
+                  width: '100%',
+                  height: '44px',
+                  paddingLeft: '40px',
+                  paddingRight: '16px',
+                  fontSize: '14px',
+                  fontFamily: 'inherit',
+                  lineHeight: '1.5',
+                  color: '#111827',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '8px',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                  transition: 'border-color 0.2s, box-shadow 0.2s',
+                  WebkitAppearance: 'none',
+                  MozAppearance: 'none',
+                  appearance: 'none',
+                  WebkitTextFillColor: '#111827',
+                  opacity: 1,
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = '#8BC34A'
+                  e.target.style.boxShadow = '0 0 0 3px rgba(139, 195, 74, 0.1)'
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = '#d1d5db'
+                  e.target.style.boxShadow = 'none'
+                }}
+                autoComplete="off"
+                spellCheck="false"
+              />
+            </div>
+
             {/* Category filter */}
             <Select
               value={selectedCategory}
@@ -479,32 +533,6 @@ function ProductsPage() {
               ]}
               className="md:w-48"
             />
-
-            {/* Search - Moved to right with fresh styling */}
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none z-10" />
-              <input
-                type="text"
-                placeholder="Search products..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                style={{
-                  width: '100%',
-                  height: '44px',
-                  paddingLeft: '2.5rem',
-                  paddingRight: '1rem',
-                  fontSize: '15px',
-                  color: '#1a1a1a',
-                  backgroundColor: '#ffffff',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '8px',
-                  outline: 'none',
-                  WebkitTextFillColor: '#1a1a1a',
-                }}
-                autoComplete="off"
-                spellCheck="false"
-              />
-            </div>
 
             {/* View toggle */}
             <div className="flex rounded-lg border border-gray-200 dark:border-dark-border">

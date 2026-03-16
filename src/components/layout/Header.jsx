@@ -7,7 +7,6 @@ import toast from 'react-hot-toast'
 import {
   Menu,
   Bell,
-  Search,
   ChevronDown,
   User,
   Settings,
@@ -105,18 +104,6 @@ function Header({ onMenuClick }) {
           >
             <Menu className="h-5 w-5" />
           </button>
-
-          {/* Search */}
-          <div className="hidden md:flex items-center">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search..."
-                className="w-64 pl-10 pr-4 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 dark:bg-dark-bg dark:border-dark-border dark:text-dark-text"
-              />
-            </div>
-          </div>
         </div>
 
         {/* Right side */}
