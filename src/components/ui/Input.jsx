@@ -20,8 +20,10 @@ const Input = forwardRef(
         <input
           type={type}
           ref={ref}
+          style={{ color: '#111827' }} // Force dark text color
           className={cn(
-            'w-full rounded-lg border bg-white px-4 text-gray-900 placeholder-gray-400 transition-colors focus:outline-none focus:ring-2',
+            'w-full rounded-lg border bg-white px-4 placeholder-gray-400 transition-colors focus:outline-none focus:ring-2',
+            '!text-gray-900 font-medium', // Force text color with !important equivalent
             sizeClasses[size],
             error
               ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
@@ -29,6 +31,7 @@ const Input = forwardRef(
             'dark:border-dark-border dark:bg-dark-card dark:text-dark-text dark:placeholder-dark-muted',
             className
           )}
+          autoComplete="off"
           {...props}
         />
         {error && (

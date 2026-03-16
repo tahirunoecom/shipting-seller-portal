@@ -156,20 +156,23 @@ function BulkUploadModal({
 
   // Load subcategories for a category
   const loadSubcategoriesForCategory = useCallback(async (categoryId) => {
-    if (!categoryId || subcategoriesMap[categoryId]) return // Already loaded
+    if (!categoryId) return
 
     try {
       const response = await productService.getSubcategories(categoryId, wh_account_id)
+      console.log(`[BulkUpload] Loaded subcategories for category ${categoryId}:`, response.data?.subcategories)
       if (response.status === 1 && response.data?.subcategories) {
         setSubcategoriesMap(prev => ({
           ...prev,
           [categoryId]: response.data.subcategories
         }))
+        return response.data.subcategories
       }
     } catch (error) {
       console.error('Failed to load subcategories:', error)
     }
-  }, [subcategoriesMap, productService, wh_account_id])
+    return []
+  }, [productService, wh_account_id])
 
   // Reload subcategories for a category (force refresh)
   const reloadSubcategoriesForCategory = async (categoryId) => {
@@ -355,10 +358,54 @@ function BulkUploadModal({
     toast.success('Template downloaded!')
   }
 
+  // Auto-create missing subcategories
+  const autoCreateMissingSubcategories = async (products) => {
+    const createdSubcategories = new Set()
+
+    for (const product of products) {
+      if (product._subcategoryNotFound && product.subcategory_name && product.category_id) {
+        const key = `${product.category_id}:${product.subcategory_name.toLowerCase()}`
+
+        // Skip if already created in this batch
+        if (createdSubcategories.has(key)) continue
+
+        try {
+          console.log(`[BulkUpload] Auto-creating subcategory: ${product.subcategory_name} for category ${product.category_id}`)
+          const response = await productService.addSubcategory({
+            wh_account_id,
+            category_id: product.category_id,
+            name: product.subcategory_name.trim(),
+          })
+
+          if (response.status === 1) {
+            createdSubcategories.add(key)
+            console.log(`[BulkUpload] Subcategory created successfully: ${product.subcategory_name}`)
+          } else if (response.message?.toLowerCase().includes('already exists')) {
+            // Subcategory already exists, that's fine
+            console.log(`[BulkUpload] Subcategory already exists: ${product.subcategory_name}`)
+            createdSubcategories.add(key)
+          }
+        } catch (error) {
+          console.error(`[BulkUpload] Failed to create subcategory ${product.subcategory_name}:`, error)
+          // Continue with upload even if subcategory creation fails
+        }
+      }
+    }
+
+    // Reload all subcategories if any were created
+    if (createdSubcategories.size > 0) {
+      const categoryIds = new Set(products.map(p => p.category_id).filter(Boolean))
+      await Promise.all(
+        Array.from(categoryIds).map(catId => reloadSubcategoriesForCategory(catId))
+      )
+    }
+
+    return createdSubcategories.size
+  }
+
   // Upload products
   const handleUpload = async () => {
     // Only block on critical errors (missing required fields or category not found)
-    // Subcategory not found is a warning but doesn't block upload
     const validProducts = parsedProducts.filter(p => !p._error && !p._categoryNotFound)
 
     if (validProducts.length === 0) {
@@ -366,15 +413,34 @@ function BulkUploadModal({
       return
     }
 
-    // Show warning if some products have missing subcategories
-    const subcategoryWarnings = validProducts.filter(p => p._subcategoryNotFound).length
-    if (subcategoryWarnings > 0) {
-      toast(`${subcategoryWarnings} product(s) have invalid subcategories and will be uploaded without them`, { icon: '⚠️' })
-    }
-
     setStep('uploading')
     setUploadProgress({ current: 0, total: validProducts.length })
     setUploadResults({ success: [], failed: [] })
+
+    // Auto-create missing subcategories first
+    const createdCount = await autoCreateMissingSubcategories(validProducts)
+    if (createdCount > 0) {
+      toast.success(`Auto-created ${createdCount} missing subcategories`)
+
+      // Re-map subcategories after creation
+      const updatedProducts = validProducts.map(product => {
+        const subcategoryId = getSubcategoryId(product.category_id, product.subcategory_name)
+        return {
+          ...product,
+          subcategory_id: subcategoryId,
+          _subcategoryNotFound: product.subcategory_name && !subcategoryId,
+        }
+      })
+
+      // Update parsed products for display
+      setParsedProducts(prev => prev.map(p => {
+        const updated = updatedProducts.find(up => up._row === p._row)
+        return updated || p
+      }))
+
+      // Use updated products for upload
+      validProducts.splice(0, validProducts.length, ...updatedProducts)
+    }
 
     const results = { success: [], failed: [] }
 
