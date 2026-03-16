@@ -468,13 +468,17 @@ function ProductsPage() {
             {/* Search */}
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none z-10" />
-              <Input
+              <input
                 type="text"
                 placeholder="Search products..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                size="md"
-                className="pl-10"
+                className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 pl-10 text-base font-medium placeholder-gray-400 transition-colors focus:outline-none focus:ring-2 focus:border-primary-500 focus:ring-primary-500/20 dark:bg-dark-card dark:border-dark-border dark:placeholder-gray-500"
+                style={{
+                  color: '#000000',
+                  WebkitTextFillColor: '#000000',
+                }}
+                autoComplete="off"
               />
             </div>
 

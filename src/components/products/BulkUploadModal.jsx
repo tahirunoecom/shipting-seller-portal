@@ -507,11 +507,20 @@ function BulkUploadModal({
     }
 
     setUploadResults(results)
+
+    console.log('[BulkUpload] Upload complete! Results:', results)
+    console.log('[BulkUpload] Setting step to complete')
+
     setStep('complete')
 
     if (results.success.length > 0) {
+      toast.success(`Successfully uploaded ${results.success.length} products!`)
       onUploadComplete?.()
+    } else {
+      toast.error('All products failed to upload')
     }
+
+    console.log('[BulkUpload] Step should now be: complete')
   }
 
   // Reset modal state
@@ -528,11 +537,13 @@ function BulkUploadModal({
   const validCount = parsedProducts.filter(p => !p._error && !p._categoryNotFound).length
   const invalidCount = parsedProducts.length - validCount
 
+  console.log('[BulkUpload] Current step:', step)
+
   return (
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      title="Bulk Upload Products"
+      title={step === 'complete' ? 'Upload Complete' : 'Bulk Upload Products'}
       size="lg"
     >
       <div className="space-y-6">
@@ -787,6 +798,7 @@ function BulkUploadModal({
         {/* Step: Complete */}
         {step === 'complete' && (
           <>
+            {console.log('[BulkUpload] Rendering complete step. Upload results:', uploadResults)}
             <div className="py-6 text-center">
               {uploadResults.success.length > 0 ? (
                 <CheckCircle className="h-16 w-16 mx-auto text-green-500 mb-4" />
