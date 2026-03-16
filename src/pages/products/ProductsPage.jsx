@@ -131,7 +131,8 @@ function ProductsPage() {
   const loadProducts = async () => {
     try {
       setLoading(true)
-      // Use getShipperProducts API with correct request structure
+      // Use getShipperProducts API with pagination parameters
+      // Load all products at once (500 max) for client-side pagination
       const response = await productService.getShipperProducts({
         wh_account_id: user.wh_account_id,
         upc: '',
@@ -139,6 +140,8 @@ function ProductsPage() {
         ai_product_id: '',
         product_id: '',
         zipcode: '',
+        page: '1',
+        items: '500', // Get all products at once (currently ~190)
       })
       console.log('Products API response:', response)
 
