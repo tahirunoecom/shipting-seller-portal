@@ -2021,7 +2021,7 @@ function WhatsAppPage() {
                                         className="border-violet-300 text-violet-600 hover:bg-violet-50"
                                       >
                                         <ShoppingBag className="h-4 w-4" />
-                                        Get a Phone Number ($1.15/mo)
+                                        Get a Phone Number
                                       </Button>
                                     ) : (
                                       <div className="space-y-3 mt-2 p-3 bg-white dark:bg-dark-card rounded-lg border border-gray-200 dark:border-gray-600">
@@ -2109,10 +2109,6 @@ function WhatsAppPage() {
                                     )}
                                   </>
                                 )}
-
-                                <p className="text-xs text-gray-400 mt-3">
-                                  <DollarSign className="h-3 w-3 inline" /> Cost: ~$1.15/month. Currently absorbed by platform.
-                                </p>
                               </div>
                             </div>
                           </div>

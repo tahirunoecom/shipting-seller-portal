@@ -505,6 +505,16 @@ function VerificationPage() {
               <label className="block text-sm font-medium text-gray-700 dark:text-dark-text mb-1.5">
                 {isSeller ? 'ID Document *' : 'Driver\'s License *'}
               </label>
+              {isSeller && (
+                <div className="mb-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <p className="text-xs text-blue-800 dark:text-blue-300 mb-2">
+                    <strong>Why we need this:</strong> ID verification is required to comply with regulations and ensure secure transactions.
+                  </p>
+                  <p className="text-xs text-blue-700 dark:text-blue-400">
+                    <strong>Accepted ID types:</strong> Government-issued Driver's License, State ID, Passport, or National ID Card
+                  </p>
+                </div>
+              )}
               {previewImages.drivinglicence ? (
                 <div className="relative inline-block">
                   <img

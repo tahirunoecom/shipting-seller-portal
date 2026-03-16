@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '@/store'
+import { whatsappService } from '@/services'
 import { Button, Input, Card, CardContent } from '@/components/ui'
 import { Mail, Lock, Eye, EyeOff, AlertCircle, CheckCircle, Info } from 'lucide-react'
 
@@ -142,7 +143,27 @@ function LoginPage() {
         return
       }
 
-      // Priority 4: Normal navigation based on roles
+      // Priority 4: Check WhatsApp connection for sellers
+      if (isSeller) {
+        try {
+          const whatsappStatus = await whatsappService.getWhatsAppStatus(userData.wh_account_id)
+          const isWhatsAppConnected = whatsappStatus?.data?.is_connected || false
+
+          // Cache the status
+          localStorage.setItem(`whatsapp_connected_${userData.wh_account_id}`, isWhatsAppConnected.toString())
+
+          if (!isWhatsAppConnected) {
+            console.log('Login - Navigating to: /whatsapp (WhatsApp not connected)')
+            navigate('/whatsapp')
+            return
+          }
+        } catch (error) {
+          console.error('Failed to check WhatsApp status:', error)
+          // Continue to normal flow if check fails
+        }
+      }
+
+      // Priority 5: Normal navigation based on roles
       if (isSeller && isDriver) {
         // User has multiple roles - let them choose
         console.log('Login - Navigating to: /select-mode (both roles)')

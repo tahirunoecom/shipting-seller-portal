@@ -17,6 +17,7 @@ import toast from 'react-hot-toast'
 const CSV_HEADERS = [
   'title',
   'category_name',
+  'subcategory_name',
   'price',
   'quantity',
   'discount',
@@ -30,9 +31,9 @@ const CSV_HEADERS = [
 ]
 
 const CSV_SAMPLE_DATA = [
-  ['Chicken Burger', 'Restaurant', '9.99', '100', '0', 'Delicious chicken burger with special sauce', '', '', '', '', '', 'active'],
-  ['Margherita Pizza', 'Restaurant', '14.99', '50', '10', 'Classic Italian pizza with fresh basil', '', '', '', '', '', 'active'],
-  ['iPhone Case', 'Electronics', '19.99', '200', '5', 'Protective case for iPhone 14', '123456789012', 'TechGuard', 'TG-IP14', 'Black', '50g', 'active'],
+  ['Chicken Burger', 'Restaurant', 'BURGERS', '9.99', '100', '0', 'Delicious chicken burger with special sauce', '', '', '', '', '', 'active'],
+  ['Margherita Pizza', 'Restaurant', 'PIZZA', '14.99', '50', '10', 'Classic Italian pizza with fresh basil', '', '', '', '', '', 'active'],
+  ['iPhone Case', 'Electronics', '', '19.99', '200', '5', 'Protective case for iPhone 14', '123456789012', 'TechGuard', 'TG-IP14', 'Black', '50g', 'active'],
 ]
 
 // Parse CSV text into array of objects
@@ -128,6 +129,7 @@ function BulkUploadModal({
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 })
   const [uploadResults, setUploadResults] = useState({ success: [], failed: [] })
   const [dragActive, setDragActive] = useState(false)
+  const [subcategoriesMap, setSubcategoriesMap] = useState({}) // { category_id: [subcategories] }
   const fileInputRef = useRef(null)
 
   // Map category name to category_id
@@ -138,6 +140,33 @@ function BulkUploadModal({
     )
     return cat?.category_id || ''
   }, [categories])
+
+  // Map subcategory name to subcategory_id
+  const getSubcategoryId = useCallback((categoryId, subcategoryName) => {
+    if (!categoryId || !subcategoryName) return ''
+    const subcategories = subcategoriesMap[categoryId] || []
+    const sub = subcategories.find(s =>
+      s.name?.toLowerCase() === subcategoryName.toLowerCase()
+    )
+    return sub?.id ? String(sub.id) : ''
+  }, [subcategoriesMap])
+
+  // Load subcategories for a category
+  const loadSubcategoriesForCategory = useCallback(async (categoryId) => {
+    if (!categoryId || subcategoriesMap[categoryId]) return // Already loaded
+
+    try {
+      const response = await productService.getSubcategories(categoryId, wh_account_id)
+      if (response.status === 1 && response.data?.subcategories) {
+        setSubcategoriesMap(prev => ({
+          ...prev,
+          [categoryId]: response.data.subcategories
+        }))
+      }
+    } catch (error) {
+      console.error('Failed to load subcategories:', error)
+    }
+  }, [subcategoriesMap, productService, wh_account_id])
 
   // Check if category is restaurant type
   const isRestaurantCategory = useCallback((categoryName) => {
@@ -175,15 +204,32 @@ function BulkUploadModal({
       const text = await selectedFile.text()
       const products = parseCSV(text)
 
+      // Get unique category IDs to load subcategories
+      const uniqueCategoryIds = new Set()
+      products.forEach(product => {
+        const categoryId = getCategoryId(product.category_name)
+        if (categoryId) {
+          uniqueCategoryIds.add(categoryId)
+        }
+      })
+
+      // Load subcategories for all categories
+      await Promise.all(
+        Array.from(uniqueCategoryIds).map(catId => loadSubcategoriesForCategory(catId))
+      )
+
       // Map category names to IDs and prepare products
       const preparedProducts = products.map(product => {
         const categoryId = getCategoryId(product.category_name)
         const isRestaurant = isRestaurantCategory(product.category_name)
+        const subcategoryId = getSubcategoryId(categoryId, product.subcategory_name)
 
         return {
           ...product,
           category_id: categoryId,
+          subcategory_id: subcategoryId,
           _categoryNotFound: !categoryId && product.category_name,
+          _subcategoryNotFound: product.subcategory_name && !subcategoryId,
           _isRestaurant: isRestaurant,
           // Auto-generate UPC for restaurant products if not provided
           upc: product.upc || (isRestaurant ? generateUPC() : ''),
@@ -232,11 +278,19 @@ function BulkUploadModal({
 
   // Upload products
   const handleUpload = async () => {
+    // Only block on critical errors (missing required fields or category not found)
+    // Subcategory not found is a warning but doesn't block upload
     const validProducts = parsedProducts.filter(p => !p._error && !p._categoryNotFound)
 
     if (validProducts.length === 0) {
       toast.error('No valid products to upload')
       return
+    }
+
+    // Show warning if some products have missing subcategories
+    const subcategoryWarnings = validProducts.filter(p => p._subcategoryNotFound).length
+    if (subcategoryWarnings > 0) {
+      toast(`${subcategoryWarnings} product(s) have invalid subcategories and will be uploaded without them`, { icon: '⚠️' })
     }
 
     setStep('uploading')
@@ -254,6 +308,7 @@ function BulkUploadModal({
         data.append('wh_account_id', wh_account_id)
         data.append('title', product.title)
         data.append('ai_category_id', product.category_id)
+        data.append('subcategory_id', product.subcategory_id || '')
         data.append('price', product.price)
         data.append('discount', product.discount || '0')
         data.append('quantity', product.quantity || '0')
@@ -326,6 +381,7 @@ function BulkUploadModal({
               <ol className="text-sm text-blue-700 dark:text-blue-300 space-y-1 list-decimal list-inside">
                 <li>Download the CSV template below</li>
                 <li>Fill in your product details (title, category_name, price are required)</li>
+                <li>Add subcategory_name if you want to categorize products further (optional)</li>
                 <li>For Restaurant category, UPC will be auto-generated</li>
                 <li>Save the file and upload it here</li>
               </ol>
@@ -441,6 +497,7 @@ function BulkUploadModal({
                     <th className="px-3 py-2 text-left">Row</th>
                     <th className="px-3 py-2 text-left">Title</th>
                     <th className="px-3 py-2 text-left">Category</th>
+                    <th className="px-3 py-2 text-left">Subcategory</th>
                     <th className="px-3 py-2 text-left">Price</th>
                     <th className="px-3 py-2 text-left">Status</th>
                   </tr>
@@ -448,10 +505,11 @@ function BulkUploadModal({
                 <tbody className="divide-y dark:divide-dark-border">
                   {parsedProducts.map((product, index) => {
                     const hasError = product._error || product._categoryNotFound
+                    const hasWarning = product._subcategoryNotFound
                     return (
                       <tr
                         key={index}
-                        className={hasError ? 'bg-red-50 dark:bg-red-900/10' : ''}
+                        className={hasError ? 'bg-red-50 dark:bg-red-900/10' : hasWarning ? 'bg-yellow-50 dark:bg-yellow-900/10' : ''}
                       >
                         <td className="px-3 py-2">{product._row}</td>
                         <td className="px-3 py-2 font-medium">{product.title || '-'}</td>
@@ -464,12 +522,26 @@ function BulkUploadModal({
                             product.category_name || '-'
                           )}
                         </td>
+                        <td className="px-3 py-2">
+                          {product._subcategoryNotFound ? (
+                            <span className="text-yellow-600 dark:text-yellow-400">
+                              {product.subcategory_name} (not found)
+                            </span>
+                          ) : (
+                            product.subcategory_name || '-'
+                          )}
+                        </td>
                         <td className="px-3 py-2">${product.price || '-'}</td>
                         <td className="px-3 py-2">
                           {hasError ? (
                             <span className="flex items-center gap-1 text-red-500">
                               <AlertCircle className="h-4 w-4" />
                               {product._error || 'Category not found'}
+                            </span>
+                          ) : hasWarning ? (
+                            <span className="flex items-center gap-1 text-yellow-600">
+                              <AlertCircle className="h-4 w-4" />
+                              Subcategory issue
                             </span>
                           ) : (
                             <span className="flex items-center gap-1 text-green-500">
