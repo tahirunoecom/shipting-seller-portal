@@ -472,7 +472,8 @@ function ProductsPage() {
                 placeholder="Search products..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 !py-3 !text-base font-normal"
+                size="md"
+                className="pl-10"
               />
             </div>
 

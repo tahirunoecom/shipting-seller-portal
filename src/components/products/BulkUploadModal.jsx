@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react'
-import { Button, Modal, ModalFooter } from '@/components/ui'
+import { Button, Modal, ModalFooter, Input } from '@/components/ui'
 import {
   Upload,
   Download,
@@ -130,6 +130,9 @@ function BulkUploadModal({
   const [uploadResults, setUploadResults] = useState({ success: [], failed: [] })
   const [dragActive, setDragActive] = useState(false)
   const [subcategoriesMap, setSubcategoriesMap] = useState({}) // { category_id: [subcategories] }
+  const [showSubcategoryModal, setShowSubcategoryModal] = useState(false)
+  const [newSubcategoryName, setNewSubcategoryName] = useState('')
+  const [creatingForProduct, setCreatingForProduct] = useState(null) // Product index
   const fileInputRef = useRef(null)
 
   // Map category name to category_id
@@ -167,6 +170,82 @@ function BulkUploadModal({
       console.error('Failed to load subcategories:', error)
     }
   }, [subcategoriesMap, productService, wh_account_id])
+
+  // Reload subcategories for a category (force refresh)
+  const reloadSubcategoriesForCategory = async (categoryId) => {
+    if (!categoryId) return
+
+    try {
+      const response = await productService.getSubcategories(categoryId, wh_account_id)
+      if (response.status === 1 && response.data?.subcategories) {
+        setSubcategoriesMap(prev => ({
+          ...prev,
+          [categoryId]: response.data.subcategories
+        }))
+        return response.data.subcategories
+      }
+    } catch (error) {
+      console.error('Failed to reload subcategories:', error)
+    }
+    return []
+  }
+
+  // Create a new subcategory
+  const handleCreateSubcategory = async () => {
+    if (creatingForProduct === null) {
+      toast.error('No product selected')
+      return
+    }
+
+    const product = parsedProducts[creatingForProduct]
+    if (!product.category_id) {
+      toast.error('Product has no valid category')
+      return
+    }
+
+    if (!newSubcategoryName.trim()) {
+      toast.error('Please enter a subcategory name')
+      return
+    }
+
+    try {
+      const response = await productService.addSubcategory({
+        wh_account_id,
+        category_id: product.category_id,
+        name: newSubcategoryName.trim(),
+      })
+
+      if (response.status === 1) {
+        toast.success('Subcategory created!')
+
+        // Reload subcategories for this category
+        const updatedSubcategories = await reloadSubcategoriesForCategory(product.category_id)
+
+        // Update the product with the new subcategory
+        const subcategoryId = getSubcategoryId(product.category_id, newSubcategoryName.trim())
+
+        setParsedProducts(prev => prev.map((p, index) => {
+          if (index === creatingForProduct) {
+            return {
+              ...p,
+              subcategory_id: subcategoryId,
+              _subcategoryNotFound: !subcategoryId, // Clear the warning if found
+            }
+          }
+          return p
+        }))
+
+        setShowSubcategoryModal(false)
+        setNewSubcategoryName('')
+        setCreatingForProduct(null)
+      } else {
+        toast.error(response.message || 'Failed to create subcategory')
+      }
+    } catch (error) {
+      console.error('Failed to create subcategory:', error)
+      toast.error('Failed to create subcategory')
+    }
+  }
 
   // Check if category is restaurant type
   const isRestaurantCategory = useCallback((categoryName) => {
@@ -524,9 +603,21 @@ function BulkUploadModal({
                         </td>
                         <td className="px-3 py-2">
                           {product._subcategoryNotFound ? (
-                            <span className="text-yellow-600 dark:text-yellow-400">
-                              {product.subcategory_name} (not found)
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-yellow-600 dark:text-yellow-400 text-xs">
+                                {product.subcategory_name} (not found)
+                              </span>
+                              <button
+                                onClick={() => {
+                                  setCreatingForProduct(index)
+                                  setNewSubcategoryName(product.subcategory_name)
+                                  setShowSubcategoryModal(true)
+                                }}
+                                className="px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
+                              >
+                                Create
+                              </button>
+                            </div>
                           ) : (
                             product.subcategory_name || '-'
                           )}
@@ -652,6 +743,65 @@ function BulkUploadModal({
           </>
         )}
       </div>
+
+      {/* Create Subcategory Modal */}
+      {showSubcategoryModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowSubcategoryModal(false)}></div>
+          <div className="relative bg-white dark:bg-dark-card rounded-lg p-6 w-full max-w-md mx-4 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-dark-text">
+                Create Subcategory
+              </h3>
+              <button
+                onClick={() => {
+                  setShowSubcategoryModal(false)
+                  setNewSubcategoryName('')
+                  setCreatingForProduct(null)
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {creatingForProduct !== null && (
+                <p className="text-sm text-gray-500 dark:text-dark-muted">
+                  Adding subcategory for:{' '}
+                  <strong className="text-gray-900 dark:text-dark-text">
+                    {categories.find(c => c.category_id === parsedProducts[creatingForProduct]?.category_id)?.name || 'Unknown'}
+                  </strong>
+                </p>
+              )}
+
+              <Input
+                label="Subcategory Name"
+                value={newSubcategoryName}
+                onChange={(e) => setNewSubcategoryName(e.target.value)}
+                placeholder="e.g., BURGERS, PIZZA, SPECIAL"
+                autoFocus
+              />
+
+              <div className="flex gap-3 justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowSubcategoryModal(false)
+                    setNewSubcategoryName('')
+                    setCreatingForProduct(null)
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button onClick={handleCreateSubcategory}>
+                  Create
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </Modal>
   )
 }
