@@ -60,6 +60,12 @@ Route::middleware(['auth:sanctum'])->prefix('seller/whatsapp')->group(function (
     Route::post('/quick-replies/save', [WhatsAppController::class, 'saveQuickReply']);
     Route::post('/quick-replies/delete', [WhatsAppController::class, 'deleteQuickReply']);
 
+    // Message templates (for Meta App Review - whatsapp_business_management permission)
+    Route::post('/templates', [WhatsAppController::class, 'getTemplates']);
+    Route::post('/templates/create', [WhatsAppController::class, 'createTemplate']);
+    Route::post('/templates/delete', [WhatsAppController::class, 'deleteTemplate']);
+    Route::post('/templates/send-test', [WhatsAppController::class, 'sendTestTemplate']);
+
     // Analytics
     Route::post('/analytics', [WhatsAppController::class, 'getAnalytics']);
 });
