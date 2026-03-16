@@ -108,21 +108,11 @@ function ProductsPage() {
   useEffect(() => {
     if (searchInputRef.current) {
       const input = searchInputRef.current
-      // Force styles using cssText (overrides everything)
-      input.style.cssText = `
-        width: 100% !important;
-        padding: 0.75rem 1rem 0.75rem 2.5rem !important;
-        font-size: 16px !important;
-        font-weight: 500 !important;
-        color: #000000 !important;
-        -webkit-text-fill-color: #000000 !important;
-        background-color: #ffffff !important;
-        border: 1px solid #d1d5db !important;
-        border-radius: 0.5rem !important;
-        outline: none !important;
-        opacity: 1 !important;
-        visibility: visible !important;
-      `
+      // Add color properties without breaking layout
+      input.style.setProperty('color', '#000000', 'important')
+      input.style.setProperty('-webkit-text-fill-color', '#000000', 'important')
+      input.style.setProperty('opacity', '1', 'important')
+      input.style.setProperty('visibility', 'visible', 'important')
     }
   }, [])
 
@@ -497,6 +487,7 @@ function ProductsPage() {
                 placeholder="Search products..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 autoComplete="off"
               />
             </div>
