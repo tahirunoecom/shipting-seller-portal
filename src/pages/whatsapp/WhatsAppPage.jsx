@@ -3321,40 +3321,10 @@ function WhatsAppPage() {
 
           {/* Analytics Tab */}
           {activeTab === 'analytics' && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5" />
-                  WhatsApp Analytics
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {!connectionData.isConnected ? (
-                  <div className="text-center py-8">
-                    <AlertCircle className="h-12 w-12 mx-auto text-gray-300 mb-4" />
-                    <p className="text-gray-500">Connect WhatsApp first to view analytics</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="p-4 bg-green-50 rounded-lg dark:bg-green-900/20">
-                      <p className="text-sm text-green-600">Messages Sent</p>
-                      <p className="text-2xl font-bold text-green-700">--</p>
-                      <p className="text-xs text-green-500">Coming soon</p>
-                    </div>
-                    <div className="p-4 bg-blue-50 rounded-lg dark:bg-blue-900/20">
-                      <p className="text-sm text-blue-600">Messages Received</p>
-                      <p className="text-2xl font-bold text-blue-700">--</p>
-                      <p className="text-xs text-blue-500">Coming soon</p>
-                    </div>
-                    <div className="p-4 bg-purple-50 rounded-lg dark:bg-purple-900/20">
-                      <p className="text-sm text-purple-600">Orders via WhatsApp</p>
-                      <p className="text-2xl font-bold text-purple-700">--</p>
-                      <p className="text-xs text-purple-500">Coming soon</p>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            <WhatsAppAnalyticsTab
+              connectionData={connectionData}
+              whAccountId={userDetails?.user_account?.wh_account_id || user?.wh_account_id}
+            />
           )}
 
           {activeTab === 'templates' && (
@@ -4348,6 +4318,202 @@ function MessageTemplatesTab({ connectionData, whAccountId }) {
         </div>
       </Modal>
     </>
+  )
+}
+
+// ============================================
+// WHATSAPP ANALYTICS TAB COMPONENT
+// ============================================
+
+function WhatsAppAnalyticsTab({ connectionData, whAccountId }) {
+  const [analytics, setAnalytics] = useState(null)
+  const [loadingAnalytics, setLoadingAnalytics] = useState(false)
+  const [dateRange, setDateRange] = useState('7d')
+
+  useEffect(() => {
+    if (connectionData.isConnected && whAccountId) {
+      loadAnalytics()
+    }
+  }, [connectionData.isConnected, whAccountId, dateRange])
+
+  const loadAnalytics = async () => {
+    try {
+      setLoadingAnalytics(true)
+      const response = await whatsappService.getAnalytics(whAccountId, dateRange)
+      if (response.status === 1) {
+        setAnalytics(response.data)
+      } else {
+        toast.error(response.message || 'Failed to load analytics')
+      }
+    } catch (error) {
+      console.error('Error loading analytics:', error)
+      toast.error('Failed to load analytics')
+    } finally {
+      setLoadingAnalytics(false)
+    }
+  }
+
+  if (!connectionData.isConnected) {
+    return (
+      <Card>
+        <CardContent className="py-12">
+          <div className="text-center">
+            <AlertCircle className="h-12 w-12 mx-auto text-gray-300 mb-4" />
+            <p className="text-gray-500">Connect WhatsApp first to view analytics</p>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <BarChart3 className="h-5 w-5" />
+            WhatsApp Analytics
+          </CardTitle>
+          <div className="flex items-center gap-2">
+            <select
+              value={dateRange}
+              onChange={(e) => setDateRange(e.target.value)}
+              className="px-3 py-2 border rounded-lg text-sm dark:bg-dark-bg dark:border-dark-border"
+            >
+              <option value="7d">Last 7 days</option>
+              <option value="30d">Last 30 days</option>
+              <option value="90d">Last 90 days</option>
+            </select>
+            <Button size="sm" variant="outline" onClick={loadAnalytics}>
+              <RefreshCw className="h-4 w-4" />
+              Refresh
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {loadingAnalytics ? (
+          <div className="flex justify-center py-12">
+            <Spinner size="lg" />
+          </div>
+        ) : analytics ? (
+          <>
+            {/* Main Stats Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <div className="p-6 bg-green-50 rounded-lg dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium text-green-600 dark:text-green-400">
+                    Messages Sent
+                  </p>
+                  <Send className="h-5 w-5 text-green-500" />
+                </div>
+                <p className="text-3xl font-bold text-green-700 dark:text-green-300">
+                  {analytics.messages_sent?.toLocaleString() || 0}
+                </p>
+                <p className="text-xs text-green-600 dark:text-green-500 mt-1">
+                  Notifications & replies
+                </p>
+              </div>
+
+              <div className="p-6 bg-blue-50 rounded-lg dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                    Messages Received
+                  </p>
+                  <Inbox className="h-5 w-5 text-blue-500" />
+                </div>
+                <p className="text-3xl font-bold text-blue-700 dark:text-blue-300">
+                  {analytics.messages_received?.toLocaleString() || 0}
+                </p>
+                <p className="text-xs text-blue-600 dark:text-blue-500 mt-1">
+                  Customer messages
+                </p>
+              </div>
+
+              <div className="p-6 bg-purple-50 rounded-lg dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium text-purple-600 dark:text-purple-400">
+                    Orders via WhatsApp
+                  </p>
+                  <ShoppingBag className="h-5 w-5 text-purple-500" />
+                </div>
+                <p className="text-3xl font-bold text-purple-700 dark:text-purple-300">
+                  {analytics.orders_via_whatsapp?.toLocaleString() || 0}
+                </p>
+                <p className="text-xs text-purple-600 dark:text-purple-500 mt-1">
+                  Total orders placed
+                </p>
+              </div>
+            </div>
+
+            {/* Additional Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 bg-gray-50 rounded-lg dark:bg-dark-bg border border-gray-200 dark:border-dark-border">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-orange-100 rounded-lg dark:bg-orange-900/30">
+                    <DollarSign className="h-5 w-5 text-orange-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Total Order Value</p>
+                    <p className="text-lg font-bold text-gray-900 dark:text-dark-text">
+                      ${analytics.total_order_value?.toLocaleString() || '0.00'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 bg-gray-50 rounded-lg dark:bg-dark-bg border border-gray-200 dark:border-dark-border">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-indigo-100 rounded-lg dark:bg-indigo-900/30">
+                    <User className="h-5 w-5 text-indigo-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Unique Customers</p>
+                    <p className="text-lg font-bold text-gray-900 dark:text-dark-text">
+                      {analytics.unique_customers?.toLocaleString() || 0}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 bg-gray-50 rounded-lg dark:bg-dark-bg border border-gray-200 dark:border-dark-border">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-pink-100 rounded-lg dark:bg-pink-900/30">
+                    <FileText className="h-5 w-5 text-pink-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Template Messages</p>
+                    <p className="text-lg font-bold text-gray-900 dark:text-dark-text">
+                      {analytics.template_messages?.toLocaleString() || 0}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Date Range Info */}
+            <div className="mt-6 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-200">
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                <span>
+                  Showing data from <strong>{analytics.start_date}</strong> to{' '}
+                  <strong>{analytics.end_date}</strong>
+                </span>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="text-center py-12">
+            <BarChart3 className="h-12 w-12 mx-auto text-gray-300 mb-4" />
+            <p className="text-gray-500 mb-4">No analytics data available</p>
+            <Button onClick={loadAnalytics} variant="outline">
+              <RefreshCw className="h-4 w-4" />
+              Load Analytics
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 

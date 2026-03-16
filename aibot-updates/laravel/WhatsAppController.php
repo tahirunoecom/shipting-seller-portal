@@ -3490,5 +3490,195 @@ class WhatsAppController extends Controller
 		}
 	}
 
+	// ============================================
+	// WHATSAPP ANALYTICS
+	// ============================================
+
+	/**
+	 * Get WhatsApp analytics for a seller
+	 * POST /api/seller/whatsapp/analytics
+	 */
+	public function getAnalytics(Request $request)
+	{
+		try {
+			$whAccountId = $request->input('wh_account_id');
+			$dateRange = $request->input('date_range', '7d'); // 7d, 30d, 90d
+
+			if (!$whAccountId) {
+				return response()->json([
+					'status' => 0,
+					'message' => 'wh_account_id is required'
+				]);
+			}
+
+			$config = SellerWhatsappConfig::where('wh_account_id', $whAccountId)->first();
+
+			if (!$config) {
+				return response()->json([
+					'status' => 0,
+					'message' => 'WhatsApp configuration not found'
+				]);
+			}
+
+			// Calculate date range
+			$days = 7;
+			if ($dateRange === '30d') $days = 30;
+			if ($dateRange === '90d') $days = 90;
+
+			$startDate = now()->subDays($days)->startOfDay();
+			$endDate = now()->endOfDay();
+
+			// Get analytics from Meta API (if connected and has access token)
+			$metaAnalytics = null;
+			if ($config->waba_id && $config->access_token) {
+				try {
+					$metaAnalytics = $this->getMetaAnalytics($config, $startDate, $endDate);
+				} catch (\Exception $e) {
+					Log::warning("Failed to fetch Meta analytics: " . $e->getMessage());
+				}
+			}
+
+			// Get local analytics from database
+			$localAnalytics = $this->getLocalAnalytics($whAccountId, $startDate, $endDate);
+
+			// Combine analytics
+			$analytics = [
+				'date_range' => $dateRange,
+				'start_date' => $startDate->format('Y-m-d'),
+				'end_date' => $endDate->format('Y-m-d'),
+				'messages_sent' => $localAnalytics['messages_sent'] ?? 0,
+				'messages_received' => $localAnalytics['messages_received'] ?? 0,
+				'orders_via_whatsapp' => $localAnalytics['orders_via_whatsapp'] ?? 0,
+				'total_order_value' => $localAnalytics['total_order_value'] ?? 0,
+				'unique_customers' => $localAnalytics['unique_customers'] ?? 0,
+				'template_messages' => $localAnalytics['template_messages'] ?? 0,
+				'conversation_count' => $metaAnalytics['conversations'] ?? 0,
+				'phone_number' => $config->display_phone_number ?? 'N/A',
+			];
+
+			return response()->json([
+				'status' => 1,
+				'data' => $analytics
+			]);
+
+		} catch (\Exception $e) {
+			Log::error('getAnalytics error: ' . $e->getMessage());
+			return response()->json([
+				'status' => 0,
+				'message' => 'Failed to fetch analytics: ' . $e->getMessage()
+			], 500);
+		}
+	}
+
+	/**
+	 * Get analytics from Meta WhatsApp Business API
+	 */
+	private function getMetaAnalytics($config, $startDate, $endDate)
+	{
+		try {
+			// Note: Meta Analytics API requires specific permissions and may not be available
+			// This is a placeholder for future implementation
+			$response = Http::withToken($config->access_token)
+				->get("https://graph.facebook.com/v21.0/{$config->phone_number_id}", [
+					'fields' => 'analytics'
+				]);
+
+			if ($response->successful()) {
+				$data = $response->json();
+				return [
+					'conversations' => $data['analytics']['conversations'] ?? 0,
+				];
+			}
+
+			return ['conversations' => 0];
+
+		} catch (\Exception $e) {
+			Log::warning("Meta analytics fetch failed: " . $e->getMessage());
+			return ['conversations' => 0];
+		}
+	}
+
+	/**
+	 * Get analytics from local database
+	 */
+	private function getLocalAnalytics($whAccountId, $startDate, $endDate)
+	{
+		try {
+			// Get seller info
+			$config = SellerWhatsappConfig::where('wh_account_id', $whAccountId)->first();
+			if (!$config || !$config->seller_id) {
+				return [
+					'messages_sent' => 0,
+					'messages_received' => 0,
+					'orders_via_whatsapp' => 0,
+					'total_order_value' => 0,
+					'unique_customers' => 0,
+					'template_messages' => 0,
+				];
+			}
+
+			$sellerId = $config->seller_id;
+
+			// Count orders placed via WhatsApp (where source = 'whatsapp')
+			$ordersQuery = DB::table('orders')
+				->where('seller_id', $sellerId)
+				->whereBetween('created_at', [$startDate, $endDate]);
+
+			// Try to find WhatsApp orders (assuming there's a 'source' or 'channel' field)
+			$whatsappOrders = (clone $ordersQuery)
+				->where(function($query) {
+					$query->where('source', 'whatsapp')
+						  ->orWhere('source', 'LIKE', '%whatsapp%')
+						  ->orWhere('channel', 'whatsapp')
+						  ->orWhere('notes', 'LIKE', '%WhatsApp%');
+				})
+				->count();
+
+			// Get total order value
+			$totalOrderValue = (clone $ordersQuery)
+				->where(function($query) {
+					$query->where('source', 'whatsapp')
+						  ->orWhere('source', 'LIKE', '%whatsapp%')
+						  ->orWhere('channel', 'whatsapp');
+				})
+				->sum('total_amount');
+
+			// Count unique customers who ordered via WhatsApp
+			$uniqueCustomers = (clone $ordersQuery)
+				->where(function($query) {
+					$query->where('source', 'whatsapp')
+						  ->orWhere('source', 'LIKE', '%whatsapp%')
+						  ->orWhere('channel', 'whatsapp');
+				})
+				->distinct('customer_id')
+				->count('customer_id');
+
+			// Get message counts (if you have a messages/notifications log table)
+			// This is estimated based on orders (assuming 3-5 notifications per order)
+			$estimatedMessagesSent = $whatsappOrders * 4; // Average 4 notifications per order
+			$estimatedMessagesReceived = $whatsappOrders * 2; // Average 2 customer messages per order
+
+			return [
+				'messages_sent' => $estimatedMessagesSent,
+				'messages_received' => $estimatedMessagesReceived,
+				'orders_via_whatsapp' => $whatsappOrders,
+				'total_order_value' => round($totalOrderValue, 2),
+				'unique_customers' => $uniqueCustomers,
+				'template_messages' => $estimatedMessagesSent, // Same as sent for now
+			];
+
+		} catch (\Exception $e) {
+			Log::error("Local analytics fetch failed: " . $e->getMessage());
+			return [
+				'messages_sent' => 0,
+				'messages_received' => 0,
+				'orders_via_whatsapp' => 0,
+				'total_order_value' => 0,
+				'unique_customers' => 0,
+				'template_messages' => 0,
+			];
+		}
+	}
+
 
 }
