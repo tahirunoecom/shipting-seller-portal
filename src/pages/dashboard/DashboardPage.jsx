@@ -187,6 +187,10 @@ function DashboardPage() {
       const productsResponse = await productService.getShipperProductsTotalCount(
         user?.wh_account_id
       )
+      console.log('🔍 Dashboard - Products Count API Response:', productsResponse)
+      console.log('🔍 Dashboard - Response Data:', productsResponse.data)
+      console.log('🔍 Dashboard - Total:', productsResponse.data?.total)
+
       if (productsResponse.status === 1) {
         setTotalProducts(productsResponse.data?.total || 0)
       }
