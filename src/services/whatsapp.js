@@ -307,6 +307,27 @@ export const whatsappService = {
     return response.data
   },
 
+  // Create message template
+  async createMessageTemplate(data) {
+    const response = await api.post('/seller/whatsapp/templates/create', data)
+    return response.data
+  },
+
+  // Delete message template
+  async deleteMessageTemplate(wh_account_id, name) {
+    const response = await api.post('/seller/whatsapp/templates/delete', {
+      wh_account_id,
+      name,
+    })
+    return response.data
+  },
+
+  // Send test message with template
+  async sendTestTemplate(data) {
+    const response = await api.post('/seller/whatsapp/templates/send-test', data)
+    return response.data
+  },
+
   // ============================================
   // ANALYTICS ENDPOINTS
   // ============================================

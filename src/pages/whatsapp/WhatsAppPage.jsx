@@ -219,6 +219,7 @@ function WhatsAppPage() {
     { key: 'settings', label: 'Bot Settings', icon: Settings },
     { key: 'auto-replies', label: 'Auto-Replies', icon: Zap },
     { key: 'quick-replies', label: 'Quick Replies', icon: MessageCircle },
+    { key: 'templates', label: 'Message Templates', icon: FileText },
     { key: 'analytics', label: 'Analytics', icon: BarChart3 },
   ]
 
@@ -3355,6 +3356,13 @@ function WhatsAppPage() {
               </CardContent>
             </Card>
           )}
+
+          {activeTab === 'templates' && (
+            <MessageTemplatesTab
+              connectionData={connectionData}
+              whAccountId={userDetails?.user_account?.wh_account_id || user?.wh_account_id}
+            />
+          )}
         </div>
       </div>
 
@@ -3780,6 +3788,514 @@ function WhatsAppPage() {
         </div>
       </Modal>
     </div>
+  )
+}
+
+// ============================================
+// MESSAGE TEMPLATES TAB COMPONENT
+// ============================================
+
+function MessageTemplatesTab({ connectionData, whAccountId }) {
+  const [templates, setTemplates] = useState([])
+  const [loadingTemplates, setLoadingTemplates] = useState(false)
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showTestModal, setShowTestModal] = useState(false)
+  const [selectedTemplate, setSelectedTemplate] = useState(null)
+  const [creating, setCreating] = useState(false)
+  const [sending, setSending] = useState(false)
+
+  // Template form state
+  const [templateForm, setTemplateForm] = useState({
+    name: '',
+    category: 'UTILITY',
+    language: 'en',
+    header_type: 'none',
+    header_text: '',
+    body_text: '',
+    footer_text: '',
+    buttons: [],
+  })
+
+  // Test message form state
+  const [testForm, setTestForm] = useState({
+    to_phone_number: '',
+    body_params: [],
+  })
+
+  // Load templates on mount and when connection changes
+  useEffect(() => {
+    if (connectionData.isConnected && whAccountId) {
+      loadTemplates()
+    }
+  }, [connectionData.isConnected, whAccountId])
+
+  const loadTemplates = async () => {
+    try {
+      setLoadingTemplates(true)
+      const response = await whatsappService.getMessageTemplates(whAccountId)
+      if (response.status === 1) {
+        setTemplates(response.data || [])
+      } else {
+        toast.error(response.message || 'Failed to load templates')
+      }
+    } catch (error) {
+      console.error('Error loading templates:', error)
+      toast.error('Failed to load templates')
+    } finally {
+      setLoadingTemplates(false)
+    }
+  }
+
+  const handleCreateTemplate = async () => {
+    if (!templateForm.name || !templateForm.body_text) {
+      toast.error('Template name and body text are required')
+      return
+    }
+
+    try {
+      setCreating(true)
+      const response = await whatsappService.createMessageTemplate({
+        wh_account_id: whAccountId,
+        ...templateForm,
+      })
+
+      if (response.status === 1) {
+        toast.success(response.message || 'Template created successfully!')
+        setShowCreateModal(false)
+        resetTemplateForm()
+        loadTemplates()
+      } else {
+        toast.error(response.message || 'Failed to create template')
+        if (response.details) {
+          toast.error(response.details, { duration: 5000 })
+        }
+      }
+    } catch (error) {
+      console.error('Error creating template:', error)
+      toast.error('Failed to create template')
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const handleDeleteTemplate = async (templateName) => {
+    if (!confirm(`Are you sure you want to delete template "${templateName}"?`)) {
+      return
+    }
+
+    try {
+      const response = await whatsappService.deleteMessageTemplate(whAccountId, templateName)
+      if (response.status === 1) {
+        toast.success('Template deleted successfully')
+        loadTemplates()
+      } else {
+        toast.error(response.message || 'Failed to delete template')
+      }
+    } catch (error) {
+      console.error('Error deleting template:', error)
+      toast.error('Failed to delete template')
+    }
+  }
+
+  const handleSendTestMessage = async () => {
+    if (!testForm.to_phone_number) {
+      toast.error('Phone number is required')
+      return
+    }
+
+    try {
+      setSending(true)
+      const response = await whatsappService.sendTestTemplate({
+        wh_account_id: whAccountId,
+        template_name: selectedTemplate.name,
+        language_code: selectedTemplate.language,
+        to_phone_number: testForm.to_phone_number,
+        body_params: testForm.body_params,
+      })
+
+      if (response.status === 1) {
+        toast.success('Test message sent successfully!')
+        setShowTestModal(false)
+        setTestForm({ to_phone_number: '', body_params: [] })
+      } else {
+        toast.error(response.message || 'Failed to send test message')
+        if (response.details) {
+          toast.error(response.details, { duration: 5000 })
+        }
+      }
+    } catch (error) {
+      console.error('Error sending test message:', error)
+      toast.error('Failed to send test message')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const resetTemplateForm = () => {
+    setTemplateForm({
+      name: '',
+      category: 'UTILITY',
+      language: 'en',
+      header_type: 'none',
+      header_text: '',
+      body_text: '',
+      footer_text: '',
+      buttons: [],
+    })
+  }
+
+  const openTestModal = (template) => {
+    setSelectedTemplate(template)
+    setShowTestModal(true)
+  }
+
+  const getStatusBadge = (status) => {
+    const statusMap = {
+      APPROVED: { color: 'green', label: 'Approved' },
+      PENDING: { color: 'yellow', label: 'Pending Review' },
+      REJECTED: { color: 'red', label: 'Rejected' },
+      PAUSED: { color: 'gray', label: 'Paused' },
+      DISABLED: { color: 'gray', label: 'Disabled' },
+    }
+    const config = statusMap[status] || { color: 'gray', label: status }
+    return (
+      <Badge variant={config.color} className="text-xs">
+        {config.label}
+      </Badge>
+    )
+  }
+
+  if (!connectionData.isConnected) {
+    return (
+      <Card>
+        <CardContent className="py-12">
+          <div className="text-center">
+            <AlertCircle className="h-12 w-12 mx-auto text-gray-300 mb-4" />
+            <p className="text-gray-500">Connect WhatsApp first to manage message templates</p>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Message Templates
+            </CardTitle>
+            <Button onClick={() => setShowCreateModal(true)}>
+              <Plus className="h-4 w-4" />
+              Create Template
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg dark:bg-blue-900/20 dark:border-blue-800">
+            <div className="flex items-start gap-2">
+              <Lightbulb className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+              <div className="text-sm text-blue-800 dark:text-blue-200">
+                <p className="font-semibold mb-1">About Message Templates</p>
+                <p className="text-blue-700 dark:text-blue-300">
+                  Message templates are pre-approved message formats required by WhatsApp for sending
+                  notifications outside of 24-hour customer service windows. Create templates for order
+                  confirmations, shipping updates, appointment reminders, and other transactional messages.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {loadingTemplates ? (
+            <div className="flex justify-center py-12">
+              <Spinner size="lg" />
+            </div>
+          ) : templates.length === 0 ? (
+            <div className="text-center py-12">
+              <FileText className="h-12 w-12 mx-auto text-gray-300 mb-4" />
+              <p className="text-gray-500 mb-4">No message templates yet</p>
+              <Button onClick={() => setShowCreateModal(true)} variant="outline">
+                <Plus className="h-4 w-4" />
+                Create Your First Template
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {templates.map((template) => (
+                <div
+                  key={template.id}
+                  className="border rounded-lg p-4 hover:shadow-md transition-shadow dark:border-dark-border"
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="font-semibold text-gray-900 dark:text-dark-text">
+                          {template.name}
+                        </h4>
+                        {getStatusBadge(template.status)}
+                      </div>
+                      <div className="flex items-center gap-4 text-xs text-gray-500">
+                        <span className="flex items-center gap-1">
+                          <Hash className="h-3 w-3" />
+                          {template.category}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Globe className="h-3 w-3" />
+                          {template.language}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {template.status === 'APPROVED' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openTestModal(template)}
+                        >
+                          <Send className="h-4 w-4" />
+                          Test
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleDeleteTemplate(template.name)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Template Preview */}
+                  <div className="mt-3 p-3 bg-gray-50 rounded-lg text-sm dark:bg-dark-bg">
+                    {template.components?.map((component, idx) => (
+                      <div key={idx} className="mb-2 last:mb-0">
+                        {component.type === 'HEADER' && component.text && (
+                          <div className="font-semibold text-gray-900 dark:text-dark-text mb-1">
+                            {component.text}
+                          </div>
+                        )}
+                        {component.type === 'BODY' && (
+                          <div className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                            {component.text}
+                          </div>
+                        )}
+                        {component.type === 'FOOTER' && component.text && (
+                          <div className="text-xs text-gray-500 mt-1">{component.text}</div>
+                        )}
+                        {component.type === 'BUTTONS' && component.buttons && (
+                          <div className="mt-2 space-y-1">
+                            {component.buttons.map((btn, btnIdx) => (
+                              <div
+                                key={btnIdx}
+                                className="text-blue-600 text-xs border border-blue-200 rounded px-2 py-1 inline-block mr-2"
+                              >
+                                {btn.text}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {template.rejected_reason && (
+                    <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700 dark:bg-red-900/20 dark:border-red-800 dark:text-red-300">
+                      <strong>Rejected:</strong> {template.rejected_reason}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-4 flex items-center justify-between pt-4 border-t dark:border-dark-border">
+            <p className="text-sm text-gray-500">{templates.length} template(s) total</p>
+            <Button variant="outline" size="sm" onClick={loadTemplates}>
+              <RefreshCw className="h-4 w-4" />
+              Refresh
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Create Template Modal */}
+      <Modal
+        isOpen={showCreateModal}
+        onClose={() => {
+          setShowCreateModal(false)
+          resetTemplateForm()
+        }}
+        title="Create Message Template"
+        size="lg"
+      >
+        <div className="space-y-4">
+          <Input
+            label="Template Name *"
+            placeholder="e.g., order_confirmation"
+            value={templateForm.name}
+            onChange={(e) =>
+              setTemplateForm((prev) => ({
+                ...prev,
+                name: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_'),
+              }))
+            }
+            hint="Lowercase letters, numbers, and underscores only"
+          />
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-dark-text mb-1">
+                Category *
+              </label>
+              <select
+                className="w-full px-3 py-2 border rounded-lg dark:bg-dark-bg dark:border-dark-border dark:text-dark-text"
+                value={templateForm.category}
+                onChange={(e) => setTemplateForm((prev) => ({ ...prev, category: e.target.value }))}
+              >
+                <option value="UTILITY">Utility (Order updates, account alerts)</option>
+                <option value="MARKETING">Marketing (Promotions, offers)</option>
+                <option value="AUTHENTICATION">Authentication (OTP, verification)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-dark-text mb-1">
+                Language *
+              </label>
+              <select
+                className="w-full px-3 py-2 border rounded-lg dark:bg-dark-bg dark:border-dark-border dark:text-dark-text"
+                value={templateForm.language}
+                onChange={(e) => setTemplateForm((prev) => ({ ...prev, language: e.target.value }))}
+              >
+                <option value="en">English</option>
+                <option value="en_US">English (US)</option>
+                <option value="hi">Hindi</option>
+                <option value="es">Spanish</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-dark-text mb-1">
+              Header (Optional)
+            </label>
+            <select
+              className="w-full px-3 py-2 border rounded-lg dark:bg-dark-bg dark:border-dark-border dark:text-dark-text mb-2"
+              value={templateForm.header_type}
+              onChange={(e) =>
+                setTemplateForm((prev) => ({ ...prev, header_type: e.target.value }))
+              }
+            >
+              <option value="none">No Header</option>
+              <option value="TEXT">Text Header</option>
+            </select>
+            {templateForm.header_type === 'TEXT' && (
+              <Input
+                placeholder="e.g., Order Confirmed!"
+                value={templateForm.header_text}
+                onChange={(e) =>
+                  setTemplateForm((prev) => ({ ...prev, header_text: e.target.value }))
+                }
+              />
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-dark-text mb-1">
+              Message Body *
+            </label>
+            <textarea
+              className="w-full px-3 py-2 border rounded-lg dark:bg-dark-bg dark:border-dark-border dark:text-dark-text"
+              rows={5}
+              placeholder="Your message body here. Use {{1}}, {{2}}, etc. for dynamic variables."
+              value={templateForm.body_text}
+              onChange={(e) => setTemplateForm((prev) => ({ ...prev, body_text: e.target.value }))}
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Use {'{'}
+              {'{'}1{'}'}
+              {'}'}, {'{'}
+              {'{'}2{'}'}
+              {'}'} for variables
+            </p>
+          </div>
+
+          <Input
+            label="Footer (Optional)"
+            placeholder="e.g., Thank you for shopping with us!"
+            value={templateForm.footer_text}
+            onChange={(e) => setTemplateForm((prev) => ({ ...prev, footer_text: e.target.value }))}
+          />
+
+          <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800 dark:bg-yellow-900/20 dark:border-yellow-800 dark:text-yellow-200">
+            <strong>Note:</strong> Templates must be approved by Meta before use. Approval typically
+            takes a few minutes to a few hours.
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowCreateModal(false)
+                resetTemplateForm()
+              }}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleCreateTemplate} isLoading={creating}>
+              Create Template
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Send Test Message Modal */}
+      <Modal
+        isOpen={showTestModal}
+        onClose={() => {
+          setShowTestModal(false)
+          setTestForm({ to_phone_number: '', body_params: [] })
+        }}
+        title={`Send Test Message: ${selectedTemplate?.name}`}
+      >
+        <div className="space-y-4">
+          <Input
+            label="Phone Number (with country code) *"
+            placeholder="e.g., 919876543210"
+            value={testForm.to_phone_number}
+            onChange={(e) =>
+              setTestForm((prev) => ({ ...prev, to_phone_number: e.target.value }))
+            }
+            hint="Enter number without + or spaces"
+          />
+
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-200">
+            Template: <strong>{selectedTemplate?.name}</strong>
+            <br />
+            Language: <strong>{selectedTemplate?.language}</strong>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowTestModal(false)
+                setTestForm({ to_phone_number: '', body_params: [] })
+              }}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleSendTestMessage} isLoading={sending}>
+              <Send className="h-4 w-4" />
+              Send Test
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    </>
   )
 }
 
