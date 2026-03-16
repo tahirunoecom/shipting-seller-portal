@@ -3101,5 +3101,394 @@ class WhatsAppController extends Controller
 		}
 	}
 
-	
+	// ============================================
+	// MESSAGE TEMPLATE MANAGEMENT
+	// ============================================
+
+	/**
+	 * Get all message templates for a WABA
+	 * POST /api/seller/whatsapp/templates
+	 */
+	public function getTemplates(Request $request)
+	{
+		try {
+			$whAccountId = $request->input('wh_account_id');
+
+			if (!$whAccountId) {
+				return response()->json([
+					'status' => 0,
+					'message' => 'wh_account_id is required'
+				]);
+			}
+
+			$config = SellerWhatsappConfig::where('wh_account_id', $whAccountId)->first();
+
+			if (!$config || !$config->waba_id || !$config->access_token) {
+				return response()->json([
+					'status' => 0,
+					'message' => 'WhatsApp not connected or missing credentials'
+				]);
+			}
+
+			Log::info("Fetching templates for WABA: {$config->waba_id}");
+
+			// Get message templates from Meta
+			$response = Http::withToken($config->access_token)
+				->get("https://graph.facebook.com/v21.0/{$config->waba_id}/message_templates", [
+					'fields' => 'name,status,category,language,components,id,rejected_reason',
+					'limit' => 100
+				]);
+
+			if (!$response->successful()) {
+				$error = $response->json()['error']['message'] ?? 'Unknown error';
+				Log::error("Failed to fetch templates: {$error}");
+				return response()->json([
+					'status' => 0,
+					'message' => "Failed to fetch templates: {$error}"
+				]);
+			}
+
+			$templates = $response->json()['data'] ?? [];
+
+			return response()->json([
+				'status' => 1,
+				'data' => $templates,
+				'count' => count($templates)
+			]);
+
+		} catch (\Exception $e) {
+			Log::error('getTemplates error: ' . $e->getMessage());
+			return response()->json([
+				'status' => 0,
+				'message' => 'Failed to fetch templates: ' . $e->getMessage()
+			], 500);
+		}
+	}
+
+	/**
+	 * Create a new message template
+	 * POST /api/seller/whatsapp/templates/create
+	 */
+	public function createTemplate(Request $request)
+	{
+		try {
+			$whAccountId = $request->input('wh_account_id');
+			$name = $request->input('name');
+			$category = $request->input('category'); // MARKETING, UTILITY, AUTHENTICATION
+			$language = $request->input('language', 'en'); // Default: English
+			$headerType = $request->input('header_type'); // TEXT, IMAGE, VIDEO, DOCUMENT, none
+			$headerText = $request->input('header_text');
+			$bodyText = $request->input('body_text');
+			$footerText = $request->input('footer_text');
+			$buttons = $request->input('buttons', []); // Array of buttons
+
+			if (!$whAccountId || !$name || !$category || !$bodyText) {
+				return response()->json([
+					'status' => 0,
+					'message' => 'Missing required fields: wh_account_id, name, category, body_text'
+				]);
+			}
+
+			$config = SellerWhatsappConfig::where('wh_account_id', $whAccountId)->first();
+
+			if (!$config || !$config->waba_id || !$config->access_token) {
+				return response()->json([
+					'status' => 0,
+					'message' => 'WhatsApp not connected or missing credentials'
+				]);
+			}
+
+			Log::info("Creating template '{$name}' for WABA: {$config->waba_id}");
+
+			// Build components array
+			$components = [];
+
+			// Header component (optional)
+			if ($headerType && $headerType !== 'none') {
+				if ($headerType === 'TEXT' && $headerText) {
+					$components[] = [
+						'type' => 'HEADER',
+						'format' => 'TEXT',
+						'text' => $headerText
+					];
+				} elseif (in_array($headerType, ['IMAGE', 'VIDEO', 'DOCUMENT'])) {
+					$components[] = [
+						'type' => 'HEADER',
+						'format' => $headerType,
+						'example' => [
+							'header_handle' => [
+								'https://example.com/placeholder.jpg' // Placeholder - user must upload
+							]
+						]
+					];
+				}
+			}
+
+			// Body component (required)
+			$components[] = [
+				'type' => 'BODY',
+				'text' => $bodyText
+			];
+
+			// Footer component (optional)
+			if ($footerText) {
+				$components[] = [
+					'type' => 'FOOTER',
+					'text' => $footerText
+				];
+			}
+
+			// Buttons component (optional)
+			if (!empty($buttons)) {
+				$buttonComponents = [];
+				foreach ($buttons as $button) {
+					if ($button['type'] === 'QUICK_REPLY') {
+						$buttonComponents[] = [
+							'type' => 'QUICK_REPLY',
+							'text' => $button['text']
+						];
+					} elseif ($button['type'] === 'URL') {
+						$buttonComponents[] = [
+							'type' => 'URL',
+							'text' => $button['text'],
+							'url' => $button['url']
+						];
+					} elseif ($button['type'] === 'PHONE_NUMBER') {
+						$buttonComponents[] = [
+							'type' => 'PHONE_NUMBER',
+							'text' => $button['text'],
+							'phone_number' => $button['phone_number']
+						];
+					}
+				}
+
+				if (!empty($buttonComponents)) {
+					$components[] = [
+						'type' => 'BUTTONS',
+						'buttons' => $buttonComponents
+					];
+				}
+			}
+
+			// Create template via Meta API
+			$payload = [
+				'name' => $name,
+				'category' => $category,
+				'language' => $language,
+				'components' => $components
+			];
+
+			Log::info("Template payload: " . json_encode($payload, JSON_PRETTY_PRINT));
+
+			$response = Http::withToken($config->access_token)
+				->post("https://graph.facebook.com/v21.0/{$config->waba_id}/message_templates", $payload);
+
+			$result = $response->json();
+			Log::info("Create template response: " . json_encode($result));
+
+			if ($response->successful() && isset($result['id'])) {
+				return response()->json([
+					'status' => 1,
+					'message' => 'Template created successfully! It will be reviewed by Meta.',
+					'data' => [
+						'id' => $result['id'],
+						'status' => $result['status'] ?? 'PENDING'
+					]
+				]);
+			}
+
+			$error = $result['error']['message'] ?? 'Unknown error';
+			$errorDetails = $result['error']['error_user_msg'] ?? '';
+
+			return response()->json([
+				'status' => 0,
+				'message' => "Failed to create template: {$error}",
+				'details' => $errorDetails
+			]);
+
+		} catch (\Exception $e) {
+			Log::error('createTemplate error: ' . $e->getMessage());
+			return response()->json([
+				'status' => 0,
+				'message' => 'Failed to create template: ' . $e->getMessage()
+			], 500);
+		}
+	}
+
+	/**
+	 * Delete a message template
+	 * POST /api/seller/whatsapp/templates/delete
+	 */
+	public function deleteTemplate(Request $request)
+	{
+		try {
+			$whAccountId = $request->input('wh_account_id');
+			$templateName = $request->input('name');
+
+			if (!$whAccountId || !$templateName) {
+				return response()->json([
+					'status' => 0,
+					'message' => 'wh_account_id and name are required'
+				]);
+			}
+
+			$config = SellerWhatsappConfig::where('wh_account_id', $whAccountId)->first();
+
+			if (!$config || !$config->waba_id || !$config->access_token) {
+				return response()->json([
+					'status' => 0,
+					'message' => 'WhatsApp not connected or missing credentials'
+				]);
+			}
+
+			Log::info("Deleting template '{$templateName}' from WABA: {$config->waba_id}");
+
+			// Delete template via Meta API
+			$response = Http::withToken($config->access_token)
+				->delete("https://graph.facebook.com/v21.0/{$config->waba_id}/message_templates", [
+					'name' => $templateName
+				]);
+
+			$result = $response->json();
+			Log::info("Delete template response: " . json_encode($result));
+
+			if ($response->successful() && ($result['success'] ?? false)) {
+				return response()->json([
+					'status' => 1,
+					'message' => 'Template deleted successfully'
+				]);
+			}
+
+			$error = $result['error']['message'] ?? 'Unknown error';
+
+			return response()->json([
+				'status' => 0,
+				'message' => "Failed to delete template: {$error}"
+			]);
+
+		} catch (\Exception $e) {
+			Log::error('deleteTemplate error: ' . $e->getMessage());
+			return response()->json([
+				'status' => 0,
+				'message' => 'Failed to delete template: ' . $e->getMessage()
+			], 500);
+		}
+	}
+
+	/**
+	 * Send a test message using a template
+	 * POST /api/seller/whatsapp/templates/send-test
+	 */
+	public function sendTestTemplate(Request $request)
+	{
+		try {
+			$whAccountId = $request->input('wh_account_id');
+			$templateName = $request->input('template_name');
+			$languageCode = $request->input('language_code', 'en');
+			$toPhoneNumber = $request->input('to_phone_number');
+			$headerParams = $request->input('header_params', []);
+			$bodyParams = $request->input('body_params', []);
+
+			if (!$whAccountId || !$templateName || !$toPhoneNumber) {
+				return response()->json([
+					'status' => 0,
+					'message' => 'Missing required fields: wh_account_id, template_name, to_phone_number'
+				]);
+			}
+
+			$config = SellerWhatsappConfig::where('wh_account_id', $whAccountId)->first();
+
+			if (!$config || !$config->phone_number_id || !$config->access_token) {
+				return response()->json([
+					'status' => 0,
+					'message' => 'WhatsApp not connected or missing credentials'
+				]);
+			}
+
+			// Clean phone number (remove + and any non-digits)
+			$toPhoneNumber = preg_replace('/[^0-9]/', '', $toPhoneNumber);
+
+			Log::info("Sending test template '{$templateName}' to {$toPhoneNumber}");
+
+			// Build template message payload
+			$components = [];
+
+			// Add header parameters if provided
+			if (!empty($headerParams)) {
+				$components[] = [
+					'type' => 'header',
+					'parameters' => array_map(function($param) {
+						return ['type' => 'text', 'text' => $param];
+					}, $headerParams)
+				];
+			}
+
+			// Add body parameters if provided
+			if (!empty($bodyParams)) {
+				$components[] = [
+					'type' => 'body',
+					'parameters' => array_map(function($param) {
+						return ['type' => 'text', 'text' => $param];
+					}, $bodyParams)
+				];
+			}
+
+			$payload = [
+				'messaging_product' => 'whatsapp',
+				'recipient_type' => 'individual',
+				'to' => $toPhoneNumber,
+				'type' => 'template',
+				'template' => [
+					'name' => $templateName,
+					'language' => [
+						'code' => $languageCode
+					]
+				]
+			];
+
+			// Add components if there are parameters
+			if (!empty($components)) {
+				$payload['template']['components'] = $components;
+			}
+
+			Log::info("Template message payload: " . json_encode($payload, JSON_PRETTY_PRINT));
+
+			// Send via WhatsApp Business API
+			$response = Http::withToken($config->access_token)
+				->post("https://graph.facebook.com/v21.0/{$config->phone_number_id}/messages", $payload);
+
+			$result = $response->json();
+			Log::info("Send template response: " . json_encode($result));
+
+			if ($response->successful() && isset($result['messages'][0]['id'])) {
+				return response()->json([
+					'status' => 1,
+					'message' => 'Test message sent successfully!',
+					'data' => [
+						'message_id' => $result['messages'][0]['id']
+					]
+				]);
+			}
+
+			$error = $result['error']['message'] ?? 'Unknown error';
+			$errorCode = $result['error']['code'] ?? 0;
+			$errorDetails = $result['error']['error_user_msg'] ?? '';
+
+			return response()->json([
+				'status' => 0,
+				'message' => "Failed to send test message: {$error}",
+				'error_code' => $errorCode,
+				'details' => $errorDetails
+			]);
+
+		} catch (\Exception $e) {
+			Log::error('sendTestTemplate error: ' . $e->getMessage());
+			return response()->json([
+				'status' => 0,
+				'message' => 'Failed to send test message: ' . $e->getMessage()
+			], 500);
+		}
+	}
+
+
 }
