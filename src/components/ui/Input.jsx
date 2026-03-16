@@ -2,7 +2,14 @@ import { forwardRef } from 'react'
 import { cn } from '@/utils/helpers'
 
 const Input = forwardRef(
-  ({ className, type = 'text', label, error, helperText, ...props }, ref) => {
+  ({ className, type = 'text', label, error, helperText, size = 'sm', ...props }, ref) => {
+    // Size variants
+    const sizeClasses = {
+      sm: 'py-2.5 text-sm',
+      md: 'py-3 text-base',
+      lg: 'py-3.5 text-lg',
+    }
+
     return (
       <div className="w-full">
         {label && (
@@ -14,7 +21,8 @@ const Input = forwardRef(
           type={type}
           ref={ref}
           className={cn(
-            'w-full rounded-lg border bg-white px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 transition-colors focus:outline-none focus:ring-2',
+            'w-full rounded-lg border bg-white px-4 text-gray-900 placeholder-gray-400 transition-colors focus:outline-none focus:ring-2',
+            sizeClasses[size],
             error
               ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
               : 'border-gray-300 focus:border-primary-500 focus:ring-primary-500/20',

@@ -146,11 +146,16 @@ function LoginPage() {
       // Priority 4: Check WhatsApp connection for sellers
       if (isSeller) {
         try {
+          console.log('Login - Checking WhatsApp status for seller:', userData.wh_account_id)
           const whatsappStatus = await whatsappService.getWhatsAppStatus(userData.wh_account_id)
-          const isWhatsAppConnected = whatsappStatus?.data?.is_connected || false
+          console.log('Login - WhatsApp status response:', whatsappStatus)
+
+          const isWhatsAppConnected = whatsappStatus?.status === 1 && (whatsappStatus?.data?.is_connected === true || whatsappStatus?.data?.is_connected === 1)
 
           // Cache the status
           localStorage.setItem(`whatsapp_connected_${userData.wh_account_id}`, isWhatsAppConnected.toString())
+
+          console.log('Login - WhatsApp connected:', isWhatsAppConnected)
 
           if (!isWhatsAppConnected) {
             console.log('Login - Navigating to: /whatsapp (WhatsApp not connected)')
@@ -158,8 +163,8 @@ function LoginPage() {
             return
           }
         } catch (error) {
-          console.error('Failed to check WhatsApp status:', error)
-          // Continue to normal flow if check fails
+          console.error('Login - Failed to check WhatsApp status:', error)
+          // Don't block login if API fails - dashboard will check again and redirect if needed
         }
       }
 
