@@ -3680,5 +3680,512 @@ class WhatsAppController extends Controller
 		}
 	}
 
+	/**
+	 * Import products from Meta catalog to Shipting
+	 * POST /api/seller/whatsapp/import-catalog-products
+	 */
+	public function importCatalogProducts(Request $request)
+	{
+		try {
+			$whAccountId = $request->input('wh_account_id');
+			$catalogId = $request->input('catalog_id');
+			$overwriteExisting = $request->input('overwrite_existing', false);
+			$autoCreateCategories = $request->input('auto_create_categories', true);
+
+			if (!$whAccountId || !$catalogId) {
+				return response()->json([
+					'status' => 0,
+					'message' => 'wh_account_id and catalog_id are required'
+				]);
+			}
+
+			$config = SellerWhatsappConfig::where('wh_account_id', $whAccountId)->first();
+
+			if (!$config || !$config->is_connected) {
+				return response()->json([
+					'status' => 0,
+					'message' => 'WhatsApp not connected'
+				]);
+			}
+
+			Log::info("Starting import from Meta catalog {$catalogId} for wh_account_id {$whAccountId}");
+
+			// Fetch products from Meta catalog
+			$metaProducts = $this->fetchMetaCatalogProducts($config, $catalogId);
+
+			if (empty($metaProducts)) {
+				return response()->json([
+					'status' => 0,
+					'message' => 'No products found in Meta catalog'
+				]);
+			}
+
+			Log::info("Found " . count($metaProducts) . " products in Meta catalog");
+
+			$results = [
+				'total' => count($metaProducts),
+				'imported' => 0,
+				'skipped' => 0,
+				'failed' => 0,
+				'errors' => []
+			];
+
+			// Category mapping cache
+			$categoryCache = [];
+
+			foreach ($metaProducts as $metaProduct) {
+				try {
+					// Extract product data from Meta format
+					$retailerId = $metaProduct['retailer_id'] ?? $metaProduct['id'] ?? null;
+					$name = $metaProduct['name'] ?? $metaProduct['title'] ?? '';
+					$description = $metaProduct['description'] ?? '';
+					$price = $this->parseMetaPrice($metaProduct['price'] ?? '0');
+					$imageUrl = $metaProduct['image_url'] ?? $metaProduct['image_link'] ?? '';
+					$brand = $metaProduct['brand'] ?? '';
+					$availability = $metaProduct['availability'] ?? 'in stock';
+					$condition = $metaProduct['condition'] ?? 'new';
+
+					if (empty($retailerId) || empty($name)) {
+						$results['skipped']++;
+						continue;
+					}
+
+					// Check if product already exists in Shipting
+					$existingProduct = $this->checkProductExists($whAccountId, $retailerId);
+
+					if ($existingProduct && !$overwriteExisting) {
+						Log::info("Product {$retailerId} already exists, skipping");
+						$results['skipped']++;
+						continue;
+					}
+
+					// Map or create category
+					$categoryId = null;
+					if ($autoCreateCategories && !empty($metaProduct['google_product_category'])) {
+						$categoryName = $metaProduct['google_product_category'];
+						if (isset($categoryCache[$categoryName])) {
+							$categoryId = $categoryCache[$categoryName];
+						} else {
+							$categoryId = $this->getOrCreateCategory($categoryName);
+							$categoryCache[$categoryName] = $categoryId;
+						}
+					}
+
+					// Download image from Meta CDN and upload to Shipting storage
+					$shiptingImageUrl = null;
+					if (!empty($imageUrl)) {
+						$shiptingImageUrl = $this->downloadAndUploadImage($imageUrl, $whAccountId, $retailerId);
+					}
+
+					// Create or update product in Shipting database
+					$productData = [
+						'wh_account_id' => $whAccountId,
+						'title' => $name,
+						'description' => $description,
+						'price' => $price,
+						'brand' => $brand,
+						'product_type' => $condition === 'new' ? 'New' : 'Used',
+						'status' => $availability === 'in stock' ? 1 : 0,
+						'image' => $shiptingImageUrl,
+						'category_id' => $categoryId,
+						'upc' => $retailerId, // Store Meta retailer_id as UPC for matching
+						'external_id' => $metaProduct['id'] ?? null, // Store Meta product ID
+						'external_source' => 'meta_catalog'
+					];
+
+					if ($existingProduct) {
+						// Update existing product
+						$this->updateProduct($existingProduct['product_id'], $productData);
+						Log::info("Updated existing product {$retailerId}");
+					} else {
+						// Create new product
+						$this->createProduct($productData);
+						Log::info("Created new product {$retailerId}");
+					}
+
+					$results['imported']++;
+
+				} catch (\Exception $e) {
+					Log::error("Failed to import product {$retailerId}: " . $e->getMessage());
+					$results['failed']++;
+					$results['errors'][] = [
+						'product_id' => $retailerId ?? 'unknown',
+						'name' => $name ?? 'unknown',
+						'error' => $e->getMessage()
+					];
+				}
+			}
+
+			Log::info("Import complete: " . json_encode($results));
+
+			return response()->json([
+				'status' => 1,
+				'message' => "Import complete! Imported {$results['imported']} products",
+				'data' => $results
+			]);
+
+		} catch (\Exception $e) {
+			Log::error('WhatsApp importCatalogProducts error: ' . $e->getMessage());
+			return response()->json([
+				'status' => 0,
+				'message' => 'Failed to import products: ' . $e->getMessage()
+			], 500);
+		}
+	}
+
+	/**
+	 * Get products from Meta catalog
+	 * POST /api/seller/whatsapp/get-catalog-products
+	 */
+	public function getCatalogProducts(Request $request)
+	{
+		try {
+			$whAccountId = $request->input('wh_account_id');
+
+			if (!$whAccountId) {
+				return response()->json([
+					'status' => 0,
+					'message' => 'wh_account_id is required'
+				]);
+			}
+
+			$config = SellerWhatsappConfig::where('wh_account_id', $whAccountId)->first();
+
+			if (!$config || !$config->is_connected) {
+				return response()->json([
+					'status' => 0,
+					'message' => 'WhatsApp not connected'
+				]);
+			}
+
+			if (!$config->catalog_id) {
+				return response()->json([
+					'status' => 0,
+					'message' => 'No catalog configured'
+				]);
+			}
+
+			// Fetch catalog info
+			$catalogInfo = $this->getMetaCatalogInfo($config, $config->catalog_id);
+
+			// Fetch products from Meta catalog
+			$products = $this->fetchMetaCatalogProducts($config, $config->catalog_id);
+
+			return response()->json([
+				'status' => 1,
+				'data' => [
+					'catalog_info' => $catalogInfo,
+					'products' => $products
+				]
+			]);
+
+		} catch (\Exception $e) {
+			Log::error('WhatsApp getCatalogProducts error: ' . $e->getMessage());
+			return response()->json([
+				'status' => 0,
+				'message' => 'Failed to get catalog products: ' . $e->getMessage()
+			], 500);
+		}
+	}
+
+	// ============================================
+	// HELPER METHODS FOR META CATALOG IMPORT
+	// ============================================
+
+	/**
+	 * Fetch products from Meta catalog using Graph API
+	 */
+	private function fetchMetaCatalogProducts($config, $catalogId, $limit = 1000)
+	{
+		try {
+			$allProducts = [];
+			$url = "https://graph.facebook.com/v21.0/{$catalogId}/products";
+			$after = null;
+
+			do {
+				$params = [
+					'access_token' => $config->access_token,
+					'fields' => 'id,retailer_id,name,description,price,availability,condition,image_url,brand,google_product_category',
+					'limit' => min(100, $limit - count($allProducts))
+				];
+
+				if ($after) {
+					$params['after'] = $after;
+				}
+
+				$response = Http::get($url, $params);
+
+				if (!$response->successful()) {
+					Log::error("Meta API error: " . $response->body());
+					break;
+				}
+
+				$data = $response->json();
+				$products = $data['data'] ?? [];
+				$allProducts = array_merge($allProducts, $products);
+
+				Log::info("Fetched " . count($products) . " products from Meta (total: " . count($allProducts) . ")");
+
+				// Check if there are more pages
+				$after = $data['paging']['cursors']['after'] ?? null;
+
+			} while ($after && count($allProducts) < $limit);
+
+			return $allProducts;
+
+		} catch (\Exception $e) {
+			Log::error('fetchMetaCatalogProducts error: ' . $e->getMessage());
+			return [];
+		}
+	}
+
+	/**
+	 * Get Meta catalog information
+	 */
+	private function getMetaCatalogInfo($config, $catalogId)
+	{
+		try {
+			$response = Http::withToken($config->access_token)
+				->get("https://graph.facebook.com/v21.0/{$catalogId}", [
+					'fields' => 'id,name,product_count,vertical'
+				]);
+
+			if ($response->successful()) {
+				$data = $response->json();
+				return [
+					'id' => $data['id'] ?? $catalogId,
+					'name' => $data['name'] ?? 'Unknown',
+					'product_count' => $data['product_count'] ?? 0,
+					'vertical' => $data['vertical'] ?? 'commerce',
+					'is_commerce' => ($data['vertical'] ?? 'commerce') === 'commerce'
+				];
+			}
+
+			return null;
+
+		} catch (\Exception $e) {
+			Log::error('getMetaCatalogInfo error: ' . $e->getMessage());
+			return null;
+		}
+	}
+
+	/**
+	 * Parse Meta price format (e.g., "999 USD" or "9.99 USD")
+	 */
+	private function parseMetaPrice($priceString)
+	{
+		if (empty($priceString)) {
+			return 0;
+		}
+
+		// Extract numeric value from price string
+		preg_match('/(\d+(\.\d+)?)/', $priceString, $matches);
+		$price = $matches[1] ?? 0;
+
+		// Meta sends prices in cents sometimes, detect and convert
+		$numPrice = floatval($price);
+		if ($numPrice > 1000 && strpos($priceString, '.') === false) {
+			// Likely cents, convert to dollars
+			$numPrice = $numPrice / 100;
+		}
+
+		return round($numPrice, 2);
+	}
+
+	/**
+	 * Check if product exists in Shipting database
+	 */
+	private function checkProductExists($whAccountId, $upc)
+	{
+		try {
+			$apiUrl = 'https://stageshipperapi.thedelivio.com/api/getMasterProducts';
+
+			$response = Http::post($apiUrl, [
+				'wh_account_id' => (string) $whAccountId,
+				'upc' => (string) $upc,
+				'ai_category_id' => '',
+				'ai_product_id' => '',
+				'product_id' => '',
+				'search_string' => '',
+				'zipcode' => '',
+				'user_id' => '',
+				'page' => '1',
+				'items' => '1'
+			]);
+
+			if ($response->successful()) {
+				$responseData = $response->json();
+				$products = $responseData['data']['getMasterProducts'] ?? [];
+
+				if (!empty($products)) {
+					return $products[0];
+				}
+			}
+
+			return null;
+
+		} catch (\Exception $e) {
+			Log::error('checkProductExists error: ' . $e->getMessage());
+			return null;
+		}
+	}
+
+	/**
+	 * Get or create category in Shipting
+	 */
+	private function getOrCreateCategory($categoryName)
+	{
+		try {
+			// Call Shipting API to get categories
+			$apiUrl = 'https://stageshipperapi.thedelivio.com/api/getCategories';
+
+			$response = Http::post($apiUrl, []);
+
+			if ($response->successful()) {
+				$responseData = $response->json();
+				$categories = $responseData['data']['categories'] ?? [];
+
+				// Try to find matching category
+				foreach ($categories as $category) {
+					if (stripos($category['name'], $categoryName) !== false ||
+						stripos($categoryName, $category['name']) !== false) {
+						return $category['category_id'];
+					}
+				}
+
+				// If no match, return first category or null
+				if (!empty($categories)) {
+					return $categories[0]['category_id'];
+				}
+			}
+
+			return null;
+
+		} catch (\Exception $e) {
+			Log::error('getOrCreateCategory error: ' . $e->getMessage());
+			return null;
+		}
+	}
+
+	/**
+	 * Download image from Meta CDN and upload to Shipting storage
+	 */
+	private function downloadAndUploadImage($metaImageUrl, $whAccountId, $productId)
+	{
+		try {
+			// Download image from Meta
+			$imageResponse = Http::timeout(30)->get($metaImageUrl);
+
+			if (!$imageResponse->successful()) {
+				Log::warning("Failed to download image from Meta: {$metaImageUrl}");
+				return null;
+			}
+
+			// Get image content and extension
+			$imageContent = $imageResponse->body();
+			$extension = pathinfo(parse_url($metaImageUrl, PHP_URL_PATH), PATHINFO_EXTENSION);
+			if (empty($extension)) {
+				$extension = 'jpg';
+			}
+
+			// Generate unique filename
+			$filename = "meta_import_{$whAccountId}_{$productId}_" . time() . ".{$extension}";
+
+			// Save to temporary file
+			$tempPath = sys_get_temp_dir() . '/' . $filename;
+			file_put_contents($tempPath, $imageContent);
+
+			// Upload to Shipting storage (adjust this based on your storage method)
+			// Option 1: Upload to Shipting API
+			$uploadUrl = 'https://stageshipperapi.thedelivio.com/api/uploadProductImage';
+
+			$uploadResponse = Http::attach(
+				'image',
+				file_get_contents($tempPath),
+				$filename
+			)->post($uploadUrl, [
+				'wh_account_id' => $whAccountId
+			]);
+
+			// Clean up temp file
+			unlink($tempPath);
+
+			if ($uploadResponse->successful()) {
+				$uploadData = $uploadResponse->json();
+				$imageUrl = $uploadData['data']['image_url'] ?? $uploadData['data']['url'] ?? null;
+
+				if ($imageUrl) {
+					Log::info("Image uploaded successfully: {$imageUrl}");
+					return $imageUrl;
+				}
+			}
+
+			// Option 2: If upload API doesn't exist, store locally and return path
+			// This is a fallback - adjust based on your actual storage implementation
+			$localPath = "uploads/products/{$filename}";
+			// You would copy the file to your storage here
+			// copy($tempPath, storage_path('app/public/' . $localPath));
+
+			Log::warning("Image upload API failed, returning Meta URL as fallback");
+			return $metaImageUrl; // Fallback to Meta URL
+
+		} catch (\Exception $e) {
+			Log::error('downloadAndUploadImage error: ' . $e->getMessage());
+			return null;
+		}
+	}
+
+	/**
+	 * Create product in Shipting database
+	 */
+	private function createProduct($productData)
+	{
+		try {
+			$apiUrl = 'https://stageshipperapi.thedelivio.com/api/addProduct';
+
+			$response = Http::post($apiUrl, $productData);
+
+			if ($response->successful()) {
+				$responseData = $response->json();
+				Log::info("Product created: " . json_encode($responseData));
+				return $responseData;
+			} else {
+				Log::error("Create product API failed: " . $response->body());
+				throw new \Exception("Failed to create product");
+			}
+
+		} catch (\Exception $e) {
+			Log::error('createProduct error: ' . $e->getMessage());
+			throw $e;
+		}
+	}
+
+	/**
+	 * Update product in Shipting database
+	 */
+	private function updateProduct($productId, $productData)
+	{
+		try {
+			$apiUrl = 'https://stageshipperapi.thedelivio.com/api/updateProduct';
+
+			$productData['product_id'] = $productId;
+
+			$response = Http::post($apiUrl, $productData);
+
+			if ($response->successful()) {
+				$responseData = $response->json();
+				Log::info("Product updated: " . json_encode($responseData));
+				return $responseData;
+			} else {
+				Log::error("Update product API failed: " . $response->body());
+				throw new \Exception("Failed to update product");
+			}
+
+		} catch (\Exception $e) {
+			Log::error('updateProduct error: ' . $e->getMessage());
+			throw $e;
+		}
+	}
+
 
 }
