@@ -407,6 +407,15 @@ export const whatsappService = {
     return response.data
   },
 
+  // Get WhatsApp analytics
+  async getAnalytics(wh_account_id, date_range = '7d') {
+    const response = await api.post('/seller/whatsapp/analytics', {
+      wh_account_id,
+      date_range,
+    })
+    return response.data
+  },
+
   // Get WhatsApp analytics (legacy)
   async getWhatsAppAnalytics(wh_account_id, date_range) {
     const response = await api.post('/seller/whatsapp/analytics', {
