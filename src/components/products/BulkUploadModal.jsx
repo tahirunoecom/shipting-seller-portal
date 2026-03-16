@@ -148,9 +148,12 @@ function BulkUploadModal({
   const getSubcategoryId = useCallback((categoryId, subcategoryName) => {
     if (!categoryId || !subcategoryName) return ''
     const subcategories = subcategoriesMap[categoryId] || []
+    const trimmedName = subcategoryName.trim().toLowerCase()
+    console.log(`[BulkUpload] Looking for subcategory "${trimmedName}" in category ${categoryId}`, subcategories)
     const sub = subcategories.find(s =>
-      s.name?.toLowerCase() === subcategoryName.toLowerCase()
+      s.name?.trim().toLowerCase() === trimmedName
     )
+    console.log(`[BulkUpload] Found subcategory:`, sub)
     return sub?.id ? String(sub.id) : ''
   }, [subcategoriesMap])
 
