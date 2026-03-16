@@ -143,7 +143,7 @@ function CatalogPage() {
             </Badge>
           </div>
           <p className="text-gray-600 dark:text-dark-muted">
-            Products synced to your Facebook & Instagram catalog
+            Products synced to your WhatsApp catalog
           </p>
         </div>
         <div className="flex gap-2">

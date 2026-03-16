@@ -1072,7 +1072,7 @@ function WhatsAppPage() {
     if (!phoneNumber) return null
 
     // WhatsApp Business catalog link
-    return `https://wa.me/${phoneNumber}?text=Hi!%20I%27d%20like%20to%20browse%20your%20catalog`
+    return `https://wa.me/${phoneNumber}?text=Hi`
   }
 
   // Get direct WhatsApp chat link
