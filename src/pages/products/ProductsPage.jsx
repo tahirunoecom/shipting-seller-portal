@@ -107,10 +107,24 @@ function ProductsPage() {
   // Force search input text color to be visible
   useEffect(() => {
     if (searchInputRef.current) {
-      searchInputRef.current.style.setProperty('color', '#000000', 'important')
-      searchInputRef.current.style.setProperty('-webkit-text-fill-color', '#000000', 'important')
+      const input = searchInputRef.current
+      // Force styles using cssText (overrides everything)
+      input.style.cssText = `
+        width: 100% !important;
+        padding: 0.75rem 1rem 0.75rem 2.5rem !important;
+        font-size: 16px !important;
+        font-weight: 500 !important;
+        color: #000000 !important;
+        -webkit-text-fill-color: #000000 !important;
+        background-color: #ffffff !important;
+        border: 1px solid #d1d5db !important;
+        border-radius: 0.5rem !important;
+        outline: none !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+      `
     }
-  }, [searchQuery])
+  }, [])
 
   // Load subcategories when category changes
   const loadSubcategories = async (categoryId) => {
@@ -483,17 +497,6 @@ function ProductsPage() {
                 placeholder="Search products..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem 1rem 0.75rem 2.5rem',
-                  fontSize: '16px',
-                  fontWeight: '500',
-                  color: '#000000',
-                  backgroundColor: '#ffffff',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0.5rem',
-                  outline: 'none',
-                }}
                 autoComplete="off"
               />
             </div>
