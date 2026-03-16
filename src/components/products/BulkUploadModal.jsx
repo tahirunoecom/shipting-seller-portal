@@ -506,21 +506,24 @@ function BulkUploadModal({
       await new Promise(resolve => setTimeout(resolve, 100))
     }
 
+    console.log('[BulkUpload] Upload complete! Results:', results)
+    console.log('[BulkUpload] Setting uploadResults and step to complete')
+
+    // Update both states together and ensure step changes
     setUploadResults(results)
 
-    console.log('[BulkUpload] Upload complete! Results:', results)
-    console.log('[BulkUpload] Setting step to complete')
+    // Use setTimeout to ensure state update happens
+    setTimeout(() => {
+      console.log('[BulkUpload] Now setting step to complete')
+      setStep('complete')
 
-    setStep('complete')
-
-    if (results.success.length > 0) {
-      toast.success(`Successfully uploaded ${results.success.length} products!`)
-      onUploadComplete?.()
-    } else {
-      toast.error('All products failed to upload')
-    }
-
-    console.log('[BulkUpload] Step should now be: complete')
+      if (results.success.length > 0) {
+        toast.success(`✅ Successfully uploaded ${results.success.length} products!`)
+        onUploadComplete?.()
+      } else {
+        toast.error('❌ All products failed to upload')
+      }
+    }, 100)
   }
 
   // Reset modal state
