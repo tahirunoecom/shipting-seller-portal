@@ -773,21 +773,37 @@ function BulkUploadModal({
                 <XCircle className="h-16 w-16 mx-auto text-red-500 mb-4" />
               )}
               <h3 className="text-xl font-semibold text-gray-900 dark:text-dark-text mb-2">
-                Upload Complete!
+                {uploadResults.success.length > 0 ? 'Products Uploaded Successfully!' : 'Upload Failed'}
               </h3>
-              <p className="text-gray-500 dark:text-dark-muted">
-                {uploadResults.success.length} products added successfully
-                {uploadResults.failed.length > 0 && (
-                  <span className="text-red-500">
-                    , {uploadResults.failed.length} failed
-                  </span>
-                )}
-              </p>
+
+              {/* Success Summary */}
+              {uploadResults.success.length > 0 && (
+                <div className="mb-4 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                  <p className="text-lg font-semibold text-green-700 dark:text-green-400 mb-1">
+                    ✅ {uploadResults.success.length} {uploadResults.success.length === 1 ? 'product' : 'products'} uploaded successfully
+                  </p>
+                  <p className="text-sm text-green-600 dark:text-green-500">
+                    Your products are now live and ready to sell!
+                  </p>
+                </div>
+              )}
+
+              {/* Failure Summary */}
+              {uploadResults.failed.length > 0 && (
+                <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                  <p className="text-lg font-semibold text-red-700 dark:text-red-400 mb-1">
+                    ❌ {uploadResults.failed.length} {uploadResults.failed.length === 1 ? 'product' : 'products'} failed to upload
+                  </p>
+                  <p className="text-sm text-red-600 dark:text-red-500 mb-2">
+                    Please check the errors below and try again
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Failed Products List */}
             {uploadResults.failed.length > 0 && (
-              <div className="max-h-40 overflow-auto border border-red-200 rounded-lg p-3 bg-red-50 dark:bg-red-900/10">
+              <div className="max-h-40 overflow-auto border border-red-200 rounded-lg p-3 bg-red-50 dark:bg-red-900/10 mb-4">
                 <p className="font-medium text-red-700 dark:text-red-400 mb-2">
                   Failed Products:
                 </p>
@@ -801,11 +817,43 @@ function BulkUploadModal({
               </div>
             )}
 
-            <ModalFooter>
-              <Button onClick={handleClose}>
-                Done
+            {/* Action Buttons */}
+            <div className="space-y-3">
+              {uploadResults.success.length > 0 && (
+                <>
+                  <Button
+                    onClick={() => {
+                      handleClose()
+                      // Trigger parent to navigate to products page
+                      window.location.href = '/products'
+                    }}
+                    className="w-full"
+                  >
+                    View All Products
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      // Reset to upload step for adding more
+                      setStep('upload')
+                      setFile(null)
+                      setParsedProducts([])
+                      setUploadResults({ success: [], failed: [] })
+                    }}
+                    className="w-full"
+                  >
+                    Upload More Products
+                  </Button>
+                </>
+              )}
+              <Button
+                variant={uploadResults.success.length > 0 ? "outline" : "default"}
+                onClick={handleClose}
+                className="w-full"
+              >
+                {uploadResults.success.length > 0 ? 'Close' : 'Done'}
               </Button>
-            </ModalFooter>
+            </div>
           </>
         )}
       </div>

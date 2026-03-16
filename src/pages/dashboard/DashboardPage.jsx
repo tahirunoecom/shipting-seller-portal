@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store'
 import { useWhatsAppStatus } from '@/hooks/useWhatsAppStatus'
 import { Card, CardContent, CardHeader, CardTitle, Badge, PageLoader, UrgentAlert } from '@/components/ui'
+import GettingStarted from '@/components/onboarding/GettingStarted'
 import { formatCurrency, formatDate } from '@/utils/helpers'
 import { dashboardService, productService } from '@/services'
 import {
@@ -253,15 +254,25 @@ function DashboardPage() {
   const earnings = getEarnings()
   const totalEarnings = earnings.reduce((sum, e) => sum + e.value, 0)
 
+  // Check if user needs onboarding
+  const needsWhatsApp = !isWhatsAppConnected
+  const needsStripe = !user?.stripe_connect || user?.stripe_connect !== 1
+  const needsProducts = totalProducts === 0
+  const showOnboarding = needsWhatsApp || needsStripe || needsProducts
+
+  // Show Getting Started page if user needs setup
+  if (showOnboarding) {
+    return (
+      <GettingStarted
+        user={user}
+        isWhatsAppConnected={isWhatsAppConnected}
+        totalProducts={totalProducts}
+      />
+    )
+  }
+
   return (
     <div className="space-y-6">
-      {/* Urgent Alerts for missing integrations */}
-      {(!user?.stripe_connect || user?.stripe_connect !== 1) && (
-        <UrgentAlert type="stripe" compact={false} />
-      )}
-      {!isWhatsAppConnected && (
-        <UrgentAlert type="whatsapp" compact={false} />
-      )}
 
       {/* Welcome header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
