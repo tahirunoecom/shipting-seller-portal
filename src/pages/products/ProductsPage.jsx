@@ -468,33 +468,13 @@ function ProductsPage() {
             {/* Search */}
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none z-10" />
-              <input
+              <Input
                 type="text"
                 placeholder="Search products..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                style={{
-                  paddingLeft: '2.5rem',
-                  padding: '0.75rem 1rem 0.75rem 2.5rem',
-                  fontSize: '1rem',
-                  fontWeight: '500',
-                  color: '#000000',
-                  backgroundColor: '#ffffff',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0.5rem',
-                  outline: 'none',
-                }}
-                onFocus={(e) => {
-                  e.target.style.borderColor = '#10b981'
-                  e.target.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.1)'
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderColor = '#d1d5db'
-                  e.target.style.boxShadow = 'none'
-                }}
-                autoComplete="off"
-                spellCheck="false"
-                className="w-full dark:bg-dark-card dark:border-dark-border dark:text-dark-text"
+                size="md"
+                className="pl-10"
               />
             </div>
 
