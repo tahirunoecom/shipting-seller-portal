@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuthStore } from '@/store'
 import { productService } from '@/services'
 import {
@@ -59,6 +59,7 @@ function ProductsPage() {
   const [viewMode, setViewMode] = useState('grid') // 'grid' or 'list'
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('')
+  const searchInputRef = useRef(null)
   const [showAddModal, setShowAddModal] = useState(false)
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false)
   const [showSubcategoryModal, setShowSubcategoryModal] = useState(false)
@@ -102,6 +103,14 @@ function ProductsPage() {
     loadProducts()
     loadCategories()
   }, [])
+
+  // Force search input text color to be visible
+  useEffect(() => {
+    if (searchInputRef.current) {
+      searchInputRef.current.style.setProperty('color', '#000000', 'important')
+      searchInputRef.current.style.setProperty('-webkit-text-fill-color', '#000000', 'important')
+    }
+  }, [searchQuery])
 
   // Load subcategories when category changes
   const loadSubcategories = async (categoryId) => {
@@ -469,6 +478,7 @@ function ProductsPage() {
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none z-10" />
               <input
+                ref={searchInputRef}
                 type="text"
                 placeholder="Search products..."
                 value={searchQuery}
