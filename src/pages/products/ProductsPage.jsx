@@ -59,7 +59,6 @@ function ProductsPage() {
   const [viewMode, setViewMode] = useState('grid') // 'grid' or 'list'
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('')
-  const searchInputRef = useRef(null)
   const [showAddModal, setShowAddModal] = useState(false)
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false)
   const [showSubcategoryModal, setShowSubcategoryModal] = useState(false)
@@ -104,17 +103,6 @@ function ProductsPage() {
     loadCategories()
   }, [])
 
-  // Force search input text color to be visible
-  useEffect(() => {
-    if (searchInputRef.current) {
-      const input = searchInputRef.current
-      // Add color properties without breaking layout
-      input.style.setProperty('color', '#000000', 'important')
-      input.style.setProperty('-webkit-text-fill-color', '#000000', 'important')
-      input.style.setProperty('opacity', '1', 'important')
-      input.style.setProperty('visibility', 'visible', 'important')
-    }
-  }, [])
 
   // Load subcategories when category changes
   const loadSubcategories = async (categoryId) => {
@@ -478,20 +466,6 @@ function ProductsPage() {
       <Card>
         <CardContent className="p-4">
           <div className="flex flex-col md:flex-row gap-4">
-            {/* Search */}
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none z-10" />
-              <input
-                ref={searchInputRef}
-                type="text"
-                placeholder="Search products..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                autoComplete="off"
-              />
-            </div>
-
             {/* Category filter */}
             <Select
               value={selectedCategory}
@@ -505,6 +479,32 @@ function ProductsPage() {
               ]}
               className="md:w-48"
             />
+
+            {/* Search - Moved to right with fresh styling */}
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none z-10" />
+              <input
+                type="text"
+                placeholder="Search products..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{
+                  width: '100%',
+                  height: '44px',
+                  paddingLeft: '2.5rem',
+                  paddingRight: '1rem',
+                  fontSize: '15px',
+                  color: '#1a1a1a',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '8px',
+                  outline: 'none',
+                  WebkitTextFillColor: '#1a1a1a',
+                }}
+                autoComplete="off"
+                spellCheck="false"
+              />
+            </div>
 
             {/* View toggle */}
             <div className="flex rounded-lg border border-gray-200 dark:border-dark-border">
