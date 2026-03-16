@@ -298,16 +298,34 @@ function BulkUploadModal({
         }
       })
 
-      // Load subcategories for all categories
+      // Load subcategories for all categories and build a local map
+      const loadedSubcategoriesMap = {}
       await Promise.all(
-        Array.from(uniqueCategoryIds).map(catId => loadSubcategoriesForCategory(catId))
+        Array.from(uniqueCategoryIds).map(async (catId) => {
+          const subs = await loadSubcategoriesForCategory(catId)
+          loadedSubcategoriesMap[catId] = subs
+        })
       )
+
+      // Helper to get subcategory ID from loaded map (not from state)
+      const findSubcategoryId = (categoryId, subcategoryName) => {
+        if (!categoryId || !subcategoryName) return ''
+        const subcategories = loadedSubcategoriesMap[categoryId] || []
+        const trimmedName = subcategoryName.trim().toLowerCase()
+        console.log(`[CSV Parse] Looking for "${trimmedName}" in category ${categoryId}`)
+        console.log(`[CSV Parse] Available subcategories:`, subcategories.map(s => ({ id: s.id, name: s.name })))
+        const sub = subcategories.find(s =>
+          s.name?.trim().toLowerCase() === trimmedName
+        )
+        console.log(`[CSV Parse] Match result:`, sub ? `Found: ${sub.name} (ID: ${sub.id})` : 'NOT FOUND')
+        return sub?.id ? String(sub.id) : ''
+      }
 
       // Map category names to IDs and prepare products
       const preparedProducts = products.map(product => {
         const categoryId = getCategoryId(product.category_name)
         const isRestaurant = isRestaurantCategory(product.category_name)
-        const subcategoryId = getSubcategoryId(categoryId, product.subcategory_name)
+        const subcategoryId = findSubcategoryId(categoryId, product.subcategory_name)
 
         return {
           ...product,
