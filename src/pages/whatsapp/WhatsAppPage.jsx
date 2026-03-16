@@ -4236,13 +4236,27 @@ function MessageTemplatesTab({ connectionData, whAccountId }) {
               value={templateForm.body_text}
               onChange={(e) => setTemplateForm((prev) => ({ ...prev, body_text: e.target.value }))}
             />
-            <p className="text-xs text-gray-500 mt-1">
-              Use {'{'}
-              {'{'}1{'}'}
-              {'}'}, {'{'}
-              {'{'}2{'}'}
-              {'}'} for variables
-            </p>
+            <div className="mt-2 space-y-2">
+              <p className="text-xs text-gray-500">
+                Use {'{'}
+                {'{'}1{'}'}
+                {'}'}, {'{'}
+                {'{'}2{'}'}
+                {'}'} for variables. <strong>Important:</strong> Always add a space before variables!
+              </p>
+              {(templateForm.body_text.match(/[#$%@&]\{\{/g) || []).length > 0 && (
+                <div className="p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700 dark:bg-red-900/20 dark:border-red-800 dark:text-red-300">
+                  <strong>⚠️ Warning:</strong> Detected special characters directly before variables (e.g., <code>#{'{{'}2{'}}'}
+</code>).
+                  Add a space to avoid rejection: <code># {'{{'}2{'}}'}
+</code>
+                </div>
+              )}
+              <div className="p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300">
+                <strong>✓ Correct:</strong> "Your order # {'{{'}1{'}}'}  is confirmed" <br />
+                <strong>✗ Wrong:</strong> "Your order #{'{{'}1{'}}'}  is confirmed" (missing space!)
+              </div>
+            </div>
           </div>
 
           <Input
