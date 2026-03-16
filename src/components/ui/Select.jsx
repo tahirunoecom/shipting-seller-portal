@@ -5,7 +5,7 @@ import { ChevronDown } from 'lucide-react'
 const Select = forwardRef(
   ({ className, label, error, options = [], placeholder = 'Select...', ...props }, ref) => {
     return (
-      <div className="w-full">
+      <div className={cn('w-full', className)}>
         {label && (
           <label className="block text-sm font-medium text-gray-700 dark:text-dark-text mb-1.5">
             {label}
@@ -19,8 +19,7 @@ const Select = forwardRef(
               error
                 ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
                 : 'border-gray-300 focus:border-primary-500 focus:ring-primary-500/20',
-              'dark:border-dark-border dark:bg-dark-card dark:text-dark-text',
-              className
+              'dark:border-dark-border dark:bg-dark-card dark:text-dark-text'
             )}
             {...props}
           >
