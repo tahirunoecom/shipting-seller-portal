@@ -11,7 +11,7 @@ const Select = forwardRef(
             {label}
           </label>
         )}
-        <div className="relative">
+        <div className="relative w-full">
           <select
             ref={ref}
             className={cn(
@@ -33,7 +33,9 @@ const Select = forwardRef(
               </option>
             ))}
           </select>
-          <ChevronDown className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+            <ChevronDown className="h-4 w-4 text-gray-400" />
+          </div>
         </div>
         {error && <p className="mt-1 text-sm text-red-500">{error}</p>}
       </div>
