@@ -148,14 +148,6 @@ function DashboardPage() {
   const [dashboardData, setDashboardData] = useState(null)
   const [totalProducts, setTotalProducts] = useState(0)
 
-  // Redirect to WhatsApp setup if not connected (first-time check only)
-  useEffect(() => {
-    if (!whatsappLoading && !isWhatsAppConnected) {
-      console.log('Dashboard - WhatsApp not connected, redirecting to /whatsapp')
-      navigate('/whatsapp', { replace: true })
-    }
-  }, [whatsappLoading, isWhatsAppConnected, navigate])
-
   // Navigate to orders page with specific tab filter
   const navigateToOrders = (tab = 'all') => {
     navigate(`/orders?tab=${tab}`)

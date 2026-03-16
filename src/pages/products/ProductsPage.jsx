@@ -482,7 +482,6 @@ function ProductsPage() {
                   backgroundColor: '#ffffff',
                   border: '1px solid #d1d5db',
                   borderRadius: '0.5rem',
-                  width: '100%',
                   outline: 'none',
                 }}
                 onFocus={(e) => {
@@ -495,7 +494,7 @@ function ProductsPage() {
                 }}
                 autoComplete="off"
                 spellCheck="false"
-                className="dark:bg-dark-card dark:border-dark-border dark:text-dark-text"
+                className="w-full dark:bg-dark-card dark:border-dark-border dark:text-dark-text"
               />
             </div>
 
