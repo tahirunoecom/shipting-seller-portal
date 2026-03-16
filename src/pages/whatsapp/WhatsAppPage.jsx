@@ -2021,7 +2021,7 @@ function WhatsAppPage() {
                                         className="border-violet-300 text-violet-600 hover:bg-violet-50"
                                       >
                                         <ShoppingBag className="h-4 w-4" />
-                                        Get a Phone Number ($1.15/mo)
+                                        Get a Phone Number
                                       </Button>
                                     ) : (
                                       <div className="space-y-3 mt-2 p-3 bg-white dark:bg-dark-card rounded-lg border border-gray-200 dark:border-gray-600">
@@ -2109,10 +2109,6 @@ function WhatsAppPage() {
                                     )}
                                   </>
                                 )}
-
-                                <p className="text-xs text-gray-400 mt-3">
-                                  <DollarSign className="h-3 w-3 inline" /> Cost: ~$1.15/month. Currently absorbed by platform.
-                                </p>
                               </div>
                             </div>
                           </div>
@@ -3784,6 +3780,7 @@ function MessageTemplatesTab({ connectionData, whAccountId }) {
     body_text: '',
     footer_text: '',
     buttons: [],
+    example_values: [], // Example values for variables {{1}}, {{2}}, etc.
   })
 
   // Test message form state
@@ -3820,6 +3817,22 @@ function MessageTemplatesTab({ connectionData, whAccountId }) {
     if (!templateForm.name || !templateForm.body_text) {
       toast.error('Template name and body text are required')
       return
+    }
+
+    // Validate example values for variables
+    const variableMatches = templateForm.body_text.match(/\{\{\d+\}\}/g) || []
+    const uniqueVariables = [...new Set(variableMatches)]
+
+    if (uniqueVariables.length > 0) {
+      const missingExamples = uniqueVariables.filter((_, index) => !templateForm.example_values[index]?.trim())
+
+      if (missingExamples.length > 0) {
+        toast.error(
+          '🚨 CRITICAL: Example values are REQUIRED for all variables! Meta will reject templates without examples.',
+          { duration: 6000 }
+        )
+        return
+      }
     }
 
     try {
@@ -3911,6 +3924,7 @@ function MessageTemplatesTab({ connectionData, whAccountId }) {
       body_text: '',
       footer_text: '',
       buttons: [],
+      example_values: [],
     })
   }
 
@@ -4265,6 +4279,76 @@ function MessageTemplatesTab({ connectionData, whAccountId }) {
             value={templateForm.footer_text}
             onChange={(e) => setTemplateForm((prev) => ({ ...prev, footer_text: e.target.value }))}
           />
+
+          {/* Example Values Section - CRITICAL FOR APPROVAL */}
+          {(() => {
+            const variableMatches = templateForm.body_text.match(/\{\{\d+\}\}/g) || []
+            const uniqueVariables = [...new Set(variableMatches)].sort()
+
+            if (uniqueVariables.length > 0) {
+              return (
+                <div className="p-4 bg-red-50 border-2 border-red-300 rounded-lg dark:bg-red-900/30 dark:border-red-700">
+                  <div className="flex items-start gap-2 mb-3">
+                    <AlertCircle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="font-semibold text-red-800 dark:text-red-200 mb-1">
+                        🚨 REQUIRED: Provide Example Values
+                      </p>
+                      <p className="text-sm text-red-700 dark:text-red-300 mb-3">
+                        Meta REQUIRES example values for ALL variables. Without examples, your template will be <strong>REJECTED</strong>!
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    {uniqueVariables.map((variable, index) => {
+                      const varNumber = variable.replace(/[{}]/g, '')
+                      return (
+                        <div key={variable}>
+                          <label className="block text-sm font-medium text-red-800 dark:text-red-200 mb-1">
+                            Example for {variable} *
+                          </label>
+                          <input
+                            type="text"
+                            className="w-full px-3 py-2 border border-red-300 rounded-lg dark:bg-dark-bg dark:border-red-700 dark:text-dark-text focus:ring-2 focus:ring-red-500"
+                            placeholder={
+                              index === 0 ? 'e.g., ORD-2024-12345' :
+                              index === 1 ? 'e.g., $45.00 USD' :
+                              'e.g., John Smith'
+                            }
+                            value={templateForm.example_values[index] || ''}
+                            onChange={(e) => {
+                              const newExamples = [...templateForm.example_values]
+                              newExamples[index] = e.target.value
+                              setTemplateForm((prev) => ({ ...prev, example_values: newExamples }))
+                            }}
+                          />
+                          <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                            {index === 0 && 'Example: Order ID, Product name, Customer name'}
+                            {index === 1 && 'Example: $45.00 USD, 3 items, Premium'}
+                            {index === 2 && 'Example: Customer name, Delivery date, Payment method'}
+                          </p>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  <div className="mt-3 p-2 bg-white dark:bg-dark-card rounded border border-red-200 dark:border-red-800">
+                    <p className="text-xs text-gray-700 dark:text-gray-300 font-medium mb-1">
+                      Preview with examples:
+                    </p>
+                    <p className="text-sm text-gray-900 dark:text-white">
+                      {templateForm.body_text.replace(/\{\{(\d+)\}\}/g, (match, num) => {
+                        const index = parseInt(num) - 1
+                        return templateForm.example_values[index] || match
+                      })}
+                    </p>
+                  </div>
+                </div>
+              )
+            }
+            return null
+          })()}
 
           <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800 dark:bg-yellow-900/20 dark:border-yellow-800 dark:text-yellow-200">
             <strong>Note:</strong> Templates must be approved by Meta before use. Approval typically
