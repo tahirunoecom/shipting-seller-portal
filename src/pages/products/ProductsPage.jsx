@@ -82,9 +82,11 @@ function ProductsPage() {
     image: null,
   })
 
-  // Pagination
+  // Pagination - Server-side
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 12 // 12 for grid (3x4 or 4x3)
+  const [totalProducts, setTotalProducts] = useState(0) // Total count from API
+  const [loadingProducts, setLoadingProducts] = useState(false) // Separate loading for page changes
 
   // Check if selected category is a restaurant category
   const isRestaurantCategory = () => {
@@ -99,9 +101,36 @@ function ProductsPage() {
   }
 
   useEffect(() => {
-    loadProducts()
-    loadCategories()
+    const init = async () => {
+      await loadTotalCount()
+      await loadProducts(1)
+      await loadCategories()
+    }
+    init()
   }, [])
+
+  // Reload products when page changes
+  useEffect(() => {
+    if (products.length > 0 && !searchQuery) { // Skip initial load and when searching
+      loadProducts(currentPage)
+    }
+  }, [currentPage])
+
+  // When category filter changes, reset to page 1 and reload
+  useEffect(() => {
+    if (products.length > 0) { // Skip initial load
+      setCurrentPage(1)
+      loadProducts(1)
+    }
+  }, [selectedCategory])
+
+  // When search changes, reset to page 1 and reload
+  useEffect(() => {
+    if (products.length > 0) { // Skip initial load
+      setCurrentPage(1)
+      loadProducts(1)
+    }
+  }, [searchQuery])
 
 
   // Load subcategories when category changes
@@ -128,22 +157,53 @@ function ProductsPage() {
     }
   }
 
-  const loadProducts = async () => {
+  // Load total product count
+  const loadTotalCount = async () => {
     try {
-      setLoading(true)
-      // Use getShipperProducts API with correct request structure
+      const response = await productService.getShipperProductsTotalCount(user.wh_account_id)
+      if (response.status === 1) {
+        const productsArray = response.data?.getSellerProducts || []
+        setTotalProducts(productsArray.length)
+        return productsArray.length
+      }
+      return 0
+    } catch (error) {
+      console.error('Failed to load total count:', error)
+      return 0
+    }
+  }
+
+  // Load products with server-side pagination
+  const loadProducts = async (page = 1) => {
+    try {
+      const isInitialLoad = page === 1 && products.length === 0
+      if (isInitialLoad) {
+        setLoading(true)
+      } else {
+        setLoadingProducts(true)
+      }
+
+      // Strategy:
+      // - If search is active: Load ALL products (max 1000) for client-side search
+      // - If only category filter: Use server-side filter + pagination
+      // - If no filters: Use server-side pagination
+      const hasSearch = searchQuery.trim().length > 0
+      const itemsToLoad = hasSearch ? '1000' : String(itemsPerPage)
+      const pageToLoad = hasSearch ? '1' : String(page)
+
       const response = await productService.getShipperProducts({
         wh_account_id: user.wh_account_id,
         upc: '',
-        ai_category_id: '',
+        ai_category_id: selectedCategory || '', // Server-side category filter
         ai_product_id: '',
         product_id: '',
         zipcode: '',
+        page: pageToLoad,
+        items: itemsToLoad,
       })
       console.log('Products API response:', response)
 
       if (response.status === 1) {
-        // Response structure: data.getSellerProducts[]
         const productsData = response.data?.getSellerProducts || response.data?.products || []
         console.log('Products loaded:', productsData.length)
         setProducts(productsData)
@@ -153,6 +213,7 @@ function ProductsPage() {
       toast.error('Failed to load products')
     } finally {
       setLoading(false)
+      setLoadingProducts(false)
     }
   }
 
@@ -417,24 +478,34 @@ function ProductsPage() {
     })
   }
 
-  const filteredProducts = products.filter((product) => {
-    const matchesSearch =
-      product.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      product.upc?.includes(searchQuery)
-    const matchesCategory = !selectedCategory ||
-      String(product.ai_category_id || product.category_id) === String(selectedCategory)
-    return matchesSearch && matchesCategory
-  })
+  // Client-side filtering (only for search - category is server-side filtered)
+  const hasSearch = searchQuery.trim().length > 0
+
+  const filteredProducts = hasSearch
+    ? products.filter((product) =>
+        product.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        product.upc?.includes(searchQuery)
+      )
+    : products // When no search, products are already filtered by server
 
   // Pagination calculations
-  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage)
-  const startIndex = (currentPage - 1) * itemsPerPage
-  const paginatedProducts = filteredProducts.slice(startIndex, startIndex + itemsPerPage)
+  let totalPages, startIndex, endIndex, paginatedProducts, displayTotal
 
-  // Reset page when filters change
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [searchQuery, selectedCategory])
+  if (hasSearch) {
+    // Client-side pagination (search loaded all products)
+    displayTotal = filteredProducts.length
+    totalPages = Math.ceil(displayTotal / itemsPerPage)
+    startIndex = (currentPage - 1) * itemsPerPage
+    endIndex = Math.min(startIndex + itemsPerPage, displayTotal)
+    paginatedProducts = filteredProducts.slice(startIndex, startIndex + itemsPerPage)
+  } else {
+    // Server-side pagination (products already paginated from API)
+    displayTotal = selectedCategory ? filteredProducts.length : totalProducts
+    totalPages = Math.ceil(displayTotal / itemsPerPage)
+    startIndex = (currentPage - 1) * itemsPerPage
+    endIndex = Math.min(startIndex + filteredProducts.length, displayTotal)
+    paginatedProducts = filteredProducts // Already paginated from server
+  }
 
   if (loading) {
     return <PageLoader />
@@ -565,7 +636,7 @@ function ProductsPage() {
       {filteredProducts.length > 0 ? (
         <>
         {viewMode === 'grid' ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" style={{ opacity: loadingProducts ? 0.5 : 1, transition: 'opacity 0.2s' }}>
             {paginatedProducts.map((product) => (
               <Card key={product.product_id} className="overflow-hidden hover:shadow-card-hover transition-shadow">
                 <div className="aspect-square bg-gray-100 dark:bg-dark-border relative">
@@ -703,14 +774,14 @@ function ProductsPage() {
         {totalPages > 1 && (
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6">
             <p className="text-sm text-gray-500">
-              Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredProducts.length)} of {filteredProducts.length} products
+              Showing {startIndex + 1} to {endIndex} of {displayTotal} products
             </p>
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
+                disabled={currentPage === 1 || loadingProducts}
               >
                 <ChevronLeft className="h-4 w-4" />
                 Previous
@@ -746,7 +817,7 @@ function ProductsPage() {
                 variant="outline"
                 size="sm"
                 onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages}
+                disabled={currentPage === totalPages || loadingProducts}
               >
                 Next
                 <ChevronRight className="h-4 w-4" />
