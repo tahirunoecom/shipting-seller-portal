@@ -133,6 +133,7 @@ function BulkUploadModal({
   const [showSubcategoryModal, setShowSubcategoryModal] = useState(false)
   const [newSubcategoryName, setNewSubcategoryName] = useState('')
   const [creatingForProduct, setCreatingForProduct] = useState(null) // Product index
+  const [productsWereUploaded, setProductsWereUploaded] = useState(false) // Track if we need to refresh
   const fileInputRef = useRef(null)
 
   // Map category name to category_id
@@ -507,27 +508,30 @@ function BulkUploadModal({
     }
 
     console.log('[BulkUpload] Upload complete! Results:', results)
-    console.log('[BulkUpload] Setting uploadResults and step to complete')
 
-    // Update both states together and ensure step changes
+    // Set results and step
     setUploadResults(results)
+    setStep('complete')
 
-    // Use setTimeout to ensure state update happens
-    setTimeout(() => {
-      console.log('[BulkUpload] Now setting step to complete')
-      setStep('complete')
+    // Mark that products were uploaded (will refresh on modal close)
+    if (results.success.length > 0) {
+      setProductsWereUploaded(true)
+      toast.success(`✅ Successfully uploaded ${results.success.length} products!`)
+    } else {
+      toast.error('❌ All products failed to upload')
+    }
 
-      if (results.success.length > 0) {
-        toast.success(`✅ Successfully uploaded ${results.success.length} products!`)
-        onUploadComplete?.()
-      } else {
-        toast.error('❌ All products failed to upload')
-      }
-    }, 100)
+    console.log('[BulkUpload] Step set to complete')
   }
 
   // Reset modal state
   const handleClose = () => {
+    // Refresh products list if any were uploaded
+    if (productsWereUploaded) {
+      onUploadComplete?.()
+      setProductsWereUploaded(false)
+    }
+
     setStep('upload')
     setFile(null)
     setParsedProducts([])
