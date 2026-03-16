@@ -41,8 +41,10 @@ const DriverEarningsPage = lazy(() => import('@/pages/driver/DriverEarningsPage'
 const DriverHistoryPage = lazy(() => import('@/pages/driver/DriverHistoryPage'))
 const DriverSettingsPage = lazy(() => import('@/pages/driver/DriverSettingsPage'))
 
+// Catalog page - Meta catalog products
+const CatalogPage = lazy(() => import('@/pages/catalog/CatalogPage'))
+
 // Placeholder pages (to be built)
-const CatalogPage = () => <PlaceholderPage title="Catalog" description="Manage your WhatsApp product catalog" />
 const DriversPage = () => <PlaceholderPage title="Find Driver" description="Find and manage delivery drivers" />
 const PaymentsPage = () => <PlaceholderPage title="Payments" description="Manage your payment settings and Stripe integration" />
 

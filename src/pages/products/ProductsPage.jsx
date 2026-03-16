@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuthStore } from '@/store'
-import { productService } from '@/services'
+import { productService, whatsappService } from '@/services'
 import {
   Card,
   CardContent,
@@ -34,6 +34,9 @@ import {
   ChevronLeft,
   ChevronRight,
   FileSpreadsheet,
+  Facebook,
+  Download,
+  AlertCircle,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -66,6 +69,24 @@ function ProductsPage() {
   const [newSubcategoryName, setNewSubcategoryName] = useState('')
   const [editingProduct, setEditingProduct] = useState(null)
   const [isInitialLoad, setIsInitialLoad] = useState(true) // Track initial load
+
+  // Meta Catalog Import state
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [showImportProgress, setShowImportProgress] = useState(false)
+  const [whatsappConnected, setWhatsappConnected] = useState(false)
+  const [metaCatalogs, setMetaCatalogs] = useState([])
+  const [selectedMetaCatalog, setSelectedMetaCatalog] = useState('')
+  const [importOptions, setImportOptions] = useState({
+    overwriteExisting: false,
+    autoCreateCategories: true,
+  })
+  const [importProgress, setImportProgress] = useState({
+    total: 0,
+    imported: 0,
+    skipped: 0,
+    failed: 0,
+  })
+
   const [formData, setFormData] = useState({
     title: '',
     category_id: '',
@@ -116,10 +137,102 @@ function ProductsPage() {
       await loadTotalCount()
       await loadProducts(1)
       await loadCategories()
+      await checkWhatsAppConnection()
       setIsInitialLoad(false) // Mark initial load complete
     }
     init()
   }, [])
+
+  // Check if WhatsApp is connected
+  const checkWhatsAppConnection = async () => {
+    try {
+      const response = await whatsappService.getWhatsAppStatus(user.wh_account_id)
+      if (response.status === 1 && response.data?.is_connected) {
+        setWhatsappConnected(true)
+      }
+    } catch (error) {
+      console.error('Failed to check WhatsApp status:', error)
+    }
+  }
+
+  // Load Meta catalogs when import modal opens
+  const loadMetaCatalogs = async () => {
+    try {
+      const response = await whatsappService.listCatalogs(user.wh_account_id)
+      if (response.status === 1) {
+        const catalogsList = response.data?.catalogs || []
+        setMetaCatalogs(catalogsList)
+        // Pre-select first commerce catalog
+        const firstCommerceCatalog = catalogsList.find(c => c.is_commerce)
+        if (firstCommerceCatalog) {
+          setSelectedMetaCatalog(firstCommerceCatalog.id)
+        }
+      } else {
+        toast.error(response.message || 'Failed to load Meta catalogs')
+      }
+    } catch (error) {
+      console.error('Failed to load Meta catalogs:', error)
+      toast.error('Failed to load Meta catalogs')
+    }
+  }
+
+  // Handle opening import modal
+  const handleOpenImportModal = () => {
+    setShowImportModal(true)
+    loadMetaCatalogs()
+  }
+
+  // Handle import confirmation
+  const handleStartImport = () => {
+    if (!selectedMetaCatalog) {
+      toast.error('Please select a catalog')
+      return
+    }
+
+    // Show confirmation dialog
+    if (window.confirm('Are you sure you want to import products from Meta catalog? This may take a few minutes.')) {
+      setShowImportModal(false)
+      setShowImportProgress(true)
+      startImport()
+    }
+  }
+
+  // Start import process
+  const startImport = async () => {
+    try {
+      setImportProgress({ total: 0, imported: 0, skipped: 0, failed: 0 })
+
+      const response = await whatsappService.importCatalogProducts(
+        user.wh_account_id,
+        selectedMetaCatalog,
+        importOptions
+      )
+
+      if (response.status === 1) {
+        setImportProgress({
+          total: response.data?.total || 0,
+          imported: response.data?.imported || 0,
+          skipped: response.data?.skipped || 0,
+          failed: response.data?.failed || 0,
+        })
+        toast.success(`Import complete! Imported ${response.data?.imported} products`)
+
+        // Reload products
+        await loadProducts(1)
+      } else {
+        toast.error(response.message || 'Import failed')
+      }
+    } catch (error) {
+      console.error('Import error:', error)
+      toast.error('Import failed: ' + error.message)
+    }
+  }
+
+  // Close import progress modal
+  const handleCloseImportProgress = () => {
+    setShowImportProgress(false)
+    setImportProgress({ total: 0, imported: 0, skipped: 0, failed: 0 })
+  }
 
   // Reload products when page changes
   useEffect(() => {
@@ -527,6 +640,12 @@ function ProductsPage() {
             <FileSpreadsheet className="h-4 w-4" />
             Bulk Upload
           </Button>
+          {whatsappConnected && (
+            <Button variant="outline" onClick={handleOpenImportModal}>
+              <Facebook className="h-4 w-4" />
+              Import from Meta
+            </Button>
+          )}
           <Button onClick={openAddProductModal}>
             <Plus className="h-4 w-4" />
             Add Product
@@ -1166,6 +1285,171 @@ function ProductsPage() {
         wh_account_id={user.wh_account_id}
         productService={productService}
       />
+
+      {/* Import from Meta Catalog Modal */}
+      <Modal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        title="Import Products from Meta Catalog"
+        size="md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600 dark:text-dark-muted">
+            Import products from your Meta (Facebook/Instagram) catalog to Shipting.
+          </p>
+
+          {/* Catalog Selection */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-dark-text mb-2">
+              Select Catalog
+            </label>
+            {metaCatalogs.length === 0 ? (
+              <div className="p-4 bg-gray-50 dark:bg-dark-border rounded-lg text-center">
+                <p className="text-sm text-gray-500">Loading catalogs...</p>
+              </div>
+            ) : (
+              <select
+                value={selectedMetaCatalog}
+                onChange={(e) => setSelectedMetaCatalog(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-dark-border rounded-lg focus:ring-2 focus:ring-primary-500 dark:bg-dark-card dark:text-dark-text"
+              >
+                <option value="">-- Select a catalog --</option>
+                {metaCatalogs.map((catalog) => (
+                  <option key={catalog.id} value={catalog.id}>
+                    {catalog.name} {catalog.is_commerce ? '(Commerce ✓)' : '(Non-commerce)'}
+                    {catalog.product_count ? ` - ${catalog.product_count} products` : ''}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          {/* Import Options */}
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={importOptions.overwriteExisting}
+                onChange={(e) => setImportOptions(prev => ({ ...prev, overwriteExisting: e.target.checked }))}
+                className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+              />
+              <span className="text-sm text-gray-700 dark:text-dark-text">
+                Overwrite existing products (match by UPC)
+              </span>
+            </label>
+
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={importOptions.autoCreateCategories}
+                onChange={(e) => setImportOptions(prev => ({ ...prev, autoCreateCategories: e.target.checked }))}
+                className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+              />
+              <span className="text-sm text-gray-700 dark:text-dark-text">
+                Create missing categories automatically
+              </span>
+            </label>
+          </div>
+
+          {/* Warning */}
+          <div className="flex gap-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+            <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-500 flex-shrink-0" />
+            <p className="text-sm text-yellow-800 dark:text-yellow-200">
+              This will import all products from the selected Meta catalog. This may take a few minutes depending on the number of products.
+            </p>
+          </div>
+        </div>
+
+        <ModalFooter>
+          <Button variant="outline" onClick={() => setShowImportModal(false)}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleStartImport}
+            disabled={!selectedMetaCatalog}
+          >
+            <Download className="h-4 w-4" />
+            Import Products
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Import Progress Modal */}
+      <Modal
+        isOpen={showImportProgress}
+        onClose={handleCloseImportProgress}
+        title="Importing Products from Meta Catalog"
+        size="md"
+      >
+        <div className="space-y-4">
+          {/* Progress Bar */}
+          {importProgress.total > 0 && (
+            <div>
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-gray-600 dark:text-dark-muted">Progress</span>
+                <span className="font-medium text-gray-900 dark:text-dark-text">
+                  {importProgress.imported + importProgress.skipped + importProgress.failed} / {importProgress.total}
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 dark:bg-dark-border rounded-full h-3">
+                <div
+                  className="bg-primary-600 h-3 rounded-full transition-all duration-300"
+                  style={{
+                    width: `${((importProgress.imported + importProgress.skipped + importProgress.failed) / importProgress.total) * 100}%`
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Stats */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg text-center">
+              <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                {importProgress.imported}
+              </div>
+              <div className="text-xs text-green-700 dark:text-green-300">Imported</div>
+            </div>
+            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-center">
+              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                {importProgress.skipped}
+              </div>
+              <div className="text-xs text-blue-700 dark:text-blue-300">Skipped</div>
+            </div>
+            <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg text-center">
+              <div className="text-2xl font-bold text-red-600 dark:text-red-400">
+                {importProgress.failed}
+              </div>
+              <div className="text-xs text-red-700 dark:text-red-300">Failed</div>
+            </div>
+          </div>
+
+          {/* Status Message */}
+          {importProgress.total === 0 ? (
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+              <p className="text-gray-600 dark:text-dark-muted">Starting import...</p>
+            </div>
+          ) : (
+            importProgress.imported + importProgress.skipped + importProgress.failed === importProgress.total && (
+              <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                <p className="text-green-700 dark:text-green-300 font-medium">
+                  Import complete!
+                </p>
+              </div>
+            )
+          )}
+        </div>
+
+        <ModalFooter>
+          <Button
+            onClick={handleCloseImportProgress}
+            disabled={importProgress.total > 0 && importProgress.imported + importProgress.skipped + importProgress.failed < importProgress.total}
+          >
+            Close
+          </Button>
+        </ModalFooter>
+      </Modal>
     </div>
   )
 }
