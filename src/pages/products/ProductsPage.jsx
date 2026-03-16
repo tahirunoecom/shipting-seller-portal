@@ -65,6 +65,7 @@ function ProductsPage() {
   const [showSubcategoryModal, setShowSubcategoryModal] = useState(false)
   const [newSubcategoryName, setNewSubcategoryName] = useState('')
   const [editingProduct, setEditingProduct] = useState(null)
+  const [isInitialLoad, setIsInitialLoad] = useState(true) // Track initial load
   const [formData, setFormData] = useState({
     title: '',
     category_id: '',
@@ -115,20 +116,21 @@ function ProductsPage() {
       await loadTotalCount()
       await loadProducts(1)
       await loadCategories()
+      setIsInitialLoad(false) // Mark initial load complete
     }
     init()
   }, [])
 
-  // Reload products when page changes (but not when search is debouncing)
+  // Reload products when page changes
   useEffect(() => {
-    if (products.length > 0) { // Skip initial load
+    if (!isInitialLoad) { // Skip only during initial mount
       loadProducts(currentPage)
     }
   }, [currentPage])
 
   // When category filter changes, reset to page 1 and reload
   useEffect(() => {
-    if (products.length > 0) { // Skip initial load
+    if (!isInitialLoad) { // Skip only during initial mount
       setCurrentPage(1)
       loadProducts(1)
     }
@@ -136,7 +138,7 @@ function ProductsPage() {
 
   // When debounced search changes, reset to page 1 and reload
   useEffect(() => {
-    if (products.length > 0) { // Skip initial load
+    if (!isInitialLoad) { // Skip only during initial mount
       setCurrentPage(1)
       loadProducts(1)
     }
