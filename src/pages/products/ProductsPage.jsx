@@ -473,10 +473,16 @@ function ProductsPage() {
                 placeholder="Search products..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 pl-10 text-base font-medium placeholder-gray-400 transition-colors focus:outline-none focus:ring-2 focus:border-primary-500 focus:ring-primary-500/20 dark:bg-dark-card dark:border-dark-border dark:placeholder-gray-500"
                 style={{
+                  width: '100%',
+                  padding: '0.75rem 1rem 0.75rem 2.5rem',
+                  fontSize: '16px',
+                  fontWeight: '500',
                   color: '#000000',
-                  WebkitTextFillColor: '#000000',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '0.5rem',
+                  outline: 'none',
                 }}
                 autoComplete="off"
               />
