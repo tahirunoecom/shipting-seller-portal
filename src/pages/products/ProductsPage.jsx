@@ -646,7 +646,7 @@ function ProductsPage() {
       </Card>
 
       {/* Products Grid/List */}
-      {filteredProducts.length > 0 ? (
+      {paginatedProducts.length > 0 ? (
         <>
         {viewMode === 'grid' ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" style={{ opacity: loadingProducts ? 0.5 : 1, transition: 'opacity 0.2s' }}>
