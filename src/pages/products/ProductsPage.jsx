@@ -58,6 +58,7 @@ function ProductsPage() {
   const [loadingSubcategories, setLoadingSubcategories] = useState(false)
   const [viewMode, setViewMode] = useState('grid') // 'grid' or 'list'
   const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('') // Debounced for API
   const [selectedCategory, setSelectedCategory] = useState('')
   const [showAddModal, setShowAddModal] = useState(false)
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false)
@@ -100,6 +101,15 @@ function ProductsPage() {
     return RESTAURANT_CATEGORIES.some(rc => categoryName.includes(rc.toLowerCase()))
   }
 
+  // Debounce search query (wait 500ms after user stops typing)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery)
+    }, 500) // Wait 500ms after user stops typing
+
+    return () => clearTimeout(timer) // Clear timeout if user keeps typing
+  }, [searchQuery])
+
   useEffect(() => {
     const init = async () => {
       await loadTotalCount()
@@ -109,9 +119,9 @@ function ProductsPage() {
     init()
   }, [])
 
-  // Reload products when page changes
+  // Reload products when page changes (but not when search is debouncing)
   useEffect(() => {
-    if (products.length > 0 && !searchQuery) { // Skip initial load and when searching
+    if (products.length > 0) { // Skip initial load
       loadProducts(currentPage)
     }
   }, [currentPage])
@@ -124,13 +134,13 @@ function ProductsPage() {
     }
   }, [selectedCategory])
 
-  // When search changes, reset to page 1 and reload
+  // When debounced search changes, reset to page 1 and reload
   useEffect(() => {
     if (products.length > 0) { // Skip initial load
       setCurrentPage(1)
       loadProducts(1)
     }
-  }, [searchQuery])
+  }, [debouncedSearchQuery])
 
 
   // Load subcategories when category changes
@@ -183,14 +193,8 @@ function ProductsPage() {
         setLoadingProducts(true)
       }
 
-      // Strategy:
-      // - If search is active: Load ALL products (max 1000) for client-side search
-      // - If only category filter: Use server-side filter + pagination
-      // - If no filters: Use server-side pagination
-      const hasSearch = searchQuery.trim().length > 0
-      const itemsToLoad = hasSearch ? '1000' : String(itemsPerPage)
-      const pageToLoad = hasSearch ? '1' : String(page)
-
+      // Server-side pagination + filtering + search
+      // All filters are handled by backend API efficiently!
       const response = await productService.getShipperProducts({
         wh_account_id: user.wh_account_id,
         upc: '',
@@ -198,8 +202,9 @@ function ProductsPage() {
         ai_product_id: '',
         product_id: '',
         zipcode: '',
-        page: pageToLoad,
-        items: itemsToLoad,
+        search_string: debouncedSearchQuery || '', // Server-side search (debounced!)
+        page: String(page),
+        items: String(itemsPerPage), // Always load 12 products
       })
       console.log('Products API response:', response)
 
@@ -478,34 +483,28 @@ function ProductsPage() {
     })
   }
 
-  // Client-side filtering (only for search - category is server-side filtered)
-  const hasSearch = searchQuery.trim().length > 0
-
-  const filteredProducts = hasSearch
-    ? products.filter((product) =>
-        product.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.upc?.includes(searchQuery)
-      )
-    : products // When no search, products are already filtered by server
+  // No client-side filtering needed! Backend handles search + category filter
+  // Products are already filtered and paginated by server
+  const paginatedProducts = products
 
   // Pagination calculations
-  let totalPages, startIndex, endIndex, paginatedProducts, displayTotal
+  const hasActiveFilters = debouncedSearchQuery || selectedCategory
 
-  if (hasSearch) {
-    // Client-side pagination (search loaded all products)
-    displayTotal = filteredProducts.length
-    totalPages = Math.ceil(displayTotal / itemsPerPage)
-    startIndex = (currentPage - 1) * itemsPerPage
-    endIndex = Math.min(startIndex + itemsPerPage, displayTotal)
-    paginatedProducts = filteredProducts.slice(startIndex, startIndex + itemsPerPage)
-  } else {
-    // Server-side pagination (products already paginated from API)
-    displayTotal = selectedCategory ? filteredProducts.length : totalProducts
-    totalPages = Math.ceil(displayTotal / itemsPerPage)
-    startIndex = (currentPage - 1) * itemsPerPage
-    endIndex = Math.min(startIndex + filteredProducts.length, displayTotal)
-    paginatedProducts = filteredProducts // Already paginated from server
-  }
+  // When no filters: Use total count from API
+  // When filters active: Estimate based on whether we got a full page
+  const displayTotal = hasActiveFilters
+    ? (products.length === itemsPerPage ? '?' : products.length) // Show ? if might be more pages
+    : totalProducts
+
+  const totalPages = hasActiveFilters
+    ? (products.length === itemsPerPage ? currentPage + 1 : currentPage) // Estimate: at least one more page if full
+    : Math.ceil(totalProducts / itemsPerPage)
+
+  const startIndex = (currentPage - 1) * itemsPerPage + 1
+  const endIndex = startIndex + products.length - 1
+
+  // Can go to next page if we got a full page (might be more results)
+  const hasNextPage = products.length === itemsPerPage
 
   if (loading) {
     return <PageLoader />
@@ -552,6 +551,20 @@ function ProductsPage() {
                   zIndex: 10
                 }}
               />
+              {searchQuery && searchQuery !== debouncedSearchQuery && (
+                <span style={{
+                  position: 'absolute',
+                  right: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  fontSize: '12px',
+                  color: '#6b7280',
+                  pointerEvents: 'none',
+                  zIndex: 10
+                }}>
+                  Searching...
+                </span>
+              )}
               <input
                 type="text"
                 placeholder="Search products..."
@@ -774,7 +787,10 @@ function ProductsPage() {
         {totalPages > 1 && (
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6">
             <p className="text-sm text-gray-500">
-              Showing {startIndex + 1} to {endIndex} of {displayTotal} products
+              {hasActiveFilters && products.length === itemsPerPage
+                ? `Showing ${startIndex} to ${endIndex} products` // Don't show total when filtering (unknown)
+                : `Showing ${startIndex} to ${endIndex} of ${displayTotal} products`
+              }
             </p>
             <div className="flex items-center gap-2">
               <Button
@@ -816,8 +832,8 @@ function ProductsPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages || loadingProducts}
+                onClick={() => setCurrentPage(prev => prev + 1)}
+                disabled={!hasNextPage || loadingProducts}
               >
                 Next
                 <ChevronRight className="h-4 w-4" />
