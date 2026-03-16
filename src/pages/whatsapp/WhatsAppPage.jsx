@@ -1094,28 +1094,75 @@ function WhatsAppPage() {
   // Download QR code as image
   const downloadQRCode = () => {
     const svg = qrCodeRef.current?.querySelector('svg')
-    if (!svg) return
-
-    const svgData = new XMLSerializer().serializeToString(svg)
-    const canvas = document.createElement('canvas')
-    const ctx = canvas.getContext('2d')
-    const img = new Image()
-
-    img.onload = () => {
-      canvas.width = img.width
-      canvas.height = img.height
-      ctx.fillStyle = 'white'
-      ctx.fillRect(0, 0, canvas.width, canvas.height)
-      ctx.drawImage(img, 0, 0)
-
-      const link = document.createElement('a')
-      link.download = `whatsapp-qr-${connectionData.phoneNumber || 'store'}.png`
-      link.href = canvas.toDataURL('image/png')
-      link.click()
-      toast.success('QR Code downloaded!')
+    if (!svg) {
+      toast.error('QR code not found')
+      return
     }
 
-    img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)))
+    try {
+      // Clone the SVG to avoid modifying the original
+      const clonedSvg = svg.cloneNode(true)
+
+      // Get SVG dimensions
+      const svgRect = svg.getBoundingClientRect()
+      const width = svgRect.width || 200
+      const height = svgRect.height || 200
+
+      // Serialize the SVG
+      const svgData = new XMLSerializer().serializeToString(clonedSvg)
+
+      // Create canvas
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+
+      // Set canvas size with some padding for better quality
+      const scale = 2 // Higher resolution
+      canvas.width = width * scale
+      canvas.height = height * scale
+
+      // Create image
+      const img = new Image()
+
+      img.onload = () => {
+        // Fill white background
+        ctx.fillStyle = '#ffffff'
+        ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+        // Draw the QR code
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+
+        // Convert to blob and download
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            toast.error('Failed to generate QR code image')
+            return
+          }
+
+          const url = URL.createObjectURL(blob)
+          const link = document.createElement('a')
+          link.download = `whatsapp-qr-${connectionData.phoneNumber || 'store'}.png`
+          link.href = url
+          link.click()
+
+          // Clean up
+          URL.revokeObjectURL(url)
+          toast.success('QR Code downloaded!')
+        }, 'image/png')
+      }
+
+      img.onerror = () => {
+        toast.error('Failed to load QR code image')
+      }
+
+      // Convert SVG to data URL (modern approach)
+      const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' })
+      const url = URL.createObjectURL(svgBlob)
+      img.src = url
+
+    } catch (error) {
+      console.error('QR download error:', error)
+      toast.error('Failed to download QR code')
+    }
   }
 
   // Share via Web Share API (mobile)
