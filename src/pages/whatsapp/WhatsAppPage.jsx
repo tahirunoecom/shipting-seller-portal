@@ -3951,17 +3951,57 @@ function MessageTemplatesTab({ connectionData, whAccountId }) {
 
   const getStatusBadge = (status) => {
     const statusMap = {
-      APPROVED: { color: 'green', label: 'Approved' },
-      PENDING: { color: 'yellow', label: 'Pending Review' },
-      REJECTED: { color: 'red', label: 'Rejected' },
-      PAUSED: { color: 'gray', label: 'Paused' },
-      DISABLED: { color: 'gray', label: 'Disabled' },
+      APPROVED: {
+        color: 'green',
+        label: 'Approved',
+        icon: CheckCircle,
+        bgClass: 'bg-green-100 dark:bg-green-900/30 border-green-500',
+        textClass: 'text-green-700 dark:text-green-300',
+      },
+      PENDING: {
+        color: 'yellow',
+        label: 'Pending Review',
+        icon: Clock,
+        bgClass: 'bg-yellow-100 dark:bg-yellow-900/30 border-yellow-500',
+        textClass: 'text-yellow-700 dark:text-yellow-300',
+      },
+      REJECTED: {
+        color: 'red',
+        label: 'Rejected',
+        icon: XCircle,
+        bgClass: 'bg-red-100 dark:bg-red-900/30 border-red-500',
+        textClass: 'text-red-700 dark:text-red-300',
+      },
+      PAUSED: {
+        color: 'gray',
+        label: 'Paused',
+        icon: AlertCircle,
+        bgClass: 'bg-gray-100 dark:bg-gray-900/30 border-gray-500',
+        textClass: 'text-gray-700 dark:text-gray-300',
+      },
+      DISABLED: {
+        color: 'gray',
+        label: 'Disabled',
+        icon: XCircle,
+        bgClass: 'bg-gray-100 dark:bg-gray-900/30 border-gray-500',
+        textClass: 'text-gray-700 dark:text-gray-300',
+      },
     }
-    const config = statusMap[status] || { color: 'gray', label: status }
+    const config = statusMap[status] || {
+      color: 'gray',
+      label: status,
+      icon: AlertCircle,
+      bgClass: 'bg-gray-100 dark:bg-gray-900/30 border-gray-500',
+      textClass: 'text-gray-700 dark:text-gray-300',
+    }
+    const Icon = config.icon
     return (
-      <Badge variant={config.color} className="text-xs">
+      <div
+        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border ${config.bgClass} ${config.textClass} font-medium text-sm`}
+      >
+        <Icon className="h-4 w-4" />
         {config.label}
-      </Badge>
+      </div>
     )
   }
 
@@ -4023,11 +4063,22 @@ function MessageTemplatesTab({ connectionData, whAccountId }) {
             </div>
           ) : (
             <div className="space-y-3">
-              {templates.map((template) => (
-                <div
-                  key={template.id}
-                  className="border rounded-lg p-4 hover:shadow-md transition-shadow dark:border-dark-border"
-                >
+              {templates.map((template) => {
+                const getCardBorderClass = (status) => {
+                  if (status === 'APPROVED')
+                    return 'border-l-4 border-l-green-500 border-t border-r border-b border-green-200 bg-green-50/30 dark:bg-green-900/10 dark:border-green-700'
+                  if (status === 'REJECTED')
+                    return 'border-l-4 border-l-red-500 border-t border-r border-b border-red-200 bg-red-50/30 dark:bg-red-900/10 dark:border-red-700'
+                  if (status === 'PENDING')
+                    return 'border-l-4 border-l-yellow-500 border-t border-r border-b border-yellow-200 bg-yellow-50/30 dark:bg-yellow-900/10 dark:border-yellow-700'
+                  return 'border border-gray-200 dark:border-dark-border'
+                }
+
+                return (
+                  <div
+                    key={template.id}
+                    className={`rounded-lg p-4 hover:shadow-md transition-all ${getCardBorderClass(template.status)}`}
+                  >
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
@@ -4107,7 +4158,8 @@ function MessageTemplatesTab({ connectionData, whAccountId }) {
                     </div>
                   )}
                 </div>
-              ))}
+              )
+              })}
             </div>
           )}
 
