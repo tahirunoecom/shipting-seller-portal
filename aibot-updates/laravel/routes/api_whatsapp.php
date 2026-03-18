@@ -62,6 +62,9 @@ Route::middleware(['auth:sanctum'])->prefix('seller/whatsapp')->group(function (
     Route::post('/quick-replies/save', [WhatsAppController::class, 'saveQuickReply']);
     Route::post('/quick-replies/delete', [WhatsAppController::class, 'deleteQuickReply']);
 
+    // Messaging
+    Route::post('/send-test', [WhatsAppController::class, 'sendTestMessage']);
+
     // Message templates (for Meta App Review - whatsapp_business_management permission)
     Route::post('/templates', [WhatsAppController::class, 'getTemplates']);
     Route::post('/templates/create', [WhatsAppController::class, 'createTemplate']);
