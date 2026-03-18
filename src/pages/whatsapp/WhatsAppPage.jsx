@@ -1221,7 +1221,7 @@ function WhatsAppPage() {
       setSendingTestMessage(true)
 
       const response = await whatsappService.sendTestMessage(
-        whAccountId,
+        user?.wh_account_id,
         testMessageForm.to_phone_number,
         testMessageForm.message
       )
