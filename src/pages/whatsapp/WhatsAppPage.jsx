@@ -164,6 +164,14 @@ function WhatsAppPage() {
   const [editingQuickReply, setEditingQuickReply] = useState(null)
   const [quickReplyForm, setQuickReplyForm] = useState({ shortcut: '', message: '' })
 
+  // Testing & Messaging state (for Meta App Review screencast)
+  const [testMessageForm, setTestMessageForm] = useState({
+    to_phone_number: '',
+    message: 'Hello! This is a test message from our WhatsApp Business integration.',
+  })
+  const [sendingTestMessage, setSendingTestMessage] = useState(false)
+  const [messageHistory, setMessageHistory] = useState([])
+
   // Phone Registration state
   const [showOtpModal, setShowOtpModal] = useState(false)
   const [otpCode, setOtpCode] = useState('')
@@ -216,6 +224,7 @@ function WhatsAppPage() {
 
   const tabs = [
     { key: 'connection', label: 'Connection', icon: Link },
+    { key: 'testing', label: 'Testing & Messaging', icon: Send },
     { key: 'settings', label: 'Bot Settings', icon: Settings },
     { key: 'auto-replies', label: 'Auto-Replies', icon: Zap },
     { key: 'quick-replies', label: 'Quick Replies', icon: MessageCircle },
@@ -1184,6 +1193,65 @@ function WhatsAppPage() {
       }
     } else {
       copyLinkToClipboard()
+    }
+  }
+
+  // Send Test Message (for Meta App Review screencast)
+  const handleSendTestMessage = async () => {
+    // Validate inputs
+    if (!testMessageForm.to_phone_number) {
+      toast.error('Please enter a recipient phone number')
+      return
+    }
+
+    if (!testMessageForm.message) {
+      toast.error('Please enter a message')
+      return
+    }
+
+    // Validate phone number format
+    const phoneRegex = /^\+?[1-9]\d{1,14}$/
+    const cleanPhone = testMessageForm.to_phone_number.replace(/[\s\-()]/g, '')
+    if (!phoneRegex.test(cleanPhone)) {
+      toast.error('Please enter a valid phone number with country code (e.g., +1234567890)')
+      return
+    }
+
+    try {
+      setSendingTestMessage(true)
+
+      const response = await whatsappService.sendTestMessage(
+        whAccountId,
+        testMessageForm.to_phone_number,
+        testMessageForm.message
+      )
+
+      if (response.status === 1) {
+        toast.success('✅ Test message sent successfully!')
+
+        // Add to message history
+        setMessageHistory(prev => [{
+          id: Date.now(),
+          to: testMessageForm.to_phone_number,
+          message: testMessageForm.message,
+          timestamp: new Date().toISOString(),
+          status: 'sent',
+          message_id: response.data?.message_id || response.data?.messageId || null,
+        }, ...prev])
+
+        // Clear message field but keep phone number for convenience
+        setTestMessageForm(prev => ({
+          ...prev,
+          message: 'Hello! This is a test message from our WhatsApp Business integration.',
+        }))
+      } else {
+        toast.error(response.message || 'Failed to send test message')
+      }
+    } catch (error) {
+      console.error('Error sending test message:', error)
+      toast.error(error.response?.data?.message || 'Failed to send test message')
+    } finally {
+      setSendingTestMessage(false)
     }
   }
 
@@ -3117,6 +3185,228 @@ function WhatsAppPage() {
                     </div>
                   </CardContent>
                 </Card>
+              )}
+            </div>
+          )}
+
+          {/* Testing & Messaging Tab (for Meta App Review) */}
+          {activeTab === 'testing' && (
+            <div className="space-y-6">
+              {!connectionData.isConnected ? (
+                <Card>
+                  <CardContent className="text-center py-12">
+                    <AlertCircle className="h-12 w-12 mx-auto text-gray-300 mb-4" />
+                    <p className="text-gray-500">Connect WhatsApp first to test messaging</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <>
+                  {/* Meta App Review Instructions */}
+                  <Card className="border-2 border-blue-200 bg-blue-50 dark:bg-blue-900/10 dark:border-blue-800">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-blue-900 dark:text-blue-300">
+                        <Lightbulb className="h-5 w-5" />
+                        Meta App Review - Screencast Guide
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="p-4 bg-white dark:bg-dark-card rounded-lg">
+                        <h4 className="font-semibold mb-3 text-gray-900 dark:text-dark-text">
+                          📹 How to Record Your Screencast:
+                        </h4>
+                        <ol className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
+                          <li className="flex gap-2">
+                            <span className="font-bold text-blue-600 dark:text-blue-400">1.</span>
+                            <span><strong>Show Asset Selection:</strong> Point to the "Connected WhatsApp Number" section below (shows your WhatsApp Business phone number)</span>
+                          </li>
+                          <li className="flex gap-2">
+                            <span className="font-bold text-blue-600 dark:text-blue-400">2.</span>
+                            <span><strong>Send Test Message:</strong> Enter your phone number, type a message, and click "Send Message"</span>
+                          </li>
+                          <li className="flex gap-2">
+                            <span className="font-bold text-blue-600 dark:text-blue-400">3.</span>
+                            <span><strong>Show Delivery:</strong> Open WhatsApp on your phone and show the message arrived</span>
+                          </li>
+                          <li className="flex gap-2">
+                            <span className="font-bold text-blue-600 dark:text-blue-400">4.</span>
+                            <span><strong>Check Message Log:</strong> Scroll down to see the message in the "Sent Messages" log</span>
+                          </li>
+                        </ol>
+                      </div>
+                      <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                        <p className="text-sm text-yellow-800 dark:text-yellow-300">
+                          <strong>⚠️ Important:</strong> Record in one continuous take showing all steps. Use English UI language and add captions if needed.
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Connected WhatsApp Number (Asset Selection) */}
+                  <Card className="border-2 border-green-200 dark:border-green-800">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <CheckCircle className="h-5 w-5 text-green-600" />
+                        Connected WhatsApp Number
+                        <Badge variant="success" className="ml-auto">Active</Badge>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid md:grid-cols-3 gap-4">
+                        <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                          <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">WhatsApp Business Number</p>
+                          <p className="text-2xl font-bold text-green-700 dark:text-green-400">
+                            {connectionData.phoneNumber}
+                          </p>
+                        </div>
+                        <div className="p-4 bg-gray-50 dark:bg-dark-bg rounded-lg">
+                          <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Business Name</p>
+                          <p className="text-lg font-semibold text-gray-900 dark:text-dark-text">
+                            {userDetails?.business_name || user?.business_name || 'Your Business'}
+                          </p>
+                        </div>
+                        <div className="p-4 bg-gray-50 dark:bg-dark-bg rounded-lg">
+                          <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Account Status</p>
+                          <p className="text-lg font-semibold text-green-600 dark:text-green-400">
+                            ✓ Connected
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Send Test Message Form */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Send className="h-5 w-5" />
+                        Send Test Message
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-dark-text mb-2">
+                          Recipient Phone Number
+                          <span className="text-red-500">*</span>
+                        </label>
+                        <Input
+                          type="tel"
+                          placeholder="+1234567890"
+                          value={testMessageForm.to_phone_number}
+                          onChange={(e) =>
+                            setTestMessageForm(prev => ({ ...prev, to_phone_number: e.target.value }))
+                          }
+                          className="font-mono"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Include country code (e.g., +1 for US, +91 for India)
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-dark-text mb-2">
+                          Message
+                          <span className="text-red-500">*</span>
+                        </label>
+                        <textarea
+                          rows={4}
+                          placeholder="Type your test message here..."
+                          value={testMessageForm.message}
+                          onChange={(e) =>
+                            setTestMessageForm(prev => ({ ...prev, message: e.target.value }))
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-dark-border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-dark-bg dark:text-dark-text"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          {testMessageForm.message.length} characters
+                        </p>
+                      </div>
+
+                      <div className="flex gap-3">
+                        <Button
+                          onClick={handleSendTestMessage}
+                          isLoading={sendingTestMessage}
+                          disabled={!testMessageForm.to_phone_number || !testMessageForm.message}
+                          className="flex-1"
+                        >
+                          <Send className="h-4 w-4 mr-2" />
+                          Send Message
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setTestMessageForm({
+                              to_phone_number: '',
+                              message: 'Hello! This is a test message from our WhatsApp Business integration.',
+                            })
+                          }}
+                        >
+                          Clear
+                        </Button>
+                      </div>
+
+                      <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                        <p className="text-sm text-blue-800 dark:text-blue-300">
+                          <strong>💡 Tip:</strong> Send the test message to your own phone number to verify the integration works correctly for your Meta app review screencast.
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Message History */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Clock className="h-5 w-5" />
+                        Sent Messages
+                        {messageHistory.length > 0 && (
+                          <Badge variant="default" className="ml-2">
+                            {messageHistory.length}
+                          </Badge>
+                        )}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {messageHistory.length === 0 ? (
+                        <div className="text-center py-8">
+                          <Inbox className="h-12 w-12 mx-auto text-gray-300 mb-3" />
+                          <p className="text-gray-500 text-sm">No messages sent yet</p>
+                          <p className="text-gray-400 text-xs mt-1">
+                            Messages you send will appear here
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {messageHistory.map((msg) => (
+                            <div
+                              key={msg.id}
+                              className="p-4 bg-gray-50 dark:bg-dark-bg rounded-lg border border-gray-200 dark:border-dark-border"
+                            >
+                              <div className="flex items-start justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  <CheckCircle className="h-4 w-4 text-green-500" />
+                                  <span className="font-semibold text-gray-900 dark:text-dark-text">
+                                    To: {msg.to}
+                                  </span>
+                                </div>
+                                <span className="text-xs text-gray-500">
+                                  {new Date(msg.timestamp).toLocaleString()}
+                                </span>
+                              </div>
+                              <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap pl-6">
+                                {msg.message}
+                              </p>
+                              {msg.message_id && (
+                                <p className="text-xs text-gray-400 mt-2 pl-6 font-mono">
+                                  Message ID: {msg.message_id}
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </>
               )}
             </div>
           )}
