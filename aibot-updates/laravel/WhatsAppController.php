@@ -3376,6 +3376,89 @@ class WhatsAppController extends Controller
 	}
 
 	/**
+	 * Send a simple test message
+	 * POST /api/seller/whatsapp/send-test
+	 */
+	public function sendTestMessage(Request $request)
+	{
+		try {
+			$whAccountId = $request->input('wh_account_id');
+			$phoneNumber = $request->input('phone_number');
+			$message = $request->input('message');
+
+			if (!$whAccountId || !$phoneNumber || !$message) {
+				return response()->json([
+					'status' => 0,
+					'message' => 'Missing required fields: wh_account_id, phone_number, message'
+				]);
+			}
+
+			$config = SellerWhatsappConfig::where('wh_account_id', $whAccountId)->first();
+
+			if (!$config || !$config->phone_number_id || !$config->access_token) {
+				return response()->json([
+					'status' => 0,
+					'message' => 'WhatsApp not connected or missing credentials'
+				]);
+			}
+
+			// Clean phone number (remove + and any non-digits)
+			$phoneNumber = preg_replace('/[^0-9]/', '', $phoneNumber);
+
+			Log::info("Sending test message to {$phoneNumber}: {$message}");
+
+			// Build text message payload
+			$payload = [
+				'messaging_product' => 'whatsapp',
+				'recipient_type' => 'individual',
+				'to' => $phoneNumber,
+				'type' => 'text',
+				'text' => [
+					'preview_url' => false,
+					'body' => $message
+				]
+			];
+
+			Log::info("Text message payload: " . json_encode($payload, JSON_PRETTY_PRINT));
+
+			// Send via WhatsApp Business API
+			$response = Http::withToken($config->access_token)
+				->post("https://graph.facebook.com/v21.0/{$config->phone_number_id}/messages", $payload);
+
+			$result = $response->json();
+			Log::info("Send message response: " . json_encode($result));
+
+			if ($response->successful() && isset($result['messages'][0]['id'])) {
+				return response()->json([
+					'status' => 1,
+					'message' => 'Test message sent successfully!',
+					'data' => [
+						'message_id' => $result['messages'][0]['id']
+					]
+				]);
+			}
+
+			$error = $result['error']['message'] ?? 'Unknown error';
+			$errorCode = $result['error']['code'] ?? 0;
+			$errorDetails = $result['error']['error_user_msg'] ?? '';
+
+			return response()->json([
+				'status' => 0,
+				'message' => "Failed to send test message: {$error}",
+				'error_code' => $errorCode,
+				'details' => $errorDetails
+			]);
+
+		} catch (\Exception $e) {
+			Log::error('sendTestMessage error: ' . $e->getMessage());
+			return response()->json([
+				'status' => 0,
+				'message' => 'Failed to send test message: ' . $e->getMessage()
+			], 500);
+		}
+	}
+
+	/**
 	 * Send a test message using a template
 	 * POST /api/seller/whatsapp/templates/send-test
 	 */
