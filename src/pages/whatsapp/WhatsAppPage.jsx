@@ -3201,46 +3201,6 @@ function WhatsAppPage() {
                 </Card>
               ) : (
                 <>
-                  {/* Meta App Review Instructions */}
-                  <Card className="border-2 border-blue-200 bg-blue-50 dark:bg-blue-900/10 dark:border-blue-800">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-blue-900 dark:text-blue-300">
-                        <Lightbulb className="h-5 w-5" />
-                        Meta App Review - Screencast Guide
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="p-4 bg-white dark:bg-dark-card rounded-lg">
-                        <h4 className="font-semibold mb-3 text-gray-900 dark:text-dark-text">
-                          📹 How to Record Your Screencast:
-                        </h4>
-                        <ol className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
-                          <li className="flex gap-2">
-                            <span className="font-bold text-blue-600 dark:text-blue-400">1.</span>
-                            <span><strong>Show Asset Selection:</strong> Point to the "Connected WhatsApp Number" section below (shows your WhatsApp Business phone number)</span>
-                          </li>
-                          <li className="flex gap-2">
-                            <span className="font-bold text-blue-600 dark:text-blue-400">2.</span>
-                            <span><strong>Send Test Message:</strong> Enter your phone number, type a message, and click "Send Message"</span>
-                          </li>
-                          <li className="flex gap-2">
-                            <span className="font-bold text-blue-600 dark:text-blue-400">3.</span>
-                            <span><strong>Show Delivery:</strong> Open WhatsApp on your phone and show the message arrived</span>
-                          </li>
-                          <li className="flex gap-2">
-                            <span className="font-bold text-blue-600 dark:text-blue-400">4.</span>
-                            <span><strong>Check Message Log:</strong> Scroll down to see the message in the "Sent Messages" log</span>
-                          </li>
-                        </ol>
-                      </div>
-                      <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-                        <p className="text-sm text-yellow-800 dark:text-yellow-300">
-                          <strong>⚠️ Important:</strong> Record in one continuous take showing all steps. Use English UI language and add captions if needed.
-                        </p>
-                      </div>
-                    </CardContent>
-                  </Card>
-
                   {/* Connected WhatsApp Number (Asset Selection) */}
                   <Card className="border-2 border-green-200 dark:border-green-800">
                     <CardHeader>
